@@ -9,6 +9,34 @@ import { v } from "convex/values";
 export default defineSchema({
 
   // ----------------------------------------------------------
+  // AUTHENTICATION
+  // ----------------------------------------------------------
+
+  /** System users with role-based access */
+  users: defineTable({
+    email: v.string(),
+    passwordHash: v.string(),
+    fullName: v.string(),
+    role: v.string(), // "admin", "user", "viewer"
+    googleEmail: v.optional(v.string()), // For Google Sheets sync access
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    lastLoginAt: v.optional(v.number()),
+  })
+    .index("by_email", ["email"])
+    .index("by_role", ["role"]),
+
+  /** Active user sessions */
+  sessions: defineTable({
+    userId: v.id("users"),
+    token: v.string(),
+    expiresAt: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_token", ["token"])
+    .index("by_user", ["userId"]),
+
+  // ----------------------------------------------------------
   // REFERENCE TABLES
   // ----------------------------------------------------------
 

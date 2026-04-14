@@ -1,13 +1,15 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import { Bell, Search, Filter } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Bell, Search, Filter, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { CURRENT_YEAR, DICT_PROJECTS } from "@/lib/types";
 import { useDashboardFilters } from "./DashboardFilterContext";
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
 
 const routeLabels: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -43,8 +45,38 @@ function getPageTitle(pathname: string): string {
 
 export function Header() {
   const pathname = usePathname();
+  const router = useRouter();
   const title = getPageTitle(pathname);
   const isDashboard = pathname === "/dashboard";
+  
+  const [user, setUser] = useState<any>(null);
+  const logout = useMutation(api.auth.logout);
+  
+  useEffect(() => {
+    const userData = localStorage.getItem("user");
+    if (userData) {
+      setUser(JSON.parse(userData));
+    }
+  }, []);
+  
+  async function handleLogout() {
+    const token = localStorage.getItem("auth_token");
+    if (token) {
+      try {
+        await logout({ token });
+      } catch (e) {
+        console.error("Logout error:", e);
+      }
+    }
+    
+    // Clear local storage and cookies
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("user");
+    document.cookie = "auth_token=; path=/; max-age=0";
+    
+    toast.success("Logged out successfully");
+    router.push("/signin");
+  }
   
   const provinces = useQuery(api.provinces.list);
   
@@ -124,6 +156,30 @@ export function Header() {
           <Bell className="w-5 h-5" />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
         </button>
+        
+        {/* User Menu */}
+        {user && (
+          <div className="flex items-center gap-2 ml-2 pl-2 border-l border-gray-200">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center text-white text-xs font-bold">
+                {user.fullName?.charAt(0).toUpperCase() || "U"}
+              </div>
+              <div className="hidden md:block">
+                <p className="text-xs font-semibold text-gray-800 leading-tight">{user.fullName}</p>
+                <p className="text-[10px] text-gray-400 leading-tight capitalize">{user.role}</p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              className="h-8 px-2 text-gray-500 hover:text-red-600 hover:bg-red-50"
+              title="Logout"
+            >
+              <LogOut className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
       </div>
     </header>
   );
