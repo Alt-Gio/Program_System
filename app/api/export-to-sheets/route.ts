@@ -19,10 +19,18 @@ import { google } from "googleapis";
 // - Scheduled data refreshes
 // ============================================================
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL ?? "");
+// Helper to get Convex client (moved from module scope to avoid build-time validation)
+function getConvexClient() {
+  const url = process.env.NEXT_PUBLIC_CONVEX_URL;
+  if (!url) {
+    throw new Error("NEXT_PUBLIC_CONVEX_URL environment variable is not set");
+  }
+  return new ConvexHttpClient(url);
+}
 
 export async function POST(request: NextRequest) {
   try {
+    const convex = getConvexClient();
     const { searchParams } = new URL(request.url);
     const yearParam = searchParams.get("year");
     const projectCode = searchParams.get("project");

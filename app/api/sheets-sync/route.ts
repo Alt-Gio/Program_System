@@ -46,7 +46,14 @@ import { api } from "@/convex/_generated/api";
 //   AD(29) Last Updated     — auto-timestamp, ignored
 // ============================================================
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL ?? "");
+// Helper to get Convex client (moved from module scope to avoid build-time validation)
+function getConvexClient() {
+  const url = process.env.NEXT_PUBLIC_CONVEX_URL;
+  if (!url) {
+    throw new Error("NEXT_PUBLIC_CONVEX_URL environment variable is not set");
+  }
+  return new ConvexHttpClient(url);
+}
 
 function normalizeDate(val: string): string {
   if (!val?.trim()) return "";
@@ -257,6 +264,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Call Convex bulk upsert ──
+    const convex = getConvexClient();
     const result = await convex.mutation(api.sheetsSync.bulkUpsertFromSheets, {
       projectId: projectId as any,
       sheetId,

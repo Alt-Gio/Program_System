@@ -1,6 +1,16 @@
 # 🚀 Deploy to Netlify NOW - Simple Steps
 
-## What I Fixed
+## ✅ Latest Fix Applied (Build-Time Validation Issue)
+
+**Fixed:** All API routes that were initializing ConvexHttpClient at module scope (causing build-time validation errors) have been updated to initialize the client inside the request handlers.
+
+**Files Fixed:**
+- ✅ `app/api/intern-sheets-sync/route.ts`
+- ✅ `app/api/sheets-sync/route.ts`
+- ✅ `app/api/looker-export/route.ts`
+- ✅ `app/api/export-to-sheets/route.ts`
+
+## What I Fixed Previously
 ✅ Removed Convex deployment from build process  
 ✅ Updated netlify.toml to use simple build  
 ✅ Removed build:netlify script  
