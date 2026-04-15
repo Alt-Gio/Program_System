@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
@@ -14,96 +14,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { ExtraFieldDef, ProjectDefinition } from "@/lib/types";
+import { R5_GEO } from "@/lib/r5-data";
+import { MapPickerModal, type PickedLocation } from "@/components/MapPickerModal";
 import {
   MapPin, CalendarDays, Users, Building2, FileText, Link2,
   CheckCircle2, ChevronRight, Loader2, Sparkles, FileSpreadsheet,
-  Tag, ClipboardList, Search, ImageIcon, Upload, X,
+  Tag, ClipboardList, ImageIcon, Upload, X,
 } from "lucide-react";
-
-// ── Mapbox Venue Search ───────────────────────────────────────
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
-
-function VenueSearchInput({ value, onChange, color }: { value: string; onChange: (v: string) => void; color: string }) {
-  const [query, setQuery]       = useState(value);
-  const [results, setResults]   = useState<{ name: string; place: string }[]>([]);
-  const [loading, setLoading]   = useState(false);
-  const [open, setOpen]         = useState(false);
-  const debounceRef             = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const wrapRef                 = useRef<HTMLDivElement>(null);
-
-  useEffect(() => { setQuery(value); }, [value]);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const search = useCallback((q: string) => {
-    if (!q.trim() || q.length < 3) { setResults([]); return; }
-    if (!MAPBOX_TOKEN) return;
-    setLoading(true);
-    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?access_token=${MAPBOX_TOKEN}&country=PH&limit=6&proximity=123.75,13.4`;
-    fetch(url)
-      .then(r => r.json())
-      .then(d => {
-        const feats = (d.features ?? []) as any[];
-        setResults(feats.map((f: any) => ({
-          name:  f.text ?? f.place_name,
-          place: f.place_name,
-        })));
-        setOpen(feats.length > 0);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
-  function handleChange(v: string) {
-    setQuery(v);
-    onChange(v);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (MAPBOX_TOKEN) debounceRef.current = setTimeout(() => search(v), 350);
-  }
-
-  function pick(place: string) {
-    setQuery(place); onChange(place); setResults([]); setOpen(false);
-  }
-
-  return (
-    <div ref={wrapRef} className="relative">
-      <div className="relative">
-        <Input
-          value={query}
-          onChange={e => handleChange(e.target.value)}
-          onFocus={() => results.length > 0 && setOpen(true)}
-          placeholder={MAPBOX_TOKEN ? "Search for a venue or place…" : "Enter venue or location name"}
-          className="h-9 text-sm pr-8"
-        />
-        {loading
-          ? <Loader2 className="absolute right-2.5 top-2.5 w-4 h-4 animate-spin text-gray-400" />
-          : MAPBOX_TOKEN
-            ? <Search className="absolute right-2.5 top-2.5 w-4 h-4 text-gray-300" />
-            : null}
-      </div>
-      {open && results.length > 0 && (
-        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
-          {results.map((r, i) => (
-            <button key={i} type="button" onMouseDown={() => pick(r.place)}
-              className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-start gap-2 border-b border-gray-100 last:border-0">
-              <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color }} />
-              <div>
-                <p className="text-sm font-medium text-gray-800 leading-tight">{r.name}</p>
-                <p className="text-[11px] text-gray-400 leading-tight">{r.place}</p>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ── Helper: render a single extra-field input ─────────────────
 function ExtraFieldInput({
@@ -234,6 +151,10 @@ export function AddActivityDialog({
   const [month,        setMonth]        = useState(new Date().getMonth() + 1);
   const [year,         setYear]         = useState(new Date().getFullYear());
 
+  // Venue map picker
+  const [mapOpen,     setMapOpen]     = useState(false);
+  const [venueCoords, setVenueCoords] = useState<{ lat: number; lng: number } | null>(null);
+
   // Image upload
   const fileInputRef                         = useRef<HTMLInputElement>(null);
   const [uploadedStorageId, setUploadedStorageId] = useState<string | null>(null);
@@ -266,6 +187,26 @@ export function AddActivityDialog({
     api.provinces.lgusByProvince,
     provinceId ? { provinceId: provinceId as any } : "skip",
   );
+
+  // Barangay list from R5_GEO, filtered by selected Province + LGU
+  const barangayList = useMemo(() => {
+    const prov = provinces?.find(p => p._id === provinceId)?.name;
+    const lgu  = lguList?.find(l => l._id === lguId)?.name;
+    if (!prov || !lgu) return [];
+    const provData = R5_GEO[prov];
+    if (!provData) return [];
+    // Try exact match first, then case-insensitive partial match
+    const lguData = provData[lgu]
+      ?? Object.entries(provData).find(([k]) =>
+          k.toLowerCase().includes(lgu.toLowerCase()) ||
+          lgu.toLowerCase().includes(k.toLowerCase())
+        )?.[1];
+    return lguData?.barangays.map(b => b.name) ?? [];
+  }, [provinces, lguList, provinceId, lguId]);
+
+  const [barangaySearch, setBarangaySearch] = useState("");
+  const [showBrgy,       setShowBrgy]       = useState(false);
+  const brgyRef = useRef<HTMLDivElement>(null);
 
   // Auto-update month/year from startDate
   useEffect(() => {
@@ -303,6 +244,7 @@ export function AddActivityDialog({
     setExtra({});
     setAfterReport(""); setFbLink(""); setPhotosLink(""); setTestimLink(""); setRemarks("");
     setUploadedStorageId(null);
+    setVenueCoords(null);
   }
 
   async function handleImageUpload(file: File) {
@@ -441,9 +383,47 @@ export function AddActivityDialog({
 
   const hasProjectFields = projectDef.extraFieldSchema.length > 0;
 
+  function handleMapConfirm(loc: PickedLocation) {
+    setVenue(loc.placeName);
+    setVenueCoords({ lat: loc.lat, lng: loc.lng });
+  }
+
   return (
-    <Dialog open={open} onOpenChange={v => { if (!saving) { if (!v) reset(); onOpenChange(v); } }}>
-      <DialogContent className="max-w-2xl max-h-[92vh] flex flex-col p-0 gap-0 overflow-hidden">
+    <>
+    <MapPickerModal
+      open={mapOpen}
+      onOpenChange={setMapOpen}
+      onConfirm={handleMapConfirm}
+      initialVenue={venue}
+      imageUrl={uploadedImageUrl ?? undefined}
+    />
+    <Dialog 
+      open={open} 
+      onOpenChange={v => { 
+        // Don't close if map picker is open
+        if (mapOpen) return;
+        if (!saving) { 
+          if (!v) reset(); 
+          onOpenChange(v); 
+        } 
+      }}
+      modal={!mapOpen}
+    >
+      <DialogContent 
+        className="max-w-2xl max-h-[92vh] flex flex-col p-0 gap-0 overflow-hidden"
+        onInteractOutside={(e) => {
+          // Prevent closing when clicking on map picker modal
+          if (mapOpen) {
+            e.preventDefault();
+          }
+        }}
+        onEscapeKeyDown={(e) => {
+          // Prevent closing with Escape when map picker is open
+          if (mapOpen) {
+            e.preventDefault();
+          }
+        }}
+      >
         {/* ── Header ── */}
         <DialogHeader className="px-6 pt-5 pb-4 border-b shrink-0"
           style={{ background: `linear-gradient(135deg, ${projectDef.color}08, transparent)` }}>
@@ -502,7 +482,7 @@ export function AddActivityDialog({
                     <Label className="text-xs font-semibold text-gray-600 mb-1 block">
                       Province <span className="text-red-500">*</span>
                     </Label>
-                    <Select value={provinceId} onValueChange={v => { setProvinceId(v); setLguId(""); }}>
+                    <Select value={provinceId} onValueChange={v => { setProvinceId(v); setLguId(""); setBarangay(""); setBarangaySearch(""); }}>
                       <SelectTrigger className="h-9 text-sm">
                         <SelectValue placeholder="Select province" />
                       </SelectTrigger>
@@ -515,7 +495,7 @@ export function AddActivityDialog({
                   </div>
                   <div>
                     <Label className="text-xs font-semibold text-gray-600 mb-1 block">LGU / Municipality</Label>
-                    <Select value={lguId} onValueChange={setLguId} disabled={!provinceId}>
+                    <Select value={lguId} onValueChange={v => { setLguId(v); setBarangay(""); setBarangaySearch(""); }} disabled={!provinceId}>
                       <SelectTrigger className="h-9 text-sm">
                         <SelectValue placeholder={provinceId ? "Select LGU" : "Select province first"} />
                       </SelectTrigger>
@@ -532,9 +512,46 @@ export function AddActivityDialog({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-xs font-semibold text-gray-600 mb-1 block">Barangay</Label>
-                    <Input value={barangay} onChange={e => setBarangay(e.target.value)}
-                      placeholder="e.g. Brgy. San Roque"
-                      className="h-9 text-sm" />
+                    {barangayList.length > 0 ? (
+                      <div ref={brgyRef} className="relative">
+                        <Input
+                          value={barangaySearch || barangay}
+                          onChange={e => {
+                            setBarangaySearch(e.target.value);
+                            setBarangay(e.target.value);
+                            setShowBrgy(true);
+                          }}
+                          onFocus={() => setShowBrgy(true)}
+                          onBlur={() => setTimeout(() => setShowBrgy(false), 150)}
+                          placeholder="Search barangay…"
+                          className="h-9 text-sm"
+                        />
+                        {showBrgy && (
+                          <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl overflow-y-auto max-h-44">
+                            {barangayList
+                              .filter(b => !barangaySearch || b.toLowerCase().includes(barangaySearch.toLowerCase()))
+                              .map(b => (
+                                <button key={b} type="button"
+                                  onMouseDown={() => { setBarangay(b); setBarangaySearch(""); setShowBrgy(false); }}
+                                  className="w-full text-left px-3 py-2 text-sm hover:bg-purple-50 border-b border-gray-100 last:border-0">
+                                  {b}
+                                </button>
+                              ))}
+                            {barangayList.filter(b => !barangaySearch || b.toLowerCase().includes(barangaySearch.toLowerCase())).length === 0 && (
+                              <p className="px-3 py-2 text-xs text-gray-400 italic">No match</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <Input
+                        value={barangay}
+                        onChange={e => setBarangay(e.target.value)}
+                        placeholder={lguId ? "Type barangay name…" : "Select LGU first"}
+                        disabled={!lguId}
+                        className="h-9 text-sm"
+                      />
+                    )}
                   </div>
                   <div />
                 </div>
@@ -543,11 +560,30 @@ export function AddActivityDialog({
                   <Label className="text-xs font-semibold text-gray-600 mb-1 block">
                     Venue <span className="text-red-500">*</span>
                   </Label>
-                  <VenueSearchInput value={venue} onChange={setVenue} color={projectDef.color} />
-                  {!MAPBOX_TOKEN && (
-                    <p className="text-[10px] text-gray-400 mt-1">
-                      Add <code>NEXT_PUBLIC_MAPBOX_TOKEN</code> to .env for place search autocomplete.
+                  <div className="flex gap-2">
+                    <div className={`flex-1 h-9 px-3 rounded-lg border text-sm flex items-center gap-2 ${
+                      venue ? "bg-white text-gray-800" : "bg-gray-50 text-gray-400"
+                    }`}>
+                      {venueCoords && <MapPin className="w-3.5 h-3.5 shrink-0 text-purple-600" />}
+                      <span className="truncate">{venue || "No location selected — click Pick on Map"}</span>
+                    </div>
+                    <Button type="button" size="sm" variant="outline"
+                      onClick={() => setMapOpen(true)}
+                      className="h-9 gap-1.5 shrink-0 border-purple-300 text-purple-700 hover:bg-purple-50">
+                      <MapPin className="w-3.5 h-3.5" />
+                      Pick on Map
+                    </Button>
+                  </div>
+                  {venueCoords && (
+                    <p className="text-[10px] text-gray-400 font-mono mt-1">
+                      {venueCoords.lat.toFixed(6)}, {venueCoords.lng.toFixed(6)}
                     </p>
+                  )}
+                  {venue && !venueCoords && (
+                    <button type="button" onClick={() => setMapOpen(true)}
+                      className="text-[10px] text-purple-600 hover:underline mt-0.5">
+                      Click Pick on Map to set exact coordinates
+                    </button>
                   )}
                 </div>
               </div>
@@ -818,5 +854,6 @@ export function AddActivityDialog({
         </Tabs>
       </DialogContent>
     </Dialog>
+    </>
   );
 }

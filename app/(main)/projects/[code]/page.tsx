@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useParams } from "next/navigation";
@@ -10,7 +10,7 @@ import {
   Monitor, Building2, Wifi, Network, Shield, GraduationCap,
   TrendingUp, Key, AlertTriangle, Globe,
   Plus, MapPin, Calendar, Users, ArrowLeft, Download,
-  CheckCircle2, ChevronRight, ExternalLink, Filter, FileSpreadsheet,
+  CheckCircle2, ChevronRight, ExternalLink, Filter, FileSpreadsheet, Loader2,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -574,9 +574,149 @@ function ProjectMap({ pins, projectColor, onProvinceClick, selectedProvince }: {
   onProvinceClick: (id: string | null) => void;
   selectedProvince: string | null;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef       = useRef<any>(null);
+  const markersRef   = useRef<Map<string, any>>(new Map());
+  const [mapReady, setMapReady] = useState(false);
+
+  // Init map once
+  useEffect(() => {
+    if (!containerRef.current || !MAPBOX_TOKEN) return;
+    let mounted = true;
+
+    (async () => {
+      const mapboxgl = (await import("mapbox-gl")).default;
+      if (!mounted) return;
+
+      if (!document.getElementById("mapbox-gl-css")) {
+        const link = document.createElement("link");
+        link.id   = "mapbox-gl-css";
+        link.rel  = "stylesheet";
+        link.href = "https://api.mapbox.com/mapbox-gl-js/v3.5.1/mapbox-gl.css";
+        document.head.appendChild(link);
+      }
+
+      mapboxgl.accessToken = MAPBOX_TOKEN!;
+
+      const map = new mapboxgl.Map({
+        container: containerRef.current!,
+        style: "mapbox://styles/mapbox/outdoors-v12",
+        center: [123.75, 13.45],
+        zoom: 7,
+        attributionControl: false,
+        interactive: true,
+      });
+
+      map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "bottom-right");
+      map.on("load", () => { if (mounted) setMapReady(true); });
+
+      mapRef.current = map;
+    })();
+
+    return () => {
+      mounted = false;
+      markersRef.current.forEach(m => m.remove());
+      markersRef.current.clear();
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Update markers whenever pins / selection change
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+
+    (async () => {
+      const mapboxgl = (await import("mapbox-gl")).default;
+
+      // Remove existing markers
+      markersRef.current.forEach(m => m.remove());
+      markersRef.current.clear();
+
+      const maxCount = Math.max(...pins.map(p => p.activityCount), 1);
+
+      for (const pin of pins) {
+        if (!pin.lat || !pin.lng || pin.activityCount === 0) continue;
+
+        const isSelected = selectedProvince === pin.provinceId;
+        const ratio      = pin.activityCount / maxCount;
+        const size       = Math.round(28 + ratio * 24);  // 28–52 px
+
+        const el = document.createElement("div");
+        el.style.cssText = [
+          `width:${size}px`,
+          `height:${size}px`,
+          `background:${isSelected ? "#1d4ed8" : projectColor}`,
+          `border:${isSelected ? 3 : 2.5}px solid ${isSelected ? "#93c5fd" : "rgba(255,255,255,0.9)"}`,
+          "border-radius:50%",
+          "display:flex",
+          "align-items:center",
+          "justify-content:center",
+          "cursor:pointer",
+          `box-shadow:0 2px 10px ${isSelected ? "rgba(29,78,216,0.5)" : "rgba(0,0,0,0.3)"}`,
+          "transition:all 0.15s",
+          "color:white",
+          `font-weight:700`,
+          `font-size:${size < 36 ? "10px" : "12px"}`,
+          "font-family:sans-serif",
+          "user-select:none",
+          "z-index:10",
+        ].join(";");
+        el.textContent = String(pin.activityCount);
+        el.title = `${pin.provinceName}: ${pin.activityCount} activities`;
+
+        el.addEventListener("click", (e) => {
+          e.stopPropagation();
+          onProvinceClick(selectedProvince === pin.provinceId ? null : pin.provinceId);
+        });
+
+        const popup = new mapboxgl.Popup({
+          offset: size / 2 + 4,
+          closeButton: false,
+          closeOnClick: false,
+          className: "province-popup",
+        }).setHTML(`
+          <div style="font-family:sans-serif;padding:6px 2px;">
+            <p style="font-weight:700;font-size:13px;margin:0 0 3px;color:#111">${pin.provinceName}</p>
+            <p style="font-size:11px;margin:0;color:#6b7280">
+              🗂 ${pin.activityCount} activities &nbsp;·&nbsp; 👥 ${pin.participantCount.toLocaleString()} participants
+            </p>
+          </div>
+        `);
+
+        el.addEventListener("mouseenter", () => popup.addTo(mapRef.current!));
+        el.addEventListener("mouseleave", () => popup.remove());
+
+        const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
+          .setLngLat([pin.lng, pin.lat])
+          .addTo(mapRef.current!);
+
+        markersRef.current.set(pin.provinceId, marker);
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapReady, pins, projectColor, selectedProvince]);
+
+  if (!MAPBOX_TOKEN) {
+    return (
+      <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg flex flex-col items-center justify-center gap-2 p-4">
+        <MapPin className="w-6 h-6 text-gray-400" />
+        <p className="text-xs text-gray-500 text-center font-medium">Map disabled</p>
+        <p className="text-[10px] text-gray-400 text-center">
+          Add <code className="bg-gray-200 px-1 rounded">NEXT_PUBLIC_MAPBOX_TOKEN</code> to .env.local
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center">
-      <p className="text-xs text-gray-400">Map visualization placeholder</p>
+    <div className="w-full h-full relative rounded-lg overflow-hidden">
+      <div ref={containerRef} className="w-full h-full" />
+      {!mapReady && (
+        <div className="absolute inset-0 bg-gray-100 flex items-center justify-center">
+          <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+        </div>
+      )}
     </div>
   );
 }
