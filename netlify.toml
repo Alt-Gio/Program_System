@@ -1,0 +1,15 @@
+[build]
+  command = "npm run build:netlify"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Environment variables needed for build
+# Make sure to set these in Netlify UI:
+# - CONVEX_DEPLOYMENT (your Convex deployment URL)
+# - NEXT_PUBLIC_CONVEX_URL (your public Convex URL)
+# - Any other environment variables your app needs

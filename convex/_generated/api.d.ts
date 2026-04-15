@@ -1,0 +1,91 @@
+/* eslint-disable */
+/**
+ * Generated `api` utility.
+ *
+ * THIS CODE IS AUTOMATICALLY GENERATED.
+ *
+ * To regenerate, run `npx convex dev`.
+ * @module
+ */
+
+import type * as activities from "../activities.js";
+import type * as activityImages from "../activityImages.js";
+import type * as auth from "../auth.js";
+import type * as crons from "../crons.js";
+import type * as dtcAnnouncements from "../dtcAnnouncements.js";
+import type * as dtcLogs from "../dtcLogs.js";
+import type * as dtcPcs from "../dtcPcs.js";
+import type * as dtcSettings from "../dtcSettings.js";
+import type * as files from "../files.js";
+import type * as gamification from "../gamification.js";
+import type * as highlightFields from "../highlightFields.js";
+import type * as http from "../http.js";
+import type * as images from "../images.js";
+import type * as internSheetsSync from "../internSheetsSync.js";
+import type * as interns from "../interns.js";
+import type * as otpCodes from "../otpCodes.js";
+import type * as personnel from "../personnel.js";
+import type * as projects from "../projects.js";
+import type * as provinces from "../provinces.js";
+import type * as sheetsActions from "../sheetsActions.js";
+import type * as sheetsSync from "../sheetsSync.js";
+import type * as subProjects from "../subProjects.js";
+
+import type {
+  ApiFromModules,
+  FilterApi,
+  FunctionReference,
+} from "convex/server";
+
+declare const fullApi: ApiFromModules<{
+  activities: typeof activities;
+  activityImages: typeof activityImages;
+  auth: typeof auth;
+  crons: typeof crons;
+  dtcAnnouncements: typeof dtcAnnouncements;
+  dtcLogs: typeof dtcLogs;
+  dtcPcs: typeof dtcPcs;
+  dtcSettings: typeof dtcSettings;
+  files: typeof files;
+  gamification: typeof gamification;
+  highlightFields: typeof highlightFields;
+  http: typeof http;
+  images: typeof images;
+  internSheetsSync: typeof internSheetsSync;
+  interns: typeof interns;
+  otpCodes: typeof otpCodes;
+  personnel: typeof personnel;
+  projects: typeof projects;
+  provinces: typeof provinces;
+  sheetsActions: typeof sheetsActions;
+  sheetsSync: typeof sheetsSync;
+  subProjects: typeof subProjects;
+}>;
+
+/**
+ * A utility for referencing Convex functions in your app's public API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = api.myModule.myFunction;
+ * ```
+ */
+export declare const api: FilterApi<
+  typeof fullApi,
+  FunctionReference<any, "public">
+>;
+
+/**
+ * A utility for referencing Convex functions in your app's internal API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = internal.myModule.myFunction;
+ * ```
+ */
+export declare const internal: FilterApi<
+  typeof fullApi,
+  FunctionReference<any, "internal">
+>;
+
+export declare const components: {};

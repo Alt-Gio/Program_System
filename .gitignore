@@ -45,9 +45,6 @@ next-env.d.ts
 # OS
 Thumbs.db
 
-# Convex
-.convex/
-convex/_generated/
 
 # Docker
 .dockerignore
