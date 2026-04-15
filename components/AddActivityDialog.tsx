@@ -410,7 +410,7 @@ export function AddActivityDialog({
       modal={!mapOpen}
     >
       <DialogContent 
-        className="max-w-2xl max-h-[92vh] flex flex-col p-0 gap-0 overflow-hidden"
+        className="max-w-2xl max-h-[92vh] sm:max-h-[92vh] max-h-[96vh] flex flex-col p-0 gap-0 overflow-hidden w-[96vw] sm:w-auto"
         onInteractOutside={(e) => {
           // Prevent closing when clicking on map picker modal
           if (mapOpen) {
@@ -425,23 +425,23 @@ export function AddActivityDialog({
         }}
       >
         {/* ── Header ── */}
-        <DialogHeader className="px-6 pt-5 pb-4 border-b shrink-0"
+        <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b shrink-0"
           style={{ background: `linear-gradient(135deg, ${projectDef.color}08, transparent)` }}>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0"
               style={{ backgroundColor: `${projectDef.color}15`, border: `1.5px solid ${projectDef.color}30` }}>
-              <Sparkles className="w-5 h-5" style={{ color: projectDef.color }} />
+              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: projectDef.color }} />
             </div>
-            <div>
-              <DialogTitle className="text-base font-bold leading-tight">
+            <div className="flex-1 min-w-0">
+              <DialogTitle className="text-sm sm:text-base font-bold leading-tight truncate">
                 Add Activity — {projectDef.shortName}
               </DialogTitle>
-              <DialogDescription className="text-xs mt-0.5">
+              <DialogDescription className="text-[10px] sm:text-xs mt-0.5 truncate">
                 {projectDef.name} · {projectDef.division}
               </DialogDescription>
             </div>
             {sheetConn?.syncEnabled && (
-              <Badge variant="outline" className="ml-auto text-xs gap-1 shrink-0"
+              <Badge variant="outline" className="ml-auto text-[10px] sm:text-xs gap-1 shrink-0 hidden sm:flex"
                 style={{ color: projectDef.color, borderColor: `${projectDef.color}40` }}>
                 <FileSpreadsheet className="w-3 h-3" />
                 Sheet sync ON
