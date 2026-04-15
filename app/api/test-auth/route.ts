@@ -10,7 +10,8 @@ export async function GET() {
       hasSession: !!session,
       user: session?.user?.email,
       hasAccessToken: !!(session as any)?.accessToken,
-      session: session,
+      error: (session as any)?.error ?? null,
+      expiresAt: (session as any)?.expiresAt ?? null,
     });
   } catch (error) {
     return NextResponse.json({

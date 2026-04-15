@@ -11,7 +11,7 @@ import {
   Monitor, Building2, Wifi, Network, Shield,
   GraduationCap, TrendingUp, Key, AlertTriangle, Globe,
   CheckCircle2, Clock, Users, Activity, ArrowRight, MapPin, Calendar,
-  Download, ChevronLeft, ChevronRight, Heart, Filter,
+  Download, ChevronLeft, ChevronRight, Heart, Filter, FileSpreadsheet,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -57,6 +57,7 @@ const MONTHS = [
 
 export default function DashboardPage() {
   const { selectedProvince, selectedYear, selectedMonth, selectedProgram } = useDashboardFilters();
+  const [isExporting, setIsExporting] = useState(false);
   
   const summary = useQuery(api.activities.dashboardSummary, { 
     year: selectedYear,
@@ -68,6 +69,34 @@ export default function DashboardPage() {
   const seedProjects = useMutation(api.projects.seed);
   const seedProvinces = useMutation(api.provinces.seed);
   const seedPersonnel = useMutation(api.personnel.seed);
+
+  const handleExportToSheets = async () => {
+    setIsExporting(true);
+    try {
+      const year = selectedYear === "all" ? CURRENT_YEAR : selectedYear;
+      const params = new URLSearchParams({ year: String(year) });
+      if (selectedProgram !== "all") params.append("project", selectedProgram);
+      if (selectedMonth !== 0) params.append("month", String(selectedMonth));
+
+      const response = await fetch(`/api/export-to-sheets?${params.toString()}`, {
+        method: "POST",
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.sheetUrl) {
+        window.open(data.sheetUrl, "_blank");
+        alert(`✅ ${data.message}\n\nSheet: ${data.sheetName}\nRows: ${data.rowCount}\nFilters: ${data.filters}`);
+      } else {
+        alert(`❌ Export failed: ${data.error}\n\n${data.hint || ""}`);
+      }
+    } catch (error) {
+      console.error("Export error:", error);
+      alert("❌ Failed to export to Google Sheets. Please try again.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   useEffect(() => {
     seedProjects();
@@ -155,11 +184,23 @@ export default function DashboardPage() {
                   </div>
                 ))}
               </div>
-              <a href={`/api/looker-export?year=${selectedYear === "all" ? CURRENT_YEAR : selectedYear}`} target="_blank" rel="noopener noreferrer" className="block mt-3">
-                <Button size="sm" variant="outline" className="w-full gap-1.5 text-xs">
-                  <Download className="w-3.5 h-3.5" /> Export CSV
+              <div className="flex gap-2 mt-3">
+                <a href={`/api/looker-export?year=${selectedYear === "all" ? CURRENT_YEAR : selectedYear}`} target="_blank" rel="noopener noreferrer" className="flex-1">
+                  <Button size="sm" variant="outline" className="w-full gap-1.5 text-xs">
+                    <Download className="w-3.5 h-3.5" /> Export CSV
+                  </Button>
+                </a>
+                <Button 
+                  size="sm" 
+                  variant="default" 
+                  className="flex-1 gap-1.5 text-xs"
+                  onClick={handleExportToSheets}
+                  disabled={isExporting}
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" /> 
+                  {isExporting ? "Exporting..." : "Export to Sheets"}
                 </Button>
-              </a>
+              </div>
             </CardContent>
           </Card>
         </div>

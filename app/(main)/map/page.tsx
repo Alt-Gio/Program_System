@@ -6,7 +6,7 @@ import { api } from "@/convex/_generated/api";
 import {
   Globe, MapPin, ChevronRight, Filter, ExternalLink,
   ChevronLeft, Building2, Home, Users, PanelLeftClose, PanelLeftOpen,
-  BarChart3,
+  BarChart3, Download, FileSpreadsheet,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -89,6 +89,7 @@ export default function MapPage() {
   const [viewState, setViewState]         = useState({ longitude: 123.5, latitude: 13.0, zoom: 7.5 });
   const [MapLib, setMapLib]               = useState<any>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // ── Convex queries ──────────────────────────────────────────
   const filterProjectData = useQuery(
@@ -126,6 +127,32 @@ export default function MapPage() {
       ? { provinceId: selProvince.provinceId as any, year: CURRENT_YEAR }
       : "skip"
   );
+
+  const handleExportToSheets = async () => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams({ year: String(CURRENT_YEAR) });
+      if (filterProject !== "all") params.append("project", filterProject);
+
+      const response = await fetch(`/api/export-to-sheets?${params.toString()}`, {
+        method: "POST",
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.sheetUrl) {
+        window.open(data.sheetUrl, "_blank");
+        alert(`✅ ${data.message}\n\nSheet: ${data.sheetName}\nRows: ${data.rowCount}`);
+      } else {
+        alert(`❌ Export failed: ${data.error}\n\n${data.hint || ""}`);
+      }
+    } catch (error) {
+      console.error("Export error:", error);
+      alert("❌ Failed to export to Google Sheets. Please try again.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // ── Load Mapbox ─────────────────────────────────────────────
   useEffect(() => {
@@ -311,6 +338,23 @@ export default function MapPage() {
                         {DICT_PROJECTS.map(p => <SelectItem key={p.code} value={p.code}>{p.shortName}</SelectItem>)}
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <a href={`/api/looker-export?year=${CURRENT_YEAR}${filterProject !== "all" ? `&project=${filterProject}` : ""}`} target="_blank" rel="noopener noreferrer" className="flex-1">
+                      <Button size="sm" variant="outline" className="w-full gap-1.5 text-[10px] h-7">
+                        <Download className="w-3 h-3" /> CSV
+                      </Button>
+                    </a>
+                    <Button 
+                      size="sm" 
+                      variant="default" 
+                      className="flex-1 gap-1.5 text-[10px] h-7"
+                      onClick={handleExportToSheets}
+                      disabled={isExporting}
+                    >
+                      <FileSpreadsheet className="w-3 h-3" /> 
+                      {isExporting ? "..." : "Sheets"}
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

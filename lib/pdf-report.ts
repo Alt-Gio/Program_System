@@ -1,5 +1,5 @@
 // ============================================================
-// PDF Report Generator � DICT Region V PMS
+// PDF Report Generator - DICT Region V PMS
 // ============================================================
 
 import jsPDF from "jspdf";
@@ -56,6 +56,11 @@ export async function generatePDFReport(config: ReportConfig): Promise<Generated
   drawHeader(doc, config, project, primaryColor, PAGE_W);
   drawByMonthChart(doc, config, primaryColor, PAGE_W, PAGE_H);
 
+  doc.addPage();
+  drawHeader(doc, config, project, primaryColor, PAGE_W);
+  drawParticipantPieChart(doc, config, primaryColor, PAGE_W, PAGE_H);
+  drawProvinceBarChart(doc, config, primaryColor, PAGE_W, PAGE_H);
+
   const pageCount = doc.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
@@ -84,7 +89,7 @@ function drawCoverPage(doc: jsPDF, config: ReportConfig, project: ReturnType<typ
   doc.text("Department of Information and Communications Technology", 37, 30);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text("Region V � Bicol", 37, 38);
+  doc.text("Region V - Bicol", 37, 38);
 
   doc.setTextColor(40, 40, 40);
   doc.setFont("helvetica", "bold");
@@ -142,7 +147,7 @@ function drawHeader(doc: jsPDF, config: ReportConfig, project: ReturnType<typeof
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
-  doc.text("DICT Region V � " + (project?.name ?? "Consolidated Report"), 10, 11);
+  doc.text("DICT Region V - " + (project?.name ?? "Consolidated Report"), 10, 11);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.text(config.periodLabel + " | " + config.fy, pw - 10, 11, { align: "right" });
@@ -237,12 +242,26 @@ function drawActivitiesTable(doc: jsPDF, config: ReportConfig, color: RGB) {
       a.participants.lgu.male + a.participants.lgu.female +
       a.participants.suc.male + a.participants.suc.female +
       a.participants.others.male + a.participants.others.female;
+    
+    // Clean and format text for better readability
+    const monthText = MONTHS[a.month - 1]?.slice(0, 3) ?? String(a.month);
+    const lguText = a.lguName || "N/A";
+    const titleText = a.activityTitle.length > 35 
+      ? a.activityTitle.slice(0, 32) + "..." 
+      : a.activityTitle;
+    const venueText = a.venue.length > 25 
+      ? a.venue.slice(0, 22) + "..." 
+      : a.venue;
+    
     return [
-      MONTHS[a.month - 1]?.slice(0, 3) ?? a.month,
-      a.provinceName, a.lguName ?? "�",
-      a.activityTitle.length > 35 ? a.activityTitle.slice(0, 35) + "�" : a.activityTitle,
-      a.venue.length > 25 ? a.venue.slice(0, 25) + "�" : a.venue,
-      a.modeOfConduct, total.toLocaleString(), a.status,
+      monthText,
+      a.provinceName,
+      lguText,
+      titleText,
+      venueText,
+      a.modeOfConduct,
+      total.toLocaleString(),
+      a.status,
     ];
   });
 
@@ -250,13 +269,28 @@ function drawActivitiesTable(doc: jsPDF, config: ReportConfig, color: RGB) {
     startY: y + 4,
     head: [["Month", "Province", "LGU", "Activity Title", "Venue", "Mode", "Participants", "Status"]],
     body: rows,
-    styles: { fontSize: 7.5, cellPadding: 2.5, overflow: "linebreak" },
-    headStyles: { fillColor: [color.r, color.g, color.b], textColor: [255, 255, 255], fontStyle: "bold" },
+    styles: { 
+      fontSize: 7.5, 
+      cellPadding: 2.5, 
+      overflow: "linebreak",
+      valign: "middle"
+    },
+    headStyles: { 
+      fillColor: [color.r, color.g, color.b], 
+      textColor: [255, 255, 255], 
+      fontStyle: "bold",
+      halign: "center"
+    },
     alternateRowStyles: { fillColor: [248, 248, 250] },
     columnStyles: {
-      0: { cellWidth: 14 }, 1: { cellWidth: 22 }, 2: { cellWidth: 25 },
-      3: { cellWidth: 60 }, 4: { cellWidth: 45 }, 5: { cellWidth: 22 },
-      6: { cellWidth: 20, halign: "right" }, 7: { cellWidth: 20 },
+      0: { cellWidth: 14, halign: "center" },
+      1: { cellWidth: 22 },
+      2: { cellWidth: 25 },
+      3: { cellWidth: 60 },
+      4: { cellWidth: 45 },
+      5: { cellWidth: 22, halign: "center" },
+      6: { cellWidth: 20, halign: "right", fontStyle: "bold" },
+      7: { cellWidth: 20, halign: "center" },
     },
     margin: { left: 10, right: 10 },
   });
@@ -273,11 +307,24 @@ function drawParticipantBreakdown(doc: jsPDF, config: ReportConfig, color: RGB) 
     const p = a.participants;
     const total = p.nga.male + p.nga.female + p.lgu.male + p.lgu.female +
       p.suc.male + p.suc.female + p.others.male + p.others.female;
+    
+    // Clean title text
+    const titleText = a.activityTitle.length > 30 
+      ? a.activityTitle.slice(0, 27) + "..." 
+      : a.activityTitle;
+    
     return [
-      a.activityTitle.length > 30 ? a.activityTitle.slice(0, 30) + "�" : a.activityTitle,
+      titleText,
       a.provinceName,
-      p.nga.male, p.nga.female, p.lgu.male, p.lgu.female,
-      p.suc.male, p.suc.female, p.others.male, p.others.female, total,
+      p.nga.male,
+      p.nga.female,
+      p.lgu.male,
+      p.lgu.female,
+      p.suc.male,
+      p.suc.female,
+      p.others.male,
+      p.others.female,
+      total,
     ];
   });
 
@@ -285,10 +332,24 @@ function drawParticipantBreakdown(doc: jsPDF, config: ReportConfig, color: RGB) 
     startY: y + 4,
     head: [["Activity", "Province", "NGA M", "NGA F", "LGU M", "LGU F", "SUC M", "SUC F", "Oth M", "Oth F", "Total"]],
     body: rows,
-    styles: { fontSize: 7, cellPadding: 2, halign: "center" },
-    headStyles: { fillColor: [color.r, color.g, color.b], textColor: [255, 255, 255], fontStyle: "bold" },
+    styles: { 
+      fontSize: 7, 
+      cellPadding: 2, 
+      halign: "center",
+      valign: "middle"
+    },
+    headStyles: { 
+      fillColor: [color.r, color.g, color.b], 
+      textColor: [255, 255, 255], 
+      fontStyle: "bold",
+      fontSize: 7
+    },
     alternateRowStyles: { fillColor: [248, 248, 250] },
-    columnStyles: { 0: { halign: "left", cellWidth: 65 }, 1: { halign: "left", cellWidth: 25 }, 10: { fontStyle: "bold" } },
+    columnStyles: {
+      0: { halign: "left", cellWidth: 65 },
+      1: { halign: "left", cellWidth: 25 },
+      10: { fontStyle: "bold", fillColor: [240, 240, 240] }
+    },
     margin: { left: 10, right: 10 },
   });
 }
@@ -310,18 +371,53 @@ function drawByProvinceSummary(doc: jsPDF, config: ReportConfig, color: RGB) {
       a.participants.suc.male + a.participants.suc.female +
       a.participants.others.male + a.participants.others.female;
   }
-  const total = Object.values(byProv).reduce((s, v) => ({ count: s.count + v.count, participants: s.participants + v.participants }), { count: 0, participants: 0 });
-  const rows = Object.entries(byProv).map(([prov, d]) => [prov, d.count, d.participants.toLocaleString(), pct(d.count, total.count), pct(d.participants, total.participants)]);
+  
+  const total = Object.values(byProv).reduce(
+    (s, v) => ({ count: s.count + v.count, participants: s.participants + v.participants }),
+    { count: 0, participants: 0 }
+  );
+  
+  // Sort by activity count descending
+  const rows = Object.entries(byProv)
+    .sort(([, a], [, b]) => b.count - a.count)
+    .map(([prov, d]) => [
+      prov,
+      d.count,
+      d.participants.toLocaleString(),
+      pct(d.count, total.count),
+      pct(d.participants, total.participants)
+    ]);
 
   autoTable(doc, {
     startY: y + 4,
     head: [["Province", "Activities", "Participants", "% Activities", "% Participants"]],
     body: rows,
     foot: [["TOTAL", total.count, total.participants.toLocaleString(), "100%", "100%"]],
-    styles: { fontSize: 9, cellPadding: 3 },
-    headStyles: { fillColor: [color.r, color.g, color.b], textColor: [255, 255, 255], fontStyle: "bold" },
-    footStyles: { fillColor: [240, 240, 240], fontStyle: "bold" },
+    styles: { 
+      fontSize: 9, 
+      cellPadding: 3,
+      valign: "middle"
+    },
+    headStyles: { 
+      fillColor: [color.r, color.g, color.b], 
+      textColor: [255, 255, 255], 
+      fontStyle: "bold",
+      halign: "center"
+    },
+    footStyles: { 
+      fillColor: [color.r, color.g, color.b], 
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+      halign: "center"
+    },
     alternateRowStyles: { fillColor: [248, 248, 248] },
+    columnStyles: {
+      0: { halign: "left", fontStyle: "bold" },
+      1: { halign: "center" },
+      2: { halign: "right" },
+      3: { halign: "center" },
+      4: { halign: "center" },
+    },
     margin: { left: 10, right: 10 },
   });
 }
@@ -331,39 +427,384 @@ function drawByMonthChart(doc: jsPDF, config: ReportConfig, color: RGB, pw: numb
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
   doc.setTextColor(30, 30, 30);
-  doc.text("Monthly Activity Count", 10, y);
-  y += 8;
+  doc.text("Monthly Activity Trend", 10, y);
+  
+  // Add subtitle
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(100, 100, 100);
+  doc.text("Number of activities conducted per month", 10, y + 6);
+  y += 12;
 
   const byMonth: Record<number, number> = {};
-  for (const a of config.activities) { byMonth[a.month] = (byMonth[a.month] || 0) + 1; }
+  for (const a of config.activities) {
+    byMonth[a.month] = (byMonth[a.month] || 0) + 1;
+  }
   const maxVal = Math.max(...Object.values(byMonth), 1);
-  const chartX = 20, chartY = y, chartW = pw - 40, chartH = 60;
-  const barW = chartW / 12 - 4;
+  const chartX = 20, chartY = y, chartW = pw - 40, chartH = 70;
+  const barW = (chartW / 12) - 6;
 
-  doc.setDrawColor(180, 180, 180);
+  // Draw chart background
+  doc.setFillColor(250, 250, 250);
+  doc.roundedRect(chartX - 5, chartY - 5, chartW + 10, chartH + 20, 3, 3, "F");
+
+  // Draw grid lines
+  doc.setDrawColor(220, 220, 220);
+  doc.setLineWidth(0.3);
+  for (let i = 0; i <= 4; i++) {
+    const gridY = chartY + (chartH / 4) * i;
+    doc.line(chartX, gridY, chartX + chartW, gridY);
+    // Add value labels on Y-axis
+    const val = Math.round(maxVal * (1 - i / 4));
+    doc.setFontSize(7);
+    doc.setTextColor(120, 120, 120);
+    doc.text(val.toString(), chartX - 8, gridY + 2, { align: "right" });
+  }
+
+  // Draw axes
+  doc.setDrawColor(100, 100, 100);
+  doc.setLineWidth(0.5);
   doc.line(chartX, chartY, chartX, chartY + chartH);
   doc.line(chartX, chartY + chartH, chartX + chartW, chartY + chartH);
 
+  // Draw bars with gradient effect
   for (let m = 1; m <= 12; m++) {
     const val = byMonth[m] ?? 0;
     const barH = (val / maxVal) * chartH;
-    const x = chartX + (m - 1) * (chartW / 12) + 2;
+    const x = chartX + (m - 1) * (chartW / 12) + 3;
     const barY = chartY + chartH - barH;
+    
     if (val > 0) {
-      doc.setFillColor(color.r, color.g, color.b);
-      doc.rect(x, barY, barW, barH, "F");
+      // Draw shadow
+      doc.setFillColor(200, 200, 200);
+      doc.rect(x + 1, barY + 1, barW, barH, "F");
+      
+      // Draw main bar with gradient colors
+      const intensity = val / maxVal;
+      const r = Math.round(color.r + (255 - color.r) * (1 - intensity));
+      const g = Math.round(color.g + (255 - color.g) * (1 - intensity));
+      const b = Math.round(color.b + (255 - color.b) * (1 - intensity));
+      doc.setFillColor(r, g, b);
+      doc.roundedRect(x, barY, barW, barH, 1, 1, "F");
+      
+      // Draw border
+      doc.setDrawColor(color.r, color.g, color.b);
+      doc.setLineWidth(0.5);
+      doc.roundedRect(x, barY, barW, barH, 1, 1, "S");
+      
+      // Value label on top of bar
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(7);
+      doc.setFontSize(8);
       doc.setTextColor(color.r, color.g, color.b);
-      doc.text(val.toString(), x + barW / 2, barY - 2, { align: "center" });
+      doc.text(val.toString(), x + barW / 2, barY - 3, { align: "center" });
     } else {
-      doc.setFillColor(220, 220, 220);
-      doc.rect(x, chartY + chartH - 1, barW, 1, "F");
+      // Empty month indicator
+      doc.setFillColor(230, 230, 230);
+      doc.rect(x, chartY + chartH - 2, barW, 2, "F");
     }
+    
+    // Month labels
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7);
+    doc.setTextColor(80, 80, 80);
+    doc.text(MONTHS[m - 1].slice(0, 3), x + barW / 2, chartY + chartH + 6, { align: "center" });
+  }
+
+  // Add legend/summary
+  const totalActivities = Object.values(byMonth).reduce((sum, val) => sum + val, 0);
+  const avgPerMonth = (totalActivities / 12).toFixed(1);
+  const activeMonths = Object.keys(byMonth).length;
+  
+  y = chartY + chartH + 15;
+  doc.setFillColor(240, 245, 255);
+  doc.roundedRect(chartX, y, chartW, 18, 2, 2, "F");
+  
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(60, 60, 60);
+  doc.text("Summary:", chartX + 5, y + 6);
+  
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.text(`Total: ${totalActivities} activities`, chartX + 25, y + 6);
+  doc.text(`Average: ${avgPerMonth} per month`, chartX + 70, y + 6);
+  doc.text(`Active Months: ${activeMonths}/12`, chartX + 130, y + 6);
+  
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(7);
+  doc.setTextColor(100, 100, 100);
+  doc.text(`Peak Month: ${MONTHS[Number(Object.entries(byMonth).sort(([, a], [, b]) => b - a)[0]?.[0] ?? 1) - 1]}`, chartX + 5, y + 13);
+}
+
+function drawParticipantPieChart(doc: jsPDF, config: ReportConfig, color: RGB, pw: number, ph: number) {
+  let y = 28;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(30, 30, 30);
+  doc.text("Participant Distribution by Sector", 10, y);
+  
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(100, 100, 100);
+  doc.text("Breakdown of participants across different sectors", 10, y + 6);
+  y += 15;
+
+  const activities = config.activities;
+  const sectors = [
+    {
+      name: "NGA",
+      value: sum(activities, a => a.participants.nga.male + a.participants.nga.female),
+      color: { r: 59, g: 130, b: 246 } // Blue
+    },
+    {
+      name: "LGU",
+      value: sum(activities, a => a.participants.lgu.male + a.participants.lgu.female),
+      color: { r: 16, g: 185, b: 129 } // Green
+    },
+    {
+      name: "SUC",
+      value: sum(activities, a => a.participants.suc.male + a.participants.suc.female),
+      color: { r: 245, g: 158, b: 11 } // Orange
+    },
+    {
+      name: "Others",
+      value: sum(activities, a => a.participants.others.male + a.participants.others.female),
+      color: { r: 139, g: 92, b: 246 } // Purple
+    },
+  ];
+
+  const total = sectors.reduce((sum, s) => sum + s.value, 0);
+  if (total === 0) return;
+
+  // Draw pie chart
+  const centerX = pw / 3;
+  const centerY = y + 40;
+  const radius = 35;
+  
+  let startAngle = -90; // Start from top
+  
+  sectors.forEach((sector, idx) => {
+    const percentage = (sector.value / total) * 100;
+    const sliceAngle = (sector.value / total) * 360;
+    const endAngle = startAngle + sliceAngle;
+    
+    if (sector.value > 0) {
+      // Draw slice
+      doc.setFillColor(sector.color.r, sector.color.g, sector.color.b);
+      drawPieSlice(doc, centerX, centerY, radius, startAngle, endAngle);
+      
+      // Draw slice border
+      doc.setDrawColor(255, 255, 255);
+      doc.setLineWidth(1);
+      drawPieSlice(doc, centerX, centerY, radius, startAngle, endAngle, true);
+      
+      // Draw percentage label on slice
+      if (percentage > 5) {
+        const labelAngle = startAngle + sliceAngle / 2;
+        const labelRadius = radius * 0.7;
+        const labelX = centerX + labelRadius * Math.cos((labelAngle * Math.PI) / 180);
+        const labelY = centerY + labelRadius * Math.sin((labelAngle * Math.PI) / 180);
+        
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.setTextColor(255, 255, 255);
+        doc.text(`${percentage.toFixed(1)}%`, labelX, labelY, { align: "center" });
+      }
+    }
+    
+    startAngle = endAngle;
+  });
+
+  // Draw center circle for donut effect
+  doc.setFillColor(255, 255, 255);
+  doc.circle(centerX, centerY, radius * 0.4, "F");
+  
+  // Total in center
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.setTextColor(60, 60, 60);
+  doc.text(total.toLocaleString(), centerX, centerY - 3, { align: "center" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(120, 120, 120);
+  doc.text("Total", centerX, centerY + 4, { align: "center" });
+
+  // Legend
+  const legendX = pw / 2 + 10;
+  let legendY = y + 10;
+  
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(60, 60, 60);
+  doc.text("Legend", legendX, legendY);
+  legendY += 8;
+
+  sectors.forEach((sector, idx) => {
+    const percentage = (sector.value / total) * 100;
+    
+    // Color box
+    doc.setFillColor(sector.color.r, sector.color.g, sector.color.b);
+    doc.roundedRect(legendX, legendY - 3, 6, 6, 1, 1, "F");
+    
+    // Sector name
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(60, 60, 60);
+    doc.text(sector.name, legendX + 10, legendY + 1);
+    
+    // Value and percentage
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
     doc.setTextColor(100, 100, 100);
-    doc.text(MONTHS[m - 1].slice(0, 3), x + barW / 2, chartY + chartH + 5, { align: "center" });
+    doc.text(`${sector.value.toLocaleString()} (${percentage.toFixed(1)}%)`, legendX + 30, legendY + 1);
+    
+    legendY += 10;
+  });
+
+  // Gender breakdown
+  legendY += 5;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(60, 60, 60);
+  doc.text("Gender Distribution", legendX, legendY);
+  legendY += 8;
+
+  const totalMale = sum(activities, a => 
+    a.participants.nga.male + a.participants.lgu.male + 
+    a.participants.suc.male + a.participants.others.male
+  );
+  const totalFemale = sum(activities, a => 
+    a.participants.nga.female + a.participants.lgu.female + 
+    a.participants.suc.female + a.participants.others.female
+  );
+
+  // Male
+  doc.setFillColor(59, 130, 246);
+  doc.roundedRect(legendX, legendY - 3, 6, 6, 1, 1, "F");
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(60, 60, 60);
+  doc.text(`Male: ${totalMale.toLocaleString()} (${pct(totalMale, total)})`, legendX + 10, legendY + 1);
+  
+  legendY += 8;
+  
+  // Female
+  doc.setFillColor(236, 72, 153);
+  doc.roundedRect(legendX, legendY - 3, 6, 6, 1, 1, "F");
+  doc.text(`Female: ${totalFemale.toLocaleString()} (${pct(totalFemale, total)})`, legendX + 10, legendY + 1);
+}
+
+function drawProvinceBarChart(doc: jsPDF, config: ReportConfig, color: RGB, pw: number, ph: number) {
+  let y = 115;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(30, 30, 30);
+  doc.text("Activities by Province", 10, y);
+  
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(100, 100, 100);
+  doc.text("Geographic distribution of activities", 10, y + 6);
+  y += 12;
+
+  const byProv: Record<string, number> = {};
+  for (const a of config.activities) {
+    byProv[a.provinceName] = (byProv[a.provinceName] || 0) + 1;
+  }
+
+  const sortedProvinces = Object.entries(byProv)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 6); // Top 6 provinces
+
+  if (sortedProvinces.length === 0) return;
+
+  const maxVal = sortedProvinces[0][1];
+  const chartX = 20;
+  const chartY = y;
+  const chartW = pw - 40;
+  const barH = 12;
+  const spacing = 4;
+
+  sortedProvinces.forEach(([province, count], idx) => {
+    const barY = chartY + idx * (barH + spacing);
+    const barWidth = (count / maxVal) * (chartW - 80);
+    
+    // Province name
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(60, 60, 60);
+    doc.text(province, chartX, barY + 8);
+    
+    // Bar background
+    doc.setFillColor(240, 240, 240);
+    doc.roundedRect(chartX + 70, barY, chartW - 80, barH, 2, 2, "F");
+    
+    // Bar
+    const intensity = count / maxVal;
+    const r = Math.round(color.r + (255 - color.r) * (1 - intensity));
+    const g = Math.round(color.g + (255 - color.g) * (1 - intensity));
+    const b = Math.round(color.b + (255 - color.b) * (1 - intensity));
+    doc.setFillColor(r, g, b);
+    doc.roundedRect(chartX + 70, barY, barWidth, barH, 2, 2, "F");
+    
+    // Value label
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(color.r, color.g, color.b);
+    doc.text(count.toString(), chartX + 70 + barWidth + 5, barY + 8);
+    
+    // Percentage
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(120, 120, 120);
+    const totalActivities = Object.values(byProv).reduce((sum, val) => sum + val, 0);
+    doc.text(`(${((count / totalActivities) * 100).toFixed(1)}%)`, chartX + 70 + barWidth + 15, barY + 8);
+  });
+}
+
+// Helper function to draw pie slices
+function drawPieSlice(
+  doc: jsPDF,
+  centerX: number,
+  centerY: number,
+  radius: number,
+  startAngle: number,
+  endAngle: number,
+  strokeOnly: boolean = false
+) {
+  const startRad = (startAngle * Math.PI) / 180;
+  const endRad = (endAngle * Math.PI) / 180;
+  
+  doc.setLineWidth(strokeOnly ? 1 : 0.1);
+  
+  // Move to center
+  const path: any[] = [];
+  path.push({ op: "m", c: [centerX, centerY] });
+  
+  // Line to start of arc
+  path.push({
+    op: "l",
+    c: [centerX + radius * Math.cos(startRad), centerY + radius * Math.sin(startRad)]
+  });
+  
+  // Draw arc
+  const steps = Math.max(Math.ceil(Math.abs(endAngle - startAngle) / 5), 1);
+  for (let i = 1; i <= steps; i++) {
+    const angle = startRad + ((endRad - startRad) * i) / steps;
+    path.push({
+      op: "l",
+      c: [centerX + radius * Math.cos(angle), centerY + radius * Math.sin(angle)]
+    });
+  }
+  
+  // Close path
+  path.push({ op: "l", c: [centerX, centerY] });
+  
+  // Draw the path
+  if (strokeOnly) {
+    doc.lines(path.map(p => p.c), centerX, centerY, [1, 1], "S");
+  } else {
+    doc.lines(path.map(p => p.c), centerX, centerY, [1, 1], "F");
   }
 }
 

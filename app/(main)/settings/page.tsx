@@ -652,33 +652,69 @@ export default function SettingsPage() {
             </svg>
             Google Account
           </CardTitle>
-          <CardDescription className="text-xs">Required to read Google Sheets data</CardDescription>
+          <CardDescription className="text-xs">
+            Required to read <strong>and write</strong> Google Sheets data (sync + add activity)
+          </CardDescription>
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent className="pt-0 space-y-3">
           {!serverAuth ? (
             <Skeleton className="h-12 w-full rounded-lg" />
           ) : serverAuth.hasSession ? (
-            <div className="flex items-center gap-3 p-3 bg-green-50 rounded-xl border border-green-200">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-800">Connected</p>
-                <p className="text-xs text-gray-500">{serverAuth.user}</p>
+            <>
+              {/* Token error banner */}
+              {serverAuth.error === "RefreshTokenError" && (
+                <div className="flex items-start gap-2 p-3 bg-red-50 rounded-xl border border-red-200">
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                  <div className="text-xs text-red-700">
+                    <p className="font-semibold">Token expired and could not auto-refresh.</p>
+                    <p>Click <strong>Reconnect Google</strong> below to restore sheet sync and add-activity access.</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-3 p-3 bg-green-50 rounded-xl border border-green-200">
+                <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-800">Connected</p>
+                  <p className="text-xs text-gray-500">{serverAuth.user}</p>
+                </div>
+                <div className="flex gap-1.5 shrink-0">
+                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
+                    onClick={() => signOut()}>
+                    <LogOut className="w-3 h-3" /> Sign out
+                  </Button>
+                  <Button size="sm" className="h-7 text-xs gap-1 bg-blue-600 hover:bg-blue-700"
+                    onClick={() => signIn("google", { callbackUrl: "/settings" })}>
+                    <RefreshCw className="w-3 h-3" /> Reconnect
+                  </Button>
+                </div>
               </div>
-              <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
-              <Button size="sm" variant="outline" className="h-7 text-xs gap-1 shrink-0"
-                onClick={() => signOut()}>
-                <LogOut className="w-3 h-3" /> Sign out
-              </Button>
-            </div>
+
+              {/* Re-auth reminder */}
+              <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-xl border border-blue-100">
+                <AlertCircle className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
+                <div className="text-[11px] text-blue-700 leading-relaxed">
+                  <p className="font-semibold mb-0.5">🔄 Re-authentication reminder</p>
+                  <p>
+                    Google access tokens auto-refresh silently every <strong>~1 hour</strong> in the background —
+                    you normally never need to reconnect manually. However, if you see a sheet sync error,
+                    click <strong>Reconnect</strong> above to force a fresh token with the latest permissions.
+                    You may also need to reconnect if you haven&apos;t used the app for <strong>6+ months</strong>
+                    or if Google revokes access.
+                  </p>
+                </div>
+              </div>
+            </>
           ) : (
             <div className="space-y-3">
               <div className="flex items-start gap-3 p-3 bg-amber-50 rounded-xl border border-amber-200">
                 <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                 <div className="text-xs text-amber-700">
                   <p className="font-semibold mb-0.5">Google account not connected</p>
-                  <p>You need to sign in to sync data from Google Sheets. Your credentials are only used to read your sheets.</p>
+                  <p>Required for Sheets sync and adding activities to Google Sheets. Your credentials are only used to access your connected sheets.</p>
                 </div>
               </div>
-              <Button className="gap-2 w-full" onClick={() => signIn("google")}>
+              <Button className="gap-2 w-full" onClick={() => signIn("google", { callbackUrl: "/settings" })}>
                 <LogIn className="w-4 h-4" />
                 Connect with Google
               </Button>

@@ -19,7 +19,7 @@ export const authOptions: NextAuthOptions = {
             "openid",
             "email",
             "profile",
-            "https://www.googleapis.com/auth/spreadsheets.readonly",
+            "https://www.googleapis.com/auth/spreadsheets",
           ].join(" "),
           access_type: "offline",
           prompt: "consent",
@@ -50,24 +50,56 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
 
   callbacks: {
-    async jwt({ token, account, user }) {
+    async jwt({ token, account }) {
+      // First sign-in — store tokens and expiry
       if (account) {
-        console.log("[NextAuth] JWT callback - account found:", {
-          provider: account.provider,
-          hasAccessToken: !!account.access_token,
-        });
-        token.accessToken  = account.access_token;
-        token.refreshToken = account.refresh_token;
-        token.expiresAt    = account.expires_at;
+        return {
+          ...token,
+          accessToken:  account.access_token,
+          refreshToken: account.refresh_token,
+          expiresAt:    account.expires_at,        // seconds since epoch
+        };
       }
-      return token;
+
+      // Token still valid — return as-is
+      const expiresAt = (token.expiresAt as number) ?? 0;
+      if (Date.now() < expiresAt * 1000 - 60_000) {
+        return token;
+      }
+
+      // ── Token expired — auto-refresh using refresh_token ──
+      if (!token.refreshToken) {
+        return { ...token, error: "RefreshTokenError" };
+      }
+      try {
+        const resp = await fetch("https://oauth2.googleapis.com/token", {
+          method:  "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            client_id:     process.env.GOOGLE_CLIENT_ID!,
+            client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+            grant_type:    "refresh_token",
+            refresh_token: token.refreshToken as string,
+          }),
+        });
+        const refreshed = await resp.json();
+        if (!resp.ok) throw refreshed;
+        return {
+          ...token,
+          accessToken:  refreshed.access_token,
+          expiresAt:    Math.floor(Date.now() / 1000) + (refreshed.expires_in ?? 3600),
+          refreshToken: refreshed.refresh_token ?? token.refreshToken,
+          error:        undefined,
+        };
+      } catch (err) {
+        console.error("[NextAuth] Token refresh failed:", err);
+        return { ...token, error: "RefreshTokenError" };
+      }
     },
     async session({ session, token }) {
-      console.log("[NextAuth] Session callback:", {
-        hasToken: !!token,
-        hasAccessToken: !!token.accessToken,
-      });
       (session as any).accessToken = token.accessToken;
+      (session as any).expiresAt   = token.expiresAt;
+      (session as any).error       = token.error;
       return session;
     },
   },
@@ -83,6 +115,8 @@ export const authOptions: NextAuthOptions = {
 declare module "next-auth" {
   interface Session {
     accessToken?: string;
+    expiresAt?: number;
+    error?: string;
   }
 }
 declare module "next-auth/jwt" {
@@ -90,5 +124,6 @@ declare module "next-auth/jwt" {
     accessToken?: string;
     refreshToken?: string;
     expiresAt?: number;
+    error?: string;
   }
 }

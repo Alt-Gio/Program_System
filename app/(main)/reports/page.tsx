@@ -618,7 +618,7 @@ function GASSetupModal({
 }
 
 // ============================================================
-// PDF TAB
+// PDF TAB - Enhanced with Charts and Visualizations
 // ============================================================
 function PDFTab() {
   const [projectCode, setProjectCode] = useState<string>("all");
@@ -648,6 +648,73 @@ function PDFTab() {
     a.participants.lgu.male + a.participants.lgu.female +
     a.participants.suc.male + a.participants.suc.female +
     a.participants.others.male + a.participants.others.female, 0);
+
+  // Calculate analytics
+  const provinceCount = new Set(filtered.map(a => a.provinceId)).size;
+  const completedCount = filtered.filter(a => a.status === "completed").length;
+  const completionRate = filtered.length > 0 ? (completedCount / filtered.length) * 100 : 0;
+
+  // Monthly breakdown
+  const monthlyData = MONTHS.map((monthName, idx) => {
+    const monthNum = idx + 1;
+    const monthActivities = filtered.filter(a => a.month === monthNum);
+    const monthPax = monthActivities.reduce((sum, a) =>
+      sum + a.participants.nga.male + a.participants.nga.female +
+      a.participants.lgu.male + a.participants.lgu.female +
+      a.participants.suc.male + a.participants.suc.female +
+      a.participants.others.male + a.participants.others.female, 0);
+    return {
+      month: monthName.substring(0, 3),
+      activities: monthActivities.length,
+      participants: monthPax,
+    };
+  }).filter(d => d.activities > 0 || d.participants > 0);
+
+  // Province breakdown
+  const provinceData = provinces?.map(prov => {
+    const provActivities = filtered.filter(a => a.provinceId === prov._id);
+    const provPax = provActivities.reduce((sum, a) =>
+      sum + a.participants.nga.male + a.participants.nga.female +
+      a.participants.lgu.male + a.participants.lgu.female +
+      a.participants.suc.male + a.participants.suc.female +
+      a.participants.others.male + a.participants.others.female, 0);
+    return {
+      name: prov.name,
+      activities: provActivities.length,
+      participants: provPax,
+    };
+  }).filter(d => d.activities > 0).sort((a, b) => b.activities - a.activities) ?? [];
+
+  // Participant type breakdown
+  const participantTypes = [
+    {
+      type: "NGA",
+      male: filtered.reduce((sum, a) => sum + a.participants.nga.male, 0),
+      female: filtered.reduce((sum, a) => sum + a.participants.nga.female, 0),
+      color: "#3b82f6",
+    },
+    {
+      type: "LGU",
+      male: filtered.reduce((sum, a) => sum + a.participants.lgu.male, 0),
+      female: filtered.reduce((sum, a) => sum + a.participants.lgu.female, 0),
+      color: "#10b981",
+    },
+    {
+      type: "SUC",
+      male: filtered.reduce((sum, a) => sum + a.participants.suc.male, 0),
+      female: filtered.reduce((sum, a) => sum + a.participants.suc.female, 0),
+      color: "#f59e0b",
+    },
+    {
+      type: "Others",
+      male: filtered.reduce((sum, a) => sum + a.participants.others.male, 0),
+      female: filtered.reduce((sum, a) => sum + a.participants.others.female, 0),
+      color: "#8b5cf6",
+    },
+  ];
+
+  const totalMale = participantTypes.reduce((sum, p) => sum + p.male, 0);
+  const totalFemale = participantTypes.reduce((sum, p) => sum + p.female, 0);
 
   async function handleGeneratePDF() {
     if (filtered.length === 0) { toast.error("No activities in selection."); return; }
@@ -695,8 +762,13 @@ function PDFTab() {
     }
   }
 
+  const maxMonthActivities = Math.max(...monthlyData.map(d => d.activities), 1);
+  const maxMonthPax = Math.max(...monthlyData.map(d => d.participants), 1);
+  const maxProvinceActivities = Math.max(...provinceData.map(d => d.activities), 1);
+
   return (
-    <div className="max-w-2xl space-y-4">
+    <div className="space-y-6">
+      {/* Filters */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Configure Report</CardTitle>
@@ -745,27 +817,266 @@ function PDFTab() {
         </CardContent>
       </Card>
 
-      {/* Preview */}
-      <div className="grid grid-cols-3 gap-3 text-center">
-        {[
-          { label: "Activities", value: filtered.length },
-          { label: "Participants", value: numberWithCommas(totalPax) },
-          { label: "Provinces", value: new Set(filtered.map(a => a.provinceId)).size },
-        ].map(k => (
-          <Card key={k.label}>
-            <CardContent className="p-4">
-              <p className="text-2xl font-bold text-gray-900">{k.value}</p>
-              <p className="text-xs text-gray-500 mt-1">{k.label}</p>
-            </CardContent>
-          </Card>
-        ))}
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-blue-600">Total Activities</p>
+                <p className="text-3xl font-bold text-blue-900 mt-2">{filtered.length}</p>
+                <p className="text-xs text-blue-500 mt-1">
+                  {completedCount} completed
+                </p>
+              </div>
+              <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                <FileText className="w-6 h-6 text-blue-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-green-200 bg-gradient-to-br from-green-50 to-white">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-green-600">Total Participants</p>
+                <p className="text-3xl font-bold text-green-900 mt-2">{numberWithCommas(totalPax)}</p>
+                <p className="text-xs text-green-500 mt-1">
+                  {totalMale}M / {totalFemale}F
+                </p>
+              </div>
+              <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                <span className="text-2xl">👥</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-white">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-purple-600">Completion Rate</p>
+                <p className="text-3xl font-bold text-purple-900 mt-2">{completionRate.toFixed(0)}%</p>
+                <p className="text-xs text-purple-500 mt-1">
+                  {completedCount} of {filtered.length}
+                </p>
+              </div>
+              <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
+                <CheckCircle2 className="w-6 h-6 text-purple-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-orange-200 bg-gradient-to-br from-orange-50 to-white">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-orange-600">Provinces Covered</p>
+                <p className="text-3xl font-bold text-orange-900 mt-2">{provinceCount}</p>
+                <p className="text-xs text-orange-500 mt-1">
+                  of 6 provinces
+                </p>
+              </div>
+              <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
+                <span className="text-2xl">📍</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      <Button className="w-full gap-2" onClick={handleGeneratePDF} disabled={generating || filtered.length === 0}>
-        {generating
-          ? <><RefreshCw className="w-4 h-4 animate-spin" /> Generating…</>
-          : <><Download className="w-4 h-4" /> Download PDF Report</>}
-      </Button>
+      {/* Charts Row 1: Monthly Trend */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Monthly Activity Trend</CardTitle>
+          <CardDescription>Activities and participants over time</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {monthlyData.length === 0 ? (
+            <div className="py-12 text-center text-gray-400">
+              <p>No data for selected period</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Activities Chart */}
+              <div>
+                <p className="text-xs font-medium text-gray-600 mb-3">Activities per Month</p>
+                <div className="space-y-2">
+                  {monthlyData.map((d, idx) => (
+                    <div key={idx} className="flex items-center gap-3">
+                      <span className="text-xs font-medium text-gray-600 w-8">{d.month}</span>
+                      <div className="flex-1 h-8 bg-gray-100 rounded-lg overflow-hidden relative">
+                        <div
+                          className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg transition-all duration-500 flex items-center justify-end pr-3"
+                          style={{ width: `${(d.activities / maxMonthActivities) * 100}%` }}
+                        >
+                          {d.activities > 0 && (
+                            <span className="text-xs font-bold text-white">{d.activities}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Participants Chart */}
+              <div>
+                <p className="text-xs font-medium text-gray-600 mb-3">Participants per Month</p>
+                <div className="space-y-2">
+                  {monthlyData.map((d, idx) => (
+                    <div key={idx} className="flex items-center gap-3">
+                      <span className="text-xs font-medium text-gray-600 w-8">{d.month}</span>
+                      <div className="flex-1 h-8 bg-gray-100 rounded-lg overflow-hidden relative">
+                        <div
+                          className="h-full bg-gradient-to-r from-green-500 to-green-600 rounded-lg transition-all duration-500 flex items-center justify-end pr-3"
+                          style={{ width: `${(d.participants / maxMonthPax) * 100}%` }}
+                        >
+                          {d.participants > 0 && (
+                            <span className="text-xs font-bold text-white">{numberWithCommas(d.participants)}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Charts Row 2: Province Distribution & Participant Types */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Province Distribution */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Activities by Province</CardTitle>
+            <CardDescription>Geographic distribution</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {provinceData.length === 0 ? (
+              <div className="py-12 text-center text-gray-400">
+                <p>No data available</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {provinceData.map((d, idx) => (
+                  <div key={idx}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-sm font-medium text-gray-700">{d.name}</span>
+                      <span className="text-sm font-bold text-gray-900">{d.activities}</span>
+                    </div>
+                    <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-purple-500 to-purple-600 rounded-full transition-all duration-500"
+                        style={{ width: `${(d.activities / maxProvinceActivities) * 100}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">{numberWithCommas(d.participants)} participants</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Participant Types */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Participants by Type</CardTitle>
+            <CardDescription>Breakdown by organization</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {participantTypes.map((p, idx) => {
+                const total = p.male + p.female;
+                const percentage = totalPax > 0 ? (total / totalPax) * 100 : 0;
+                return (
+                  <div key={idx}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: p.color }}
+                        />
+                        <span className="text-sm font-medium text-gray-700">{p.type}</span>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-gray-900">{numberWithCommas(total)}</p>
+                        <p className="text-xs text-gray-500">{percentage.toFixed(1)}%</p>
+                      </div>
+                    </div>
+                    <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${percentage}%`,
+                          backgroundColor: p.color,
+                        }}
+                      />
+                    </div>
+                    <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-500">
+                      <span>👨 {numberWithCommas(p.male)} Male</span>
+                      <span>👩 {numberWithCommas(p.female)} Female</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Gender Summary */}
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <p className="text-xs font-medium text-gray-600 mb-3">Overall Gender Distribution</p>
+              <div className="flex gap-2">
+                <div className="flex-1 h-12 bg-blue-100 rounded-lg flex flex-col items-center justify-center">
+                  <p className="text-lg font-bold text-blue-900">{numberWithCommas(totalMale)}</p>
+                  <p className="text-xs text-blue-600">Male ({((totalMale / totalPax) * 100).toFixed(1)}%)</p>
+                </div>
+                <div className="flex-1 h-12 bg-pink-100 rounded-lg flex flex-col items-center justify-center">
+                  <p className="text-lg font-bold text-pink-900">{numberWithCommas(totalFemale)}</p>
+                  <p className="text-xs text-pink-600">Female ({((totalFemale / totalPax) * 100).toFixed(1)}%)</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Download Button */}
+      <Card className="border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-gray-900">Ready to generate your report?</p>
+              <p className="text-sm text-gray-600 mt-1">
+                Download a comprehensive PDF with all activities and details
+              </p>
+            </div>
+            <Button
+              size="lg"
+              className="gap-2 bg-blue-600 hover:bg-blue-700"
+              onClick={handleGeneratePDF}
+              disabled={generating || filtered.length === 0}
+            >
+              {generating ? (
+                <>
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                  Generating…
+                </>
+              ) : (
+                <>
+                  <Download className="w-5 h-5" />
+                  Download PDF Report
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
