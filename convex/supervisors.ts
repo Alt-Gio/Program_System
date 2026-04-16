@@ -22,6 +22,32 @@ function generateToken(): string {
 // QUERIES
 // ============================================================
 
+export const getMyProfile = query({
+  args: { token: v.string() },
+  handler: async (ctx, args) => {
+    const session = await ctx.db
+      .query("supervisorSessions")
+      .withIndex("by_token", (q) => q.eq("token", args.token))
+      .first();
+    
+    if (!session) throw new Error("Invalid or expired session");
+    if (session.expiresAt < Date.now()) throw new Error("Session expired");
+
+    const supervisor = await ctx.db.get(session.supervisorId);
+    if (!supervisor) throw new Error("Supervisor not found");
+
+    return {
+      id: supervisor._id,
+      fullName: supervisor.fullName,
+      email: supervisor.email,
+      department: supervisor.department ?? null,
+      phone: supervisor.phone ?? null,
+      role: supervisor.role,
+      status: supervisor.status,
+    };
+  },
+});
+
 export const list = query({
   args: {},
   handler: async (ctx) => {

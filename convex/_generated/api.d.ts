@@ -24,14 +24,18 @@ import type * as images from "../images.js";
 import type * as internAuth from "../internAuth.js";
 import type * as internPortal from "../internPortal.js";
 import type * as internSheetsSync from "../internSheetsSync.js";
+import type * as internTasks from "../internTasks.js";
 import type * as interns from "../interns.js";
 import type * as otpCodes from "../otpCodes.js";
 import type * as personnel from "../personnel.js";
 import type * as projects from "../projects.js";
 import type * as provinces from "../provinces.js";
+import type * as resetTestSupervisor from "../resetTestSupervisor.js";
+import type * as seedTestAccounts from "../seedTestAccounts.js";
 import type * as sheetsActions from "../sheetsActions.js";
 import type * as sheetsSync from "../sheetsSync.js";
 import type * as subProjects from "../subProjects.js";
+import type * as supervisorTools from "../supervisorTools.js";
 import type * as supervisors from "../supervisors.js";
 
 import type {
@@ -57,14 +61,18 @@ declare const fullApi: ApiFromModules<{
   internAuth: typeof internAuth;
   internPortal: typeof internPortal;
   internSheetsSync: typeof internSheetsSync;
+  internTasks: typeof internTasks;
   interns: typeof interns;
   otpCodes: typeof otpCodes;
   personnel: typeof personnel;
   projects: typeof projects;
   provinces: typeof provinces;
+  resetTestSupervisor: typeof resetTestSupervisor;
+  seedTestAccounts: typeof seedTestAccounts;
   sheetsActions: typeof sheetsActions;
   sheetsSync: typeof sheetsSync;
   subProjects: typeof subProjects;
+  supervisorTools: typeof supervisorTools;
   supervisors: typeof supervisors;
 }>;
 

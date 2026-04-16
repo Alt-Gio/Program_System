@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Link from "next/link";
-import { CheckCircle2, Clock, ListTodo, Calendar, Flame, BookOpen, Target, Trophy, AlertCircle, QrCode } from "lucide-react";
+import { CheckCircle2, Clock, ListTodo, Calendar, Flame, BookOpen, Target, Trophy, AlertCircle, QrCode, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const PRIORITY_DOT: Record<string, string> = {
@@ -41,10 +41,12 @@ export default function InternDashboardPage() {
   const [token, setToken] = useState<string | null>(null);
   useEffect(() => { setToken(localStorage.getItem("intern_token")); }, []);
 
-  const data       = useQuery(api.internAuth.getMyData,          token ? { token } : "skip");
-  const habitData  = useQuery(api.internPortal.getHabitsForToday, token ? { token } : "skip");
-  const pastLogs   = useQuery(api.internPortal.listDailyLogs,     token ? { token } : "skip");
-  const goals      = useQuery(api.internPortal.listGoals,         token ? { token } : "skip");
+  const data        = useQuery(api.internAuth.getMyData,           token ? { token } : "skip");
+  const habitData   = useQuery(api.internPortal.getHabitsForToday, token ? { token } : "skip");
+  const pastLogs    = useQuery(api.internPortal.listDailyLogs,     token ? { token } : "skip");
+  const goals       = useQuery(api.internPortal.listGoals,         token ? { token } : "skip");
+  const allMessages = useQuery(api.supervisorTools.getInternMessages, token ? { internToken: token } : "skip");
+  const unreadMsgs  = useMemo(() => allMessages?.filter((m: any) => m.senderType === "supervisor" && !m.readAt).length ?? 0, [allMessages]);
 
   const today    = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const todayAtt = useMemo(() => data?.attendance.find(a => a.date === today), [data, today]);
@@ -115,7 +117,7 @@ export default function InternDashboardPage() {
         ) : todayAtt?.timeOut ? (
           <><CheckCircle2 className="w-5 h-5 text-blue-400 shrink-0" />
           <div className="flex-1"><p className="text-blue-300 text-xs font-bold">Done for today 🎉</p>
-          <p className="text-white/40 text-[11px]">{todayAtt.hours != null ? ${todayAtt.hours}h logged : ""} · Out {todayAtt.timeOut.slice(11,16)}</p></div></>
+          <p className="text-white/40 text-[11px]">{todayAtt.hours != null ? `${todayAtt.hours}h logged` : ""} · Out {todayAtt.timeOut.slice(11,16)}</p></div></>
         ) : (
           <><div className="w-2.5 h-2.5 rounded-full bg-white/20 shrink-0" />
           <div className="flex-1"><p className="text-white/50 text-xs font-bold">Not checked in yet</p>
@@ -233,6 +235,29 @@ export default function InternDashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Messages Notification */}
+      <Link href="/intern/messages"
+        className={cn(
+          "flex items-center gap-3 rounded-2xl border px-4 py-3 transition-all active:scale-[0.98]",
+          unreadMsgs > 0
+            ? "bg-indigo-500/10 border-indigo-500/30"
+            : "bg-white/[0.03] border-white/[0.06]"
+        )}>
+        <div className="relative">
+          <MessageSquare className={cn("w-5 h-5", unreadMsgs > 0 ? "text-indigo-400" : "text-white/30")} />
+          {unreadMsgs > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 rounded-full text-[9px] font-extrabold text-white flex items-center justify-center">{unreadMsgs}</span>
+          )}
+        </div>
+        <div className="flex-1">
+          <p className={cn("text-xs font-bold", unreadMsgs > 0 ? "text-indigo-300" : "text-white/40")}>
+            {unreadMsgs > 0 ? `${unreadMsgs} new message${unreadMsgs > 1 ? "s" : ""} from your supervisor` : "Messages from Supervisor"}
+          </p>
+          <p className="text-white/25 text-[11px]">{allMessages ? `${allMessages.length} total` : "Tap to view"}</p>
+        </div>
+        <span className="text-white/20 text-xs">→</span>
+      </Link>
 
       {/* Supervisor */}
       {data.supervisor && (

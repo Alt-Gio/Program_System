@@ -417,6 +417,80 @@ export const getInternJournalForSupervisor = query({
       .query("internDailyLogs")
       .withIndex("by_intern", (q: any) => q.eq("internId", args.internId))
       .order("desc")
-      .take(14);
+      .take(60);
+  },
+});
+
+export const getInternHabitsForSupervisor = query({
+  args: { internId: v.id("interns") },
+  handler: async (ctx, args) => {
+    const today = new Date().toISOString().slice(0, 10);
+
+    const habits = (
+      await ctx.db
+        .query("internHabits")
+        .withIndex("by_intern", (q: any) => q.eq("internId", args.internId))
+        .collect()
+    ).filter((h: any) => h.isActive);
+
+    const recentLogs = await ctx.db
+      .query("internHabitLogs")
+      .withIndex("by_intern", (q: any) => q.eq("internId", args.internId))
+      .order("desc")
+      .take(500);
+
+    const logMap = new Map<string, boolean>();
+    for (const log of recentLogs) {
+      const key = `${log.habitId}:${log.date}`;
+      if (!logMap.has(key)) logMap.set(key, log.completed);
+    }
+
+    const habitsWithData = habits.map((h: any) => {
+      const completedToday = logMap.get(`${h._id}:${today}`) ?? false;
+
+      const last7: { date: string; completed: boolean }[] = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const ds = d.toISOString().slice(0, 10);
+        last7.push({ date: ds, completed: logMap.get(`${h._id}:${ds}`) ?? false });
+      }
+
+      let streak = 0;
+      for (let i = completedToday ? 0 : 1; i <= 60; i++) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const ds = d.toISOString().slice(0, 10);
+        if (logMap.get(`${h._id}:${ds}`)) streak++;
+        else break;
+      }
+
+      return {
+        habitId: h._id,
+        title: h.title,
+        emoji: h.emoji,
+        frequency: h.frequency,
+        completed: completedToday,
+        streak,
+        last7Days: last7,
+      };
+    });
+
+    return {
+      habits: habitsWithData,
+      completedToday: habitsWithData.filter((h: any) => h.completed).length,
+      totalToday: habits.length,
+    };
+  },
+});
+
+export const getInternGoalsForSupervisor = query({
+  args: { internId: v.id("interns") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("internGoals")
+      .withIndex("by_intern", (q: any) => q.eq("internId", args.internId))
+      .order("desc")
+      .take(30);
   },
 });

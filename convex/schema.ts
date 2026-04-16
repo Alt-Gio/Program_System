@@ -458,11 +458,30 @@ export default defineSchema({
     status: v.string(), // PRESENT, ABSENT, HALF_DAY, LEAVE, HOLIDAY
     notes: v.optional(v.string()),
     sessionCount: v.optional(v.number()),
+    checkInLat: v.optional(v.number()),
+    checkInLng: v.optional(v.number()),
+    checkInAccuracy: v.optional(v.number()),
+    checkInAddress: v.optional(v.string()),
+    checkInVerified: v.optional(v.boolean()),
+    checkOutLat: v.optional(v.number()),
+    checkOutLng: v.optional(v.number()),
     createdAt: v.number(),
   })
     .index("by_intern", ["internId"])
     .index("by_date", ["date"])
     .index("by_intern_date", ["internId", "date"]),
+
+  /** GPS geofence zones where interns are allowed to check in */
+  officeGeoFence: defineTable({
+    name: v.string(),
+    lat: v.number(),
+    lng: v.number(),
+    radiusMeters: v.number(),
+    isActive: v.boolean(),
+    createdBy: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_active", ["isActive"]),
 
   /** Tasks assigned to interns */
   internTasks: defineTable({
@@ -473,6 +492,11 @@ export default defineSchema({
     priority: v.string(), // LOW, MEDIUM, HIGH, URGENT
     dueDate: v.optional(v.string()),
     completedAt: v.optional(v.string()),
+    progressNotes: v.optional(v.array(v.object({ note: v.string(), createdAt: v.number() }))),
+    completionNote: v.optional(v.string()),
+    proofStorageIds: v.optional(v.array(v.string())),
+    submittedAt: v.optional(v.number()),
+    supervisorNotified: v.optional(v.boolean()),
     createdAt: v.number(),
   })
     .index("by_intern", ["internId"])
@@ -635,6 +659,45 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_intern", ["internId"]),
+
+  /** Group projects created by supervisors for intern collaboration */
+  internProjects: defineTable({
+    title: v.string(),
+    description: v.optional(v.string()),
+    supervisorId: v.id("supervisors"),
+    status: v.string(), // ACTIVE, COMPLETED, PAUSED, CANCELLED
+    dueDate: v.optional(v.string()),
+    priority: v.string(), // LOW, MEDIUM, HIGH, URGENT
+    tags: v.optional(v.array(v.string())),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_supervisor", ["supervisorId"])
+    .index("by_status", ["status"]),
+
+  /** Intern members within group projects */
+  internProjectMembers: defineTable({
+    projectId: v.id("internProjects"),
+    internId: v.id("interns"),
+    role: v.string(), // LEAD, MEMBER
+    joinedAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_intern", ["internId"])
+    .index("by_project_intern", ["projectId", "internId"]),
+
+  /** Direct messages between supervisor and intern */
+  supervisorMessages: defineTable({
+    supervisorId: v.id("supervisors"),
+    internId: v.id("interns"),
+    senderType: v.string(), // "supervisor" | "intern"
+    message: v.string(),
+    readAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_supervisor_intern", ["supervisorId", "internId"])
+    .index("by_intern", ["internId"])
+    .index("by_supervisor", ["supervisorId"]),
 
   /** Google Sheets to Convex ID mapping for interns */
   internSheetMapping: defineTable({

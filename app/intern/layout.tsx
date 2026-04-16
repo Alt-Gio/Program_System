@@ -2,17 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import Link from "next/link";
-import { LayoutDashboard, Flame, BookOpen, QrCode, LogOut } from "lucide-react";
+import { LayoutDashboard, Flame, BookOpen, QrCode, LogOut, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const PUBLIC_PATHS = ["/intern/login", "/intern/register"];
 
 const NAV = [
-  { href: "/intern/dashboard", icon: LayoutDashboard, label: "Home"    },
-  { href: "/intern/habits",    icon: Flame,           label: "Habits"  },
-  { href: "/intern/journal",   icon: BookOpen,        label: "Journal" },
-  { href: "/intern/qr",        icon: QrCode,          label: "QR"      },
+  { href: "/intern/dashboard",  icon: LayoutDashboard, label: "Home"     },
+  { href: "/intern/habits",     icon: Flame,           label: "Habits"   },
+  { href: "/intern/journal",    icon: BookOpen,        label: "Journal"  },
+  { href: "/intern/messages",   icon: MessageSquare,   label: "Messages" },
+  { href: "/intern/qr",         icon: QrCode,          label: "QR"       },
 ];
 
 export default function InternLayout({ children }: { children: React.ReactNode }) {
@@ -20,6 +23,17 @@ export default function InternLayout({ children }: { children: React.ReactNode }
   const router   = useRouter();
   const isPublic = PUBLIC_PATHS.some(p => pathname.startsWith(p));
   const [ready, setReady] = useState(false);
+  const [internToken, setInternToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isPublic) setInternToken(localStorage.getItem("intern_token"));
+  }, [isPublic]);
+
+  const allMessages = useQuery(
+    api.supervisorTools.getInternMessages,
+    internToken && !isPublic ? { internToken } : "skip"
+  );
+  const unreadCount = allMessages?.filter((m: any) => m.senderType === "supervisor" && !m.readAt).length ?? 0;
 
   useEffect(() => {
     if (isPublic) { setReady(true); return; }
@@ -81,13 +95,19 @@ export default function InternLayout({ children }: { children: React.ReactNode }
       <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-[#0f172a]/95 backdrop-blur border-t border-white/[0.08] flex justify-around py-2 z-50">
         {NAV.map(({ href, icon: Icon, label }) => {
           const active = pathname.startsWith(href);
+          const isMessages = href === "/intern/messages";
           return (
             <Link key={href} href={href}
               className={cn(
-                "flex flex-col items-center gap-1 px-5 py-1.5 rounded-xl transition-all",
+                "relative flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl transition-all",
                 active ? "text-indigo-400" : "text-white/30 hover:text-white/60"
               )}>
               <Icon className={cn("w-5 h-5 transition-transform", active && "scale-110")} />
+              {isMessages && unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full text-[9px] font-extrabold text-white flex items-center justify-center">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
               <span className={cn("text-[10px] font-semibold", active ? "text-indigo-400" : "text-white/30")}>{label}</span>
             </Link>
           );

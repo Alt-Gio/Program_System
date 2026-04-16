@@ -271,8 +271,26 @@ export const selfRegister = mutation({
   },
 });
 
+// Haversine distance in metres
+function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 export const checkIn = mutation({
-  args: { token: v.string() },
+  args: {
+    token: v.string(),
+    lat: v.optional(v.number()),
+    lng: v.optional(v.number()),
+    accuracy: v.optional(v.number()),
+    address: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const session = await ctx.db
       .query("internLoginSessions")
@@ -281,6 +299,41 @@ export const checkIn = mutation({
     if (!session || session.expiresAt < Date.now()) throw new Error("Session expired. Please log in again.");
     const loginRecord = await ctx.db.get(session.internLoginId);
     if (!loginRecord || !loginRecord.isActive) throw new Error("Account is disabled.");
+
+    // ── GPS geofence verification ──────────────────────────
+    let geoVerified = false;
+    let nearestFenceName: string | null = null;
+    let distanceMeters: number | null = null;
+
+    if (args.lat != null && args.lng != null) {
+      const fences = await ctx.db
+        .query("officeGeoFence")
+        .withIndex("by_active", (q) => q.eq("isActive", true))
+        .collect();
+
+      if (fences.length > 0) {
+        for (const fence of fences) {
+          const dist = haversineMeters(args.lat!, args.lng!, fence.lat, fence.lng);
+          if (distanceMeters === null || dist < distanceMeters) {
+            distanceMeters = dist;
+            nearestFenceName = fence.name;
+          }
+          if (dist <= fence.radiusMeters) {
+            geoVerified = true;
+            break;
+          }
+        }
+        // Block check-in if outside all fences (only when fences are configured)
+        if (!geoVerified) {
+          const distStr = distanceMeters != null ? `${Math.round(distanceMeters)}m` : "unknown";
+          throw new Error(
+            `Location check failed. You are ${distStr} away from "${nearestFenceName}". ` +
+            `Move closer to the office and try again.`
+          );
+        }
+      }
+      // No fences configured → allow freely (geoVerified stays false = "unverified but allowed")
+    }
 
     const now = new Date();
     const today = now.toISOString().slice(0, 10);
@@ -300,14 +353,30 @@ export const checkIn = mutation({
         date: today,
         timeIn: timeStr,
         status: "PRESENT",
+        checkInLat: args.lat,
+        checkInLng: args.lng,
+        checkInAccuracy: args.accuracy,
+        checkInAddress: args.address,
+        checkInVerified: geoVerified,
         createdAt: Date.now(),
       });
-      return { action: "checked_in" as const, time: timeStr, hours: null };
+      return {
+        action: "checked_in" as const,
+        time: timeStr,
+        hours: null,
+        geoVerified,
+        distanceMeters,
+      };
     } else if (existing.timeIn && !existing.timeOut) {
       const inDate  = new Date(existing.timeIn);
       const outDate = new Date(timeStr);
       const hours   = Math.round((outDate.getTime() - inDate.getTime()) / 36000) / 100;
-      await ctx.db.patch(existing._id, { timeOut: timeStr, hours });
+      await ctx.db.patch(existing._id, {
+        timeOut: timeStr,
+        hours,
+        checkOutLat: args.lat,
+        checkOutLng: args.lng,
+      });
       const intern = await ctx.db.get(loginRecord.internId);
       if (intern) {
         await ctx.db.patch(loginRecord.internId, {
@@ -315,7 +384,13 @@ export const checkIn = mutation({
           updatedAt: Date.now(),
         });
       }
-      return { action: "checked_out" as const, time: timeStr, hours };
+      return {
+        action: "checked_out" as const,
+        time: timeStr,
+        hours,
+        geoVerified,
+        distanceMeters,
+      };
     } else {
       throw new Error("Attendance already complete for today.");
     }
