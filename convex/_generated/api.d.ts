@@ -21,6 +21,8 @@ import type * as gamification from "../gamification.js";
 import type * as highlightFields from "../highlightFields.js";
 import type * as http from "../http.js";
 import type * as images from "../images.js";
+import type * as internAuth from "../internAuth.js";
+import type * as internPortal from "../internPortal.js";
 import type * as internSheetsSync from "../internSheetsSync.js";
 import type * as interns from "../interns.js";
 import type * as otpCodes from "../otpCodes.js";
@@ -30,6 +32,7 @@ import type * as provinces from "../provinces.js";
 import type * as sheetsActions from "../sheetsActions.js";
 import type * as sheetsSync from "../sheetsSync.js";
 import type * as subProjects from "../subProjects.js";
+import type * as supervisors from "../supervisors.js";
 
 import type {
   ApiFromModules,
@@ -51,6 +54,8 @@ declare const fullApi: ApiFromModules<{
   highlightFields: typeof highlightFields;
   http: typeof http;
   images: typeof images;
+  internAuth: typeof internAuth;
+  internPortal: typeof internPortal;
   internSheetsSync: typeof internSheetsSync;
   interns: typeof interns;
   otpCodes: typeof otpCodes;
@@ -60,6 +65,7 @@ declare const fullApi: ApiFromModules<{
   sheetsActions: typeof sheetsActions;
   sheetsSync: typeof sheetsSync;
   subProjects: typeof subProjects;
+  supervisors: typeof supervisors;
 }>;
 
 /**

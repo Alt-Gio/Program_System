@@ -36,6 +36,7 @@ export const list = query({
           course: intern.course,
           department: intern.department ?? null,
           supervisor: intern.supervisor ?? null,
+          supervisorId: intern.supervisorId ?? null,
           startDate: intern.startDate,
           endDate: intern.endDate,
           requiredHours: intern.requiredHours,

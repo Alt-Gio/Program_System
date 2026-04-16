@@ -16,7 +16,59 @@ import { createSign } from "node:crypto";
 import type { ActionCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 
-// ── Date & number helpers (mirrors app/api/sheets-sync/route.ts) ──
+// ── Shared column aliases (MUST match activity-to-sheet/route.ts) ──────────────
+// These map our internal field keys to possible header names in any sheet.
+// When reading a sheet, we find the column with a matching header, so the
+// column ORDER in the sheet does not matter.
+const COL_ALIASES: Record<string, string[]> = {
+  province:            ["Province"],
+  lgu:                 ["LGU/Municipality Name", "LGU", "Municipality", "LGU Name"],
+  barangay:            ["Barangay", "Brgy", "Barangay/Sitio"],
+  year:                ["Year"],
+  month:               ["Month", "Month (Do not Edit)", "Month Name"],
+  activityTitle:       ["Activity Title", "Title", "Activity Name"],
+  venue:               ["Venue", "Location"],
+  partnerOrganizations:["Name of Partner", "Name of Partner (LGU/NGA/Private)", "Partner Organizations", "Partners"],
+  startDate:           ["Start Date", "Start Date 1/1/2025", "Date Start"],
+  endDate:             ["End Date", "End Date 1/1/2025", "Date End"],
+  modeOfConduct:       ["Mode of Conduct", "Mode", "Conduct Mode"],
+  personnelRaw:        ["DICT Personnel Involve", "Personnel", "DICT Personnel", "Personnel Involved"],
+  ngaMale:             ["NGA Male", "NGA M"],
+  ngaFemale:           ["NGA Female", "NGA F"],
+  lguMale:             ["LGU Male", "LGU M"],
+  lguFemale:           ["LGU Female", "LGU F"],
+  sucMale:             ["SUC Male", "SUC M"],
+  sucFemale:           ["SUC Female", "SUC F"],
+  othersMale:          ["Others Male", "Other Male"],
+  othersFemale:        ["Others Female", "Other Female"],
+  othersLabel:         ["Others Label", "Other Category"],
+  afterActivityReport: ["After Activity Report", "AAR"],
+  fbPostingLink:       ["FB Posting Link", "Facebook Link", "FB Link"],
+  rawPhotosLink:       ["Raw Photos Link", "Photos", "Photos Link", "Raw Photos"],
+  testimonialsLink:    ["Testimonials Link", "Testimonials"],
+  driveFolderLink:     ["Drive Folder Link", "Drive Link", "Google Drive Link"],
+  remarks:             ["Remarks", "Notes"],
+  status:              ["Status", "Status (Don't Edit)", "Status (Do not Edit)"],
+};
+
+/** Build a field→column-index map from a header row. */
+function buildColMap(headers: string[]): Record<string, number> {
+  const headerIndex: Record<string, number> = {};
+  headers.forEach((h, i) => { if (h.trim()) headerIndex[h.trim()] = i; });
+
+  const cm: Record<string, number> = {};
+  for (const [field, aliases] of Object.entries(COL_ALIASES)) {
+    for (const alias of aliases) {
+      if (headerIndex[alias] !== undefined) {
+        cm[field] = headerIndex[alias];
+        break;
+      }
+    }
+  }
+  return cm;
+}
+
+// ── Date & number helpers ─────────────────────────────────────────────────────
 
 function normalizeDate(val: string): string {
   if (!val?.trim()) return "";
@@ -32,6 +84,26 @@ function normalizeDate(val: string): string {
 function safeInt(v: unknown): number {
   const n = parseInt(String(v ?? "0").replace(/,/g, "").trim());
   return isNaN(n) ? 0 : Math.abs(n);
+}
+
+function toMonthNumber(val: string): number {
+  const n = parseInt(val);
+  if (!isNaN(n) && n >= 1 && n <= 12) return n;
+  const map: Record<string, number> = {
+    january:1, february:2, march:3, april:4, may:5, june:6,
+    july:7, august:8, september:9, october:10, november:11, december:12,
+    jan:1, feb:2, mar:3, apr:4, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12,
+  };
+  return map[val.toLowerCase().trim()] ?? (new Date().getMonth() + 1);
+}
+
+function mapStatus(raw: string): string {
+  const map: Record<string, string> = {
+    "completed": "Reported", "ongoing": "Submitted", "for submission": "Submitted",
+    "pending": "Draft", "cancelled": "Draft",
+    "draft": "Draft", "submitted": "Submitted", "validated": "Validated", "reported": "Reported",
+  };
+  return map[raw.toLowerCase().trim()] ?? "Submitted";
 }
 
 // ── Service account JWT → access token ──────────────────────
@@ -121,16 +193,8 @@ async function doSync(
     return { error: err };
   }
 
-  // Fetch province lookup
-  const provinces = await ctx.runQuery(api.provinces.list, {});
-  const provinceMap: Record<string, string> = {};
-  for (const p of provinces) {
-    provinceMap[p.name.toLowerCase().trim()] = p._id;
-    provinceMap[p.code.toLowerCase().trim()] = p._id;
-  }
-
-  // Read the sheet
-  const range = encodeURIComponent(`${params.sheetName}!A:Z`);
+  // Read the sheet — A:AH covers up to column 34, enough for any standard layout
+  const range = encodeURIComponent(`${params.sheetName}!A:AH`);
   const sheetResp = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${params.sheetId}/values/${range}`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
@@ -151,7 +215,22 @@ async function doSync(
     return { error: "Sheet has no data rows (only header or empty)", inserted: 0, updated: 0 };
   }
 
-  // Parse rows
+  // ── Header-based column map — column ORDER in sheet no longer matters ──
+  const headerRow = (rawRows[0] ?? []).map((h: string) => h.trim());
+  const cm = buildColMap(headerRow);
+  // Helper: get a field value from a data row using the header map
+  const g = (row: string[], field: string): string =>
+    (row[cm[field] ?? -1] ?? "").trim();
+
+  // Province lookup
+  const provinces = await ctx.runQuery(api.provinces.list, {});
+  const provinceMap: Record<string, string> = {};
+  for (const p of provinces) {
+    provinceMap[p.name.toLowerCase().trim()] = p._id;
+    provinceMap[p.code.toLowerCase().trim()] = p._id;
+  }
+
+  // ── Parse data rows ──
   const parsedRows: any[] = [];
   const parseErrors: string[] = [];
 
@@ -159,45 +238,60 @@ async function doSync(
     const row = rawRows[i];
     if (!row || row.every((c) => !c?.trim())) continue;
 
-    const pKey = (row[0] ?? "").trim().toLowerCase();
+    const pKey = g(row, "province").toLowerCase();
     const provinceId = provinceMap[pKey];
     if (!provinceId) {
-      parseErrors.push(`Row ${i + 1}: Unknown province "${row[0] ?? ""}"`);
+      parseErrors.push(`Row ${i + 1}: Unknown province "${g(row, "province") || "(empty)"}"`);
       continue;
     }
 
-    const activityTitle = (row[4] ?? "").trim();
+    const activityTitle = g(row, "activityTitle");
     if (!activityTitle) {
-      parseErrors.push(`Row ${i + 1}: Missing Activity Title (col E)`);
+      parseErrors.push(`Row ${i + 1}: Missing Activity Title`);
       continue;
     }
 
-    const year  = safeInt(row[2]) || new Date().getFullYear();
-    const month = Math.min(12, Math.max(1, safeInt(row[3]) || new Date().getMonth() + 1));
+    const year  = safeInt(g(row, "year")) || new Date().getFullYear();
+    const month = Math.min(12, Math.max(1, toMonthNumber(g(row, "month"))));
+
+    const barangay        = g(row, "barangay");
+    const driveFolderLink = g(row, "driveFolderLink");
+    const extraFieldsObj: Record<string, string> = {};
+    if (barangay)        extraFieldsObj.barangay        = barangay;
+    if (driveFolderLink) extraFieldsObj.driveFolderLink = driveFolderLink;
+    const extraFields = Object.keys(extraFieldsObj).length > 0
+      ? JSON.stringify(extraFieldsObj)
+      : undefined;
+
+    const rawStatus = g(row, "status");
+    const status = rawStatus ? mapStatus(rawStatus) : "Submitted";
+    const startDate = normalizeDate(g(row, "startDate"));
 
     parsedRows.push({
       provinceId,
       month, year,
       activityTitle,
-      venue:                (row[5] ?? "").trim() || "TBD",
-      partnerOrganizations: (row[6] ?? "").split(";").map((s) => s.trim()).filter(Boolean),
-      startDate:            normalizeDate(row[7] ?? ""),
-      endDate:              normalizeDate(row[8] ?? row[7] ?? ""),
-      modeOfConduct:        (row[9] ?? "Face-to-face").trim(),
-      personnelRaw:         row[10]?.trim() || undefined,
+      venue:                g(row, "venue") || "TBD",
+      partnerOrganizations: g(row, "partnerOrganizations").split(/[,;]/).map((s: string) => s.trim()).filter(Boolean),
+      startDate,
+      endDate:              normalizeDate(g(row, "endDate")) || startDate,
+      modeOfConduct:        g(row, "modeOfConduct") || "Face-to-Face",
+      personnelRaw:         g(row, "personnelRaw") || undefined,
       participants: {
-        nga:    { male: safeInt(row[11]), female: safeInt(row[12]) },
-        lgu:    { male: safeInt(row[13]), female: safeInt(row[14]) },
-        suc:    { male: safeInt(row[15]), female: safeInt(row[16]) },
-        others: { male: safeInt(row[17]), female: safeInt(row[18]), label: row[19]?.trim() || undefined },
+        nga:    { male: safeInt(g(row, "ngaMale")),    female: safeInt(g(row, "ngaFemale"))    },
+        lgu:    { male: safeInt(g(row, "lguMale")),    female: safeInt(g(row, "lguFemale"))    },
+        suc:    { male: safeInt(g(row, "sucMale")),    female: safeInt(g(row, "sucFemale"))    },
+        others: { male: safeInt(g(row, "othersMale")), female: safeInt(g(row, "othersFemale")),
+                  label: g(row, "othersLabel") || undefined },
       },
-      afterActivityReport: row[20]?.trim() || undefined,
-      fbPostingLink:       row[21]?.trim() || undefined,
-      rawPhotosLink:       row[22]?.trim() || undefined,
-      testimonialsLink:    row[23]?.trim() || undefined,
-      remarks:             row[24]?.trim() || undefined,
-      status:              row[25]?.trim() || undefined,
-      sheetRowNumber:      i + 1,
+      afterActivityReport: g(row, "afterActivityReport") || undefined,
+      fbPostingLink:       g(row, "fbPostingLink")       || undefined,
+      rawPhotosLink:       g(row, "rawPhotosLink")       || undefined,
+      testimonialsLink:    g(row, "testimonialsLink")    || undefined,
+      remarks:             g(row, "remarks")             || undefined,
+      status,
+      extraFields,
+      sheetRowNumber: i + 1,
     });
   }
 
@@ -211,6 +305,13 @@ async function doSync(
     rows:      parsedRows,
     syncedBy:  "auto-sync",
   })) as { inserted: number; updated: number; errors: string[] };
+
+  // ── Update connection metadata so the UI can show "Last synced X min ago" ──
+  await ctx.runMutation(internal.sheetsSync.markSyncSuccess, {
+    sheetId:      params.sheetId,
+    rowsAffected: result.inserted + result.updated,
+    projectId:    params.projectId,
+  });
 
   return { inserted: result.inserted, updated: result.updated, parseErrors };
 }

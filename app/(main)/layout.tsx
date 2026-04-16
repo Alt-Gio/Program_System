@@ -11,9 +11,11 @@ function MainLayoutContent({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar />
-      <div className={`flex flex-col flex-1 overflow-hidden transition-all duration-300 ${collapsed ? 'ml-20' : 'ml-64'}`}>
+      {/* On mobile: full-width (sidebar is off-canvas drawer).
+          On desktop: respect collapsed/expanded sidebar width. */}
+      <div className={`flex flex-col flex-1 overflow-hidden transition-all duration-300 ml-0 ${collapsed ? 'md:ml-20' : 'md:ml-64'}`}>
         <Header />
-        <main className="flex-1 overflow-y-auto p-6 animate-fade-in">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 animate-fade-in">
           {children}
         </main>
       </div>

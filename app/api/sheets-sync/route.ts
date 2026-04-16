@@ -160,6 +160,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ── Init Convex client (must be before any .query/.mutation calls) ──
+    const convex = getConvexClient();
+
     // ── Fetch provinces for ID lookup ──
     const provinces = await convex.query(api.provinces.list, {});
     const provinceById: Record<string, string> = {};
@@ -169,6 +172,52 @@ export async function POST(request: NextRequest) {
       provinceById[p.name.toLowerCase().replace(/^camarines /, "cam. ").trim()] = p._id;
     }
 
+    // ── Header-based column map (same aliases as activity-to-sheet) ──
+    // Column ORDER in the sheet no longer matters.
+    const headerRow = ((rawRows[0] ?? []) as string[]).map((h: string) => h.trim());
+    const headerIndex: Record<string, number> = {};
+    headerRow.forEach((h, i) => { if (h) headerIndex[h] = i; });
+
+    const colIdx = (aliases: string[]): number => {
+      for (const a of aliases) { if (headerIndex[a] !== undefined) return headerIndex[a]; }
+      return -1;
+    };
+
+    // Pre-compute field→column-index using STANDARD_ALIASES
+    const COL = {
+      province:    colIdx(["Province"]),
+      lgu:         colIdx(["LGU/Municipality Name","LGU","Municipality","LGU Name"]),
+      barangay:    colIdx(["Barangay","Brgy","Barangay/Sitio"]),
+      year:        colIdx(["Year"]),
+      month:       colIdx(["Month","Month (Do not Edit)","Month Name"]),
+      title:       colIdx(["Activity Title","Title","Activity Name"]),
+      venue:       colIdx(["Venue","Location"]),
+      partners:    colIdx(["Name of Partner","Name of Partner (LGU/NGA/Private)","Partner Organizations","Partners"]),
+      startDate:   colIdx(["Start Date","Start Date 1/1/2025","Date Start"]),
+      endDate:     colIdx(["End Date","End Date 1/1/2025","Date End"]),
+      mode:        colIdx(["Mode of Conduct","Mode","Conduct Mode"]),
+      personnel:   colIdx(["DICT Personnel Involve","Personnel","DICT Personnel","Personnel Involved"]),
+      ngaM:        colIdx(["NGA Male","NGA M"]),
+      ngaF:        colIdx(["NGA Female","NGA F"]),
+      lguM:        colIdx(["LGU Male","LGU M"]),
+      lguF:        colIdx(["LGU Female","LGU F"]),
+      sucM:        colIdx(["SUC Male","SUC M"]),
+      sucF:        colIdx(["SUC Female","SUC F"]),
+      othM:        colIdx(["Others Male","Other Male"]),
+      othF:        colIdx(["Others Female","Other Female"]),
+      othLbl:      colIdx(["Others Label","Other Category"]),
+      aar:         colIdx(["After Activity Report","AAR"]),
+      fb:          colIdx(["FB Posting Link","Facebook Link","FB Link"]),
+      photos:      colIdx(["Raw Photos Link","Photos","Photos Link","Raw Photos"]),
+      testimonials:colIdx(["Testimonials Link","Testimonials"]),
+      drive:       colIdx(["Drive Folder Link","Drive Link","Google Drive Link"]),
+      remarks:     colIdx(["Remarks","Notes"]),
+      status:      colIdx(["Status","Status (Don't Edit)","Status (Do not Edit)"]),
+    };
+
+    const r = (row: string[], idx: number): string =>
+      idx >= 0 ? (row[idx] ?? "").trim() : "";
+
     // ── Parse rows (row 0 = header, skip) ──
     const parsedRows: any[] = [];
     const parseErrors: string[] = [];
@@ -177,81 +226,58 @@ export async function POST(request: NextRequest) {
       const row = rawRows[i];
       const rowNum = i + 1;
 
-      // Skip entirely empty rows
-      if (!row || row.every(c => !c?.trim())) continue;
+      if (!row || row.every((c: string) => !c?.trim())) continue;
 
-      // A(0): Province
-      const provinceKey = (row[0] ?? "").trim().toLowerCase();
+      const provinceKey = r(row, COL.province).toLowerCase();
       const provinceId  = provinceById[provinceKey];
       if (!provinceId) {
-        parseErrors.push(`Row ${rowNum}: Unknown province "${row[0] ?? "(empty)"}".`);
+        parseErrors.push(`Row ${rowNum}: Unknown province "${r(row, COL.province) || "(empty)"}".`);
         continue;
       }
 
-      // F(5): Activity Title — required
-      const activityTitle = (row[5] ?? "").trim();
+      const activityTitle = r(row, COL.title);
       if (!activityTitle) {
-        parseErrors.push(`Row ${rowNum}: Activity Title (column F) is required.`);
+        parseErrors.push(`Row ${rowNum}: Activity Title is required.`);
         continue;
       }
 
-      // D(3): Year, E(4): Month
-      const year  = safeInt(row[3]) || new Date().getFullYear();
-      const month = toMonthNumber(row[4] ?? "");
+      const year      = safeInt(r(row, COL.year)) || new Date().getFullYear();
+      const month     = toMonthNumber(r(row, COL.month));
+      const rawStatus = r(row, COL.status);
+      const status    = rawStatus ? mapStatus(rawStatus) : "Submitted";
+      const startDate = normalizeDate(r(row, COL.startDate));
 
-      // AA(26): Status — map from Apps Script values to web app values
-      const rawStatus = (row[26] ?? "").trim();
-      const status = rawStatus ? mapStatus(rawStatus) : "Submitted";
-
-      // C(2): Barangay, AB(27): Drive Folder Link — stored in extraFields
-      const barangay       = (row[2] ?? "").trim();
-      const driveFolderLink = (row[27] ?? "").trim();
-      const extraFields = JSON.stringify({
-        ...(barangay        ? { barangay }        : {}),
-        ...(driveFolderLink ? { driveFolderLink } : {}),
-      });
-
-      // AE(30): Image URLs — newline-separated Drive image URLs
-      const imageUrlsRaw = (row[30] ?? "").trim();
-      const images = imageUrlsRaw
-        ? imageUrlsRaw.split('\n')
-            .map((url: string) => url.trim())
-            .filter(Boolean)
-            .map((url: string) => ({
-              url,
-              uploadedAt: Date.now(),
-            }))
-        : undefined;
+      const barangay        = r(row, COL.barangay);
+      const driveFolderLink = r(row, COL.drive);
+      const extraFieldsObj: Record<string, string> = {};
+      if (barangay)        extraFieldsObj.barangay        = barangay;
+      if (driveFolderLink) extraFieldsObj.driveFolderLink = driveFolderLink;
 
       parsedRows.push({
         provinceId,
         month:  Math.min(12, Math.max(1, month)),
         year,
         activityTitle,
-        venue:                (row[6]  ?? "").trim() || "TBD",       // G(6)
-        partnerOrganizations: (row[7]  ?? "").split(/[,;]/).map((s: string) => s.trim()).filter(Boolean), // H(7)
-        startDate:            normalizeDate(row[8]  ?? ""),           // I(8)
-        endDate:              normalizeDate(row[9]  ?? row[8] ?? ""), // J(9)
-        modeOfConduct:        (row[10] ?? "Face-to-Face").trim(),     // K(10)
-        personnelRaw:         (row[11] ?? "").trim() || undefined,    // L(11)
+        venue:                r(row, COL.venue) || "TBD",
+        partnerOrganizations: r(row, COL.partners).split(/[,;]/).map((s: string) => s.trim()).filter(Boolean),
+        startDate,
+        endDate:              normalizeDate(r(row, COL.endDate)) || startDate,
+        modeOfConduct:        r(row, COL.mode) || "Face-to-Face",
+        personnelRaw:         r(row, COL.personnel) || undefined,
         participants: {
-          nga:    { male: safeInt(row[12]), female: safeInt(row[13]) }, // M(12), N(13)
-          lgu:    { male: safeInt(row[14]), female: safeInt(row[15]) }, // O(14), P(15)
-          suc:    { male: safeInt(row[16]), female: safeInt(row[17]) }, // Q(16), R(17)
-          others: {
-            male:   safeInt(row[18]),                                  // S(18)
-            female: safeInt(row[19]),                                  // T(19)
-            label:  (row[20] ?? "").trim() || undefined,               // U(20)
-          },
+          nga:    { male: safeInt(r(row, COL.ngaM)), female: safeInt(r(row, COL.ngaF)) },
+          lgu:    { male: safeInt(r(row, COL.lguM)), female: safeInt(r(row, COL.lguF)) },
+          suc:    { male: safeInt(r(row, COL.sucM)), female: safeInt(r(row, COL.sucF)) },
+          others: { male: safeInt(r(row, COL.othM)), female: safeInt(r(row, COL.othF)),
+                    label: r(row, COL.othLbl) || undefined },
         },
-        afterActivityReport: (row[21] ?? "").trim() || undefined,    // V(21)
-        fbPostingLink:       (row[22] ?? "").trim() || undefined,    // W(22)
-        rawPhotosLink:       (row[23] ?? "").trim() || undefined,    // X(23)
-        testimonialsLink:    (row[24] ?? "").trim() || undefined,    // Y(24)
-        remarks:             (row[25] ?? "").trim() || undefined,    // Z(25)
+        afterActivityReport: r(row, COL.aar)          || undefined,
+        fbPostingLink:       r(row, COL.fb)           || undefined,
+        rawPhotosLink:       r(row, COL.photos)       || undefined,
+        testimonialsLink:    r(row, COL.testimonials) || undefined,
+        remarks:             r(row, COL.remarks)      || undefined,
         status,
-        images,                                                       // AE(30)
-        extraFields: extraFields !== "{}" ? extraFields : undefined,
+        extraFields: Object.keys(extraFieldsObj).length > 0 ? JSON.stringify(extraFieldsObj) : undefined,
         sheetRowNumber: rowNum,
       });
     }
@@ -264,7 +290,6 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Call Convex bulk upsert ──
-    const convex = getConvexClient();
     const result = await convex.mutation(api.sheetsSync.bulkUpsertFromSheets, {
       projectId: projectId as any,
       sheetId,

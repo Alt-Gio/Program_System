@@ -14,7 +14,7 @@ const crons = cronJobs();
 
 crons.interval(
   "auto-sync-all-sheets",
-  { hours: 6 },
+  { minutes: 15 },
   internal.sheetsActions.syncAllEnabled,
   {}
 );

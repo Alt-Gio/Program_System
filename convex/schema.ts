@@ -429,6 +429,7 @@ export default defineSchema({
     officeAssignment: v.optional(v.string()),
     onboardingDate: v.optional(v.number()),
     estimatedCompletion: v.optional(v.number()),
+    supervisorId: v.optional(v.id("supervisors")),
     photoStorageId: v.optional(v.string()),
     doc2x2StorageId: v.optional(v.string()),
     docResumeStorageId: v.optional(v.string()),
@@ -444,6 +445,7 @@ export default defineSchema({
   })
     .index("by_status", ["status"])
     .index("by_school", ["school"])
+    .index("by_email", ["email"])
     .index("by_createdAt", ["createdAt"]),
 
   /** Intern attendance records */
@@ -518,6 +520,121 @@ export default defineSchema({
     .index("by_intern", ["internId"])
     .index("by_account", ["accountId"])
     .index("by_createdAt", ["createdAt"]),
+
+  // ----------------------------------------------------------
+  // SUPERVISOR & INTERN AUTH
+  // ----------------------------------------------------------
+
+  /** Supervisors who manage interns */
+  supervisors: defineTable({
+    email: v.string(),
+    passwordHash: v.string(),
+    fullName: v.string(),
+    phone: v.optional(v.string()),
+    department: v.optional(v.string()),
+    role: v.string(), // "supervisor", "head_supervisor"
+    status: v.string(), // "active", "inactive"
+    invitedBy: v.optional(v.string()),
+    createdAt: v.number(),
+    lastLoginAt: v.optional(v.number()),
+  })
+    .index("by_email", ["email"])
+    .index("by_status", ["status"]),
+
+  /** Invite tokens for supervisor self-registration */
+  supervisorInvites: defineTable({
+    email: v.string(),
+    token: v.string(),
+    createdBy: v.string(),
+    used: v.boolean(),
+    usedAt: v.optional(v.number()),
+    expiresAt: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_token", ["token"])
+    .index("by_email", ["email"]),
+
+  /** Auth sessions for supervisors */
+  supervisorSessions: defineTable({
+    supervisorId: v.id("supervisors"),
+    token: v.string(),
+    expiresAt: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_token", ["token"])
+    .index("by_supervisor", ["supervisorId"]),
+
+  /** Login credentials for intern accounts */
+  internLogins: defineTable({
+    internId: v.id("interns"),
+    email: v.string(),
+    passwordHash: v.string(),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    lastLoginAt: v.optional(v.number()),
+  })
+    .index("by_email", ["email"])
+    .index("by_intern", ["internId"]),
+
+  /** Auth sessions for intern logins */
+  internLoginSessions: defineTable({
+    internLoginId: v.id("internLogins"),
+    token: v.string(),
+    expiresAt: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_token", ["token"])
+    .index("by_login", ["internLoginId"]),
+
+  /** Daily habits for interns to track */
+  internHabits: defineTable({
+    internId: v.id("interns"),
+    title: v.string(),
+    emoji: v.string(),
+    frequency: v.string(), // DAILY, WEEKDAYS
+    isActive: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_intern", ["internId"]),
+
+  /** Log of completed habits per day */
+  internHabitLogs: defineTable({
+    internId: v.id("interns"),
+    habitId: v.id("internHabits"),
+    date: v.string(), // YYYY-MM-DD
+    completed: v.boolean(),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_intern", ["internId"])
+    .index("by_intern_date", ["internId", "date"])
+    .index("by_habit_date", ["habitId", "date"]),
+
+  /** Daily accomplishment journal entries */
+  internDailyLogs: defineTable({
+    internId: v.id("interns"),
+    date: v.string(), // YYYY-MM-DD
+    accomplishments: v.optional(v.string()),
+    mood: v.optional(v.string()), // GREAT, GOOD, OKAY, ROUGH
+    learnings: v.optional(v.string()),
+    challenges: v.optional(v.string()),
+    tomorrowPlan: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_intern", ["internId"])
+    .index("by_intern_date", ["internId", "date"]),
+
+  /** Personal goals set by interns */
+  internGoals: defineTable({
+    internId: v.id("interns"),
+    title: v.string(),
+    description: v.optional(v.string()),
+    targetDate: v.optional(v.string()),
+    isCompleted: v.boolean(),
+    completedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_intern", ["internId"]),
 
   /** Google Sheets to Convex ID mapping for interns */
   internSheetMapping: defineTable({

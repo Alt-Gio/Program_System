@@ -56,12 +56,28 @@ const projects = [
 export function Sidebar() {
   const pathname = usePathname();
   const [projectsExpanded, setProjectsExpanded] = useState(true);
-  const { collapsed, setCollapsed } = useSidebar();
+  const { collapsed, setCollapsed, mobileOpen, setMobileOpen } = useSidebar();
+
+  function closeMobile() { setMobileOpen(false); }
 
   return (
+    <>
+      {/* Mobile backdrop */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm md:hidden"
+          onClick={closeMobile}
+        />
+      )}
+
     <aside className={cn(
       "fixed left-0 top-0 z-40 h-screen flex-col bg-gradient-to-b from-gray-50 to-white border-r border-gray-200 flex overflow-hidden transition-all duration-300",
-      collapsed ? "w-20" : "w-64"
+      // Desktop: collapsed vs full
+      "md:translate-x-0",
+      collapsed ? "md:w-20" : "md:w-64",
+      // Mobile: drawer width matches desktop expanded width (256px)
+      "w-64",
+      mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
     )}>
       {/* Header */}
       <div className="dict-gradient p-5 shrink-0 relative">
@@ -88,15 +104,23 @@ export function Sidebar() {
             <p className="text-blue-200 text-xs font-medium">Program Management System</p>
           </>
         )}
+        {/* Desktop collapse toggle */}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow-md hover:bg-gray-50 transition-colors"
+          className="hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-white border border-gray-200 rounded-full items-center justify-center shadow-md hover:bg-gray-50 transition-colors"
         >
           {collapsed ? (
             <PanelLeftOpen className="w-3.5 h-3.5 text-gray-600" />
           ) : (
             <PanelLeftClose className="w-3.5 h-3.5 text-gray-600" />
           )}
+        </button>
+        {/* Mobile close button */}
+        <button
+          onClick={closeMobile}
+          className="md:hidden absolute right-3 top-3 w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center text-white hover:bg-white/30 transition-colors"
+        >
+          <PanelLeftClose className="w-4 h-4" />
         </button>
       </div>
 
@@ -109,6 +133,7 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={closeMobile}
               className={cn(
                 "flex items-center rounded-xl text-sm font-medium transition-all",
                 collapsed ? "justify-center px-3 py-3" : "gap-3 px-4 py-3",
@@ -136,6 +161,7 @@ export function Sidebar() {
                   <Link
                     key={project.code}
                     href={href}
+                    onClick={closeMobile}
                     className={cn(
                       "flex items-center justify-center p-2 rounded-lg transition-all border",
                       active
@@ -180,6 +206,7 @@ export function Sidebar() {
                   <Link
                     key={project.code}
                     href={href}
+                    onClick={closeMobile}
                     className={cn(
                       "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all border",
                       active
@@ -212,6 +239,7 @@ export function Sidebar() {
         <div className="pt-6 border-t border-gray-200 mt-6 space-y-1">
           <Link
             href="/personnel"
+            onClick={closeMobile}
             className={cn(
               "flex items-center rounded-xl text-sm font-medium transition-all",
               collapsed ? "justify-center px-3 py-3" : "gap-3 px-4 py-3",
@@ -225,11 +253,12 @@ export function Sidebar() {
             {!collapsed && "Personnel"}
           </Link>
           <Link
-            href="/interns"
+            href="/intern-portal"
+            onClick={closeMobile}
             className={cn(
               "flex items-center rounded-xl text-sm font-medium transition-all",
               collapsed ? "justify-center px-3 py-3" : "gap-3 px-4 py-3",
-              pathname.startsWith("/interns")
+              pathname.startsWith("/intern-portal")
                 ? "bg-violet-600 text-white shadow-md shadow-violet-200"
                 : "text-gray-600 hover:bg-white hover:shadow-sm hover:text-gray-900"
             )}
@@ -240,6 +269,7 @@ export function Sidebar() {
           </Link>
           <Link
             href="/settings"
+            onClick={closeMobile}
             className={cn(
               "flex items-center rounded-xl text-sm font-medium transition-all",
               collapsed ? "justify-center px-3 py-3" : "gap-3 px-4 py-3",
@@ -270,5 +300,6 @@ export function Sidebar() {
         </div>
       )}
     </aside>
+    </>
   );
 }
