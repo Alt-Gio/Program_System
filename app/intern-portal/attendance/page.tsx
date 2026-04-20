@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { CalendarCheck, Plus, Trash2, CalendarDays } from "lucide-react";
+import { CalendarCheck, Plus, Trash2, CalendarDays, QrCode, ScanFace } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,6 +26,7 @@ export default function AttendancePage() {
 
   const [dateFilter,   setDateFilter]   = useState(new Date().toISOString().slice(0, 10));
   const [internFilter, setInternFilter] = useState("ALL");
+  const [methodFilter, setMethodFilter] = useState("ALL");
   const [open,   setOpen]   = useState(false);
   const [form,   setForm]   = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
@@ -34,11 +35,18 @@ export default function AttendancePage() {
     if (!interns) return [];
     return interns
       .flatMap(i => i.attendance
-        .filter(a => (!dateFilter || a.date === dateFilter) && (internFilter === "ALL" || i.id === internFilter))
+        .filter(a =>
+          (!dateFilter || a.date === dateFilter) &&
+          (internFilter === "ALL" || i.id === internFilter) &&
+          (methodFilter === "ALL" ||
+           (methodFilter === "QR"      && a.checkInMethod === "QR") ||
+           (methodFilter === "FACE_CV" && a.checkInMethod === "FACE_CV") ||
+           (methodFilter === "MANUAL"  && !a.checkInMethod))
+        )
         .map(a => ({ ...a, internName: i.fullName, school: i.school, iid: i.id }))
       )
       .sort((a, b) => (a.timeIn ?? "").localeCompare(b.timeIn ?? ""));
-  }, [interns, dateFilter, internFilter]);
+  }, [interns, dateFilter, internFilter, methodFilter]);
 
   const todayStats = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -108,7 +116,14 @@ export default function AttendancePage() {
           <option value="ALL">All Interns</option>
           {(interns ?? []).map(i => <option key={i.id} value={i.id}>{i.fullName}</option>)}
         </select>
-        <Button variant="outline" size="sm" onClick={() => { setDateFilter(""); setInternFilter("ALL"); }} className="text-xs shrink-0">Clear</Button>
+        <select value={methodFilter} onChange={e => setMethodFilter(e.target.value)}
+          className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 shadow-sm outline-none shrink-0">
+          <option value="ALL">All Methods</option>
+          <option value="QR">QR Only</option>
+          <option value="FACE_CV">Face Recognition</option>
+          <option value="MANUAL">Manual</option>
+        </select>
+        <Button variant="outline" size="sm" onClick={() => { setDateFilter(""); setInternFilter("ALL"); setMethodFilter("ALL"); }} className="text-xs shrink-0">Clear</Button>
       </div>
 
       {/* Table */}
@@ -131,6 +146,7 @@ export default function AttendancePage() {
                 <th className="px-4 py-3 text-left">Time Out</th>
                 <th className="px-4 py-3 text-right hidden md:table-cell">Hours</th>
                 <th className="px-4 py-3 text-center">Status</th>
+                <th className="px-4 py-3 text-center hidden md:table-cell">Method</th>
                 <th className="px-4 py-3 text-left hidden lg:table-cell">Notes</th>
                 <th className="px-4 py-3 w-10"></th>
               </tr>
@@ -151,6 +167,20 @@ export default function AttendancePage() {
                   <td className="px-4 py-3 text-right font-bold tabular-nums text-blue-600 hidden md:table-cell">{row.hours != null ? `${row.hours}h` : "—"}</td>
                   <td className="px-4 py-3 text-center">
                     <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full border", ATT_BADGE[row.status] ?? "bg-gray-50 text-gray-500 border-gray-200")}>{row.status}</span>
+                  </td>
+                  <td className="px-4 py-3 text-center hidden md:table-cell">
+                    {row.checkInMethod === "FACE_CV" ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-purple-50 text-purple-700 border-purple-200" title={row.faceConfidence != null ? `Confidence: ${Math.round(row.faceConfidence * 100)}%` : "Face Recognition"}>
+                        <ScanFace className="w-3 h-3" />
+                        {row.faceConfidence != null ? `${Math.round(row.faceConfidence * 100)}%` : "Face"}
+                      </span>
+                    ) : row.checkInMethod === "QR" ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-blue-50 text-blue-700 border-blue-200">
+                        <QrCode className="w-3 h-3" />QR
+                      </span>
+                    ) : (
+                      <span className="text-gray-300">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-gray-400 hidden lg:table-cell max-w-[150px] truncate">{row.notes ?? "—"}</td>
                   <td className="px-4 py-3">

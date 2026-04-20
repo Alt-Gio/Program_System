@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 
 // ─── Create Log Entry ─────────────────────────────────────────────────────────
 export const create = mutation({
@@ -29,7 +30,24 @@ export const create = mutation({
       timeOut: undefined,
       satisfactionRating: undefined,
       remarks: undefined,
+      syncedToSheets: false,
       createdAt: Date.now(),
+    });
+
+    // Audit log entry for DTC client check-in
+    await ctx.runMutation(internal.auditLog.logEntry, {
+      type: "DTC_CLIENT_CHECKIN",
+      entityId: logId,
+      userName: args.fullName,
+      timestamp: timeIn,
+      method: "WALK_IN",
+      pcId: args.pcId ?? undefined,
+      metadata: JSON.stringify({
+        agency: args.agency,
+        purpose: args.purpose,
+        serviceType: args.serviceType,
+        equipmentUsed: args.equipmentUsed,
+      }),
     });
 
     return { id: logId, timeIn };
@@ -55,7 +73,27 @@ export const update = mutation({
       await ctx.db.patch(log.pcId, { status: "ONLINE" });
     }
 
-    await ctx.db.patch(id, updates);
+    // Mark as needing re-sync if checking out
+    if (updates.timeOut) {
+      await ctx.db.patch(id, { ...updates, syncedToSheets: false });
+
+      // Audit log entry for DTC client check-out
+      await ctx.runMutation(internal.auditLog.logEntry, {
+        type: "DTC_CLIENT_CHECKOUT",
+        entityId: id,
+        userName: log.fullName,
+        timestamp: updates.timeOut,
+        method: "WALK_IN",
+        pcId: log.pcId ?? undefined,
+        metadata: JSON.stringify({
+          satisfactionRating: updates.satisfactionRating,
+          remarks: updates.remarks,
+        }),
+      });
+    } else {
+      await ctx.db.patch(id, updates);
+    }
+
     return { success: true };
   },
 });

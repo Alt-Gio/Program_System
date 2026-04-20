@@ -10,6 +10,8 @@
 
 import type * as activities from "../activities.js";
 import type * as activityImages from "../activityImages.js";
+import type * as attendanceSync from "../attendanceSync.js";
+import type * as auditLog from "../auditLog.js";
 import type * as auth from "../auth.js";
 import type * as crons from "../crons.js";
 import type * as dtcAnnouncements from "../dtcAnnouncements.js";
@@ -18,11 +20,13 @@ import type * as dtcPcs from "../dtcPcs.js";
 import type * as dtcSettings from "../dtcSettings.js";
 import type * as files from "../files.js";
 import type * as gamification from "../gamification.js";
+import type * as googleSheetsWrite from "../googleSheetsWrite.js";
 import type * as highlightFields from "../highlightFields.js";
 import type * as http from "../http.js";
 import type * as images from "../images.js";
 import type * as internAuth from "../internAuth.js";
 import type * as internPortal from "../internPortal.js";
+import type * as internPublic from "../internPublic.js";
 import type * as internSheetsSync from "../internSheetsSync.js";
 import type * as internTasks from "../internTasks.js";
 import type * as interns from "../interns.js";
@@ -37,6 +41,8 @@ import type * as sheetsSync from "../sheetsSync.js";
 import type * as subProjects from "../subProjects.js";
 import type * as supervisorTools from "../supervisorTools.js";
 import type * as supervisors from "../supervisors.js";
+import type * as syncMonitor from "../syncMonitor.js";
+import type * as testEnv from "../testEnv.js";
 
 import type {
   ApiFromModules,
@@ -47,6 +53,8 @@ import type {
 declare const fullApi: ApiFromModules<{
   activities: typeof activities;
   activityImages: typeof activityImages;
+  attendanceSync: typeof attendanceSync;
+  auditLog: typeof auditLog;
   auth: typeof auth;
   crons: typeof crons;
   dtcAnnouncements: typeof dtcAnnouncements;
@@ -55,11 +63,13 @@ declare const fullApi: ApiFromModules<{
   dtcSettings: typeof dtcSettings;
   files: typeof files;
   gamification: typeof gamification;
+  googleSheetsWrite: typeof googleSheetsWrite;
   highlightFields: typeof highlightFields;
   http: typeof http;
   images: typeof images;
   internAuth: typeof internAuth;
   internPortal: typeof internPortal;
+  internPublic: typeof internPublic;
   internSheetsSync: typeof internSheetsSync;
   internTasks: typeof internTasks;
   interns: typeof interns;
@@ -74,6 +84,8 @@ declare const fullApi: ApiFromModules<{
   subProjects: typeof subProjects;
   supervisorTools: typeof supervisorTools;
   supervisors: typeof supervisors;
+  syncMonitor: typeof syncMonitor;
+  testEnv: typeof testEnv;
 }>;
 
 /**

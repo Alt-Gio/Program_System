@@ -1,6 +1,7 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 
 // ============================================================
 // Convex HTTP Actions — Google Sheets Webhook Endpoint
@@ -57,8 +58,8 @@ http.route({
       const rows: RawSheetRow[] = Array.isArray(body) ? body : [body];
 
       // Resolve province + LGU names to IDs
-      const provinces = await ctx.runQuery(api.provinces.list, {});
-      const allLGUs = await ctx.runQuery(api.provinces.allLGUs, {});
+      const provinces: Array<{ _id: Id<"provinces">; name: string; code: string }> = await ctx.runQuery(api.provinces.list, {});
+      const allLGUs: Array<{ _id: Id<"lgus">; provinceId: Id<"provinces">; name: string }> = await ctx.runQuery(api.provinces.allLGUs, {});
 
       const results: Array<{ action: string; id: string; error?: string }> = [];
 
@@ -158,6 +159,51 @@ http.route({
     );
   }),
 });
+
+// ── Manual sync trigger endpoint (for test dashboard) ───────────────────────
+http.route({
+  path: "/api/trigger-sync",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const body = await request.json() as { target?: string };
+      const target = body.target;
+      if (!target) {
+        return new Response(JSON.stringify({ ok: false, message: "Missing 'target'" }), {
+          status: 400,
+          headers: cors,
+        });
+      }
+
+      const result = await ctx.runAction(internal.googleSheetsWrite.manualTrigger, { target });
+      return new Response(JSON.stringify(result), {
+        status: result.ok ? 200 : 500,
+        headers: cors,
+      });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, message: String(e) }), {
+        status: 500,
+        headers: cors,
+      });
+    }
+  }),
+});
+
+// CORS preflight for trigger-sync
+http.route({
+  path: "/api/trigger-sync",
+  method: "OPTIONS",
+  handler: httpAction(async () => {
+    return new Response(null, { status: 204, headers: cors });
+  }),
+});
+
+const cors: HeadersInit = {
+  "Content-Type": "application/json",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
 
 export default http;
 

@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 
 async function hashPassword(password: string): Promise<string> {
@@ -209,6 +210,8 @@ export const getMyData = query({
         hours: a.hours ?? null,
         status: a.status,
         notes: a.notes ?? null,
+        checkInMethod: a.checkInMethod ?? null,
+        faceConfidence: a.faceConfidence ?? null,
       })),
       tasks: tasks.map((t) => ({
         id: t._id,
@@ -348,7 +351,7 @@ export const checkIn = mutation({
       .first();
 
     if (!existing) {
-      await ctx.db.insert("internAttendance", {
+      const attId = await ctx.db.insert("internAttendance", {
         internId: loginRecord.internId,
         date: today,
         timeIn: timeStr,
@@ -358,8 +361,21 @@ export const checkIn = mutation({
         checkInAccuracy: args.accuracy,
         checkInAddress: args.address,
         checkInVerified: geoVerified,
+        checkInMethod: "QR",
+        syncedToSheets: false,
         createdAt: Date.now(),
       });
+
+      const internDoc = await ctx.db.get(loginRecord.internId);
+      await ctx.runMutation(internal.auditLog.logEntry, {
+        type: "INTERN_CHECKIN",
+        entityId: attId,
+        userId: loginRecord.internId,
+        userName: internDoc?.fullName ?? "Unknown",
+        timestamp: timeStr,
+        method: "QR",
+      });
+
       return {
         action: "checked_in" as const,
         time: timeStr,
@@ -376,6 +392,7 @@ export const checkIn = mutation({
         hours,
         checkOutLat: args.lat,
         checkOutLng: args.lng,
+        syncedToSheets: false,
       });
       const intern = await ctx.db.get(loginRecord.internId);
       if (intern) {
@@ -384,6 +401,16 @@ export const checkIn = mutation({
           updatedAt: Date.now(),
         });
       }
+
+      await ctx.runMutation(internal.auditLog.logEntry, {
+        type: "INTERN_CHECKOUT",
+        entityId: existing._id,
+        userId: loginRecord.internId,
+        userName: intern?.fullName ?? "Unknown",
+        timestamp: timeStr,
+        method: "QR",
+      });
+
       return {
         action: "checked_out" as const,
         time: timeStr,
@@ -394,6 +421,97 @@ export const checkIn = mutation({
     } else {
       throw new Error("Attendance already complete for today.");
     }
+  },
+});
+
+// ─── Face Recognition Check-In (called from Python CV station) ───────────────
+export const faceCheckIn = mutation({
+  args: {
+    internId:      v.optional(v.id("interns")),
+    internName:    v.optional(v.string()),
+    action:        v.string(),           // "timeIn" | "timeOut"
+    confidence:    v.optional(v.number()),
+    isoTimestamp:  v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // 1. Resolve intern — prefer direct ID, fall back to name match
+    let intern = null;
+    if (args.internId) {
+      intern = await ctx.db.get(args.internId);
+    } else if (args.internName) {
+      const all = await ctx.db.query("interns").collect();
+      intern = all.find(
+        i => i.fullName.toLowerCase() === args.internName!.toLowerCase()
+      ) ?? null;
+    }
+    if (!intern) throw new Error("Intern not found");
+    if (intern.status !== "ACTIVE") throw new Error(`${intern.fullName} is not an active intern`);
+
+    // 2. Build timestamp from provided ISO string or server time
+    const now   = args.isoTimestamp ? new Date(args.isoTimestamp) : new Date();
+    const today = now.toISOString().slice(0, 10);
+    const pad   = (n: number) => String(n).padStart(2, "0");
+    const timeStr = `${today}T${pad(now.getHours())}:${pad(now.getMinutes())}:00`;
+
+    // 3. Find existing attendance record for today
+    const existing = await ctx.db
+      .query("internAttendance")
+      .withIndex("by_intern_date", q =>
+        q.eq("internId", intern!._id).eq("date", today)
+      )
+      .first();
+
+    // 4a. Check-In — no record yet for today
+    if (!existing) {
+      const attId = await ctx.db.insert("internAttendance", {
+        internId:      intern._id,
+        date:          today,
+        timeIn:        timeStr,
+        status:        "PRESENT",
+        checkInMethod: "FACE_CV",
+        faceConfidence: args.confidence,
+        syncedToSheets: false,
+        createdAt:     Date.now(),
+      });
+
+      await ctx.runMutation(internal.auditLog.logEntry, {
+        type: "INTERN_CHECKIN",
+        entityId: attId,
+        userId: intern._id,
+        userName: intern.fullName,
+        timestamp: timeStr,
+        method: "FACE_CV",
+        confidence: args.confidence,
+      });
+
+      return { action: "checked_in" as const, time: timeStr, hours: null, internName: intern.fullName };
+    }
+
+    // 4b. Check-Out — open record exists
+    if (existing.timeIn && !existing.timeOut) {
+      const inDate  = new Date(existing.timeIn);
+      const outDate = new Date(timeStr);
+      const hours   = Math.round((outDate.getTime() - inDate.getTime()) / 36000) / 100;
+      await ctx.db.patch(existing._id, { timeOut: timeStr, hours, syncedToSheets: false });
+      await ctx.db.patch(intern._id, {
+        totalHours: intern.totalHours + hours,
+        updatedAt:  Date.now(),
+      });
+
+      await ctx.runMutation(internal.auditLog.logEntry, {
+        type: "INTERN_CHECKOUT",
+        entityId: existing._id,
+        userId: intern._id,
+        userName: intern.fullName,
+        timestamp: timeStr,
+        method: "FACE_CV",
+        confidence: args.confidence,
+      });
+
+      return { action: "checked_out" as const, time: timeStr, hours, internName: intern.fullName };
+    }
+
+    throw new Error("Attendance already complete for today.");
   },
 });
 

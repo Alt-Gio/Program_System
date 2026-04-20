@@ -348,11 +348,15 @@ export default defineSchema({
     timeOut: v.optional(v.string()),
     satisfactionRating: v.optional(v.number()),
     remarks: v.optional(v.string()),
+    syncedToSheets: v.optional(v.boolean()),
+    lastSyncedAt: v.optional(v.number()),
+    sheetRowNumber: v.optional(v.number()),
     createdAt: v.number(),
   })
     .index("by_timeIn", ["timeIn"])
     .index("by_pcId", ["pcId"])
-    .index("by_createdAt", ["createdAt"]),
+    .index("by_createdAt", ["createdAt"])
+    .index("by_syncedToSheets", ["syncedToSheets"]),
 
   /** DTC computer workstations */
   dtcPcs: defineTable({
@@ -420,6 +424,7 @@ export default defineSchema({
     phone: v.optional(v.string()),
     photoUrl: v.optional(v.string()),
     notes: v.optional(v.string()),
+    employeeId: v.optional(v.string()),
     sex: v.optional(v.string()),
     age: v.optional(v.number()),
     civilStatus: v.optional(v.string()),
@@ -465,11 +470,18 @@ export default defineSchema({
     checkInVerified: v.optional(v.boolean()),
     checkOutLat: v.optional(v.number()),
     checkOutLng: v.optional(v.number()),
+    checkInMethod: v.optional(v.string()),  // "QR" | "FACE_CV"
+    faceConfidence: v.optional(v.number()), // 0.0 – 1.0
+    lunchStart: v.optional(v.string()),    // ISO timestamp when lunch break started
+    lunchEnd:   v.optional(v.string()),    // ISO timestamp when lunch break ended
+    syncedToSheets: v.optional(v.boolean()),
+    lastSyncedAt: v.optional(v.number()),
     createdAt: v.number(),
   })
     .index("by_intern", ["internId"])
     .index("by_date", ["date"])
-    .index("by_intern_date", ["internId", "date"]),
+    .index("by_intern_date", ["internId", "date"])
+    .index("by_syncedToSheets", ["syncedToSheets"]),
 
   /** GPS geofence zones where interns are allowed to check in */
   officeGeoFence: defineTable({
@@ -698,6 +710,45 @@ export default defineSchema({
     .index("by_supervisor_intern", ["supervisorId", "internId"])
     .index("by_intern", ["internId"])
     .index("by_supervisor", ["supervisorId"]),
+
+  // ----------------------------------------------------------
+  // AUDIT & SYNC TRACKING
+  // ----------------------------------------------------------
+
+  /** Immutable audit log for all check-in/out events */
+  auditLog: defineTable({
+    type: v.string(),        // INTERN_CHECKIN, INTERN_CHECKOUT, DTC_CLIENT_CHECKIN, DTC_CLIENT_CHECKOUT
+    entityId: v.string(),    // internAttendance._id or dtcLogs._id
+    userId: v.optional(v.string()),      // intern._id or client name
+    userName: v.string(),
+    timestamp: v.string(),   // ISO-8601
+    method: v.optional(v.string()),      // QR, FACE_CV, MANUAL, WALK_IN
+    confidence: v.optional(v.number()),  // face recognition confidence
+    pcId: v.optional(v.string()),        // DTC PC used
+    metadata: v.optional(v.string()),    // JSON string for extra data
+    syncedToSheets: v.optional(v.boolean()),
+    lastSyncedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_type", ["type"])
+    .index("by_timestamp", ["timestamp"])
+    .index("by_syncedToSheets", ["syncedToSheets"])
+    .index("by_entityId", ["entityId"]),
+
+  /** Sync status monitoring per Google Sheet */
+  syncStatus: defineTable({
+    sheetName: v.string(),   // "DICT_Attendance_Log", "DICT_DTC_Logbook", "DICT_Sync_Status"
+    sheetId: v.string(),
+    lastSyncTime: v.optional(v.number()),
+    status: v.string(),      // "idle", "syncing", "success", "error"
+    recordsSynced: v.optional(v.number()),
+    totalPending: v.optional(v.number()),
+    lastError: v.optional(v.string()),
+    nextScheduledSync: v.optional(v.number()),
+    updatedAt: v.number(),
+  })
+    .index("by_sheetName", ["sheetName"])
+    .index("by_status", ["status"]),
 
   /** Google Sheets to Convex ID mapping for interns */
   internSheetMapping: defineTable({

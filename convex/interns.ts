@@ -57,6 +57,8 @@ export const list = query({
             status: a.status,
             notes: a.notes ?? null,
             sessionCount: a.sessionCount ?? undefined,
+            checkInMethod: a.checkInMethod ?? null,
+            faceConfidence: a.faceConfidence ?? null,
           })),
           tasks: tasks.map((t) => ({
             id: t._id,
