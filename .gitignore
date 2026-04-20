@@ -49,3 +49,14 @@ Thumbs.db
 # Docker
 .dockerignore
 docker-compose.override.yml
+
+# CV Station build artefacts
+cv-station/.venv/
+cv-station/build/
+cv-station/dist/
+cv-station/*.spec
+cv-station/__pycache__/
+
+# Packaged CV Station binary (produced by cv-station/build.bat)
+downloads/*.exe
+downloads/*.zip

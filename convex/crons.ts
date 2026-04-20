@@ -42,6 +42,22 @@ crons.interval(
   {}
 );
 
+// ── NEW: Sync activities (Convex → project Google Sheets) every 15 min ──────
+crons.interval(
+  "sync-activities-to-sheets",
+  { minutes: 15 },
+  internal.googleSheetsWrite.syncPendingActivities,
+  {}
+);
+
+// ── NEW: Sync interns (Google Sheets → Convex) every 15 min ─────────────────
+crons.interval(
+  "sync-interns-from-sheets",
+  { minutes: 15 },
+  internal.googleSheetsWrite.syncInternFromSheets,
+  {}
+);
+
 // ── NEW: Update DICT_Sync_Status sheet (every 30 min) ───────────────────────
 crons.interval(
   "update-sync-status-sheet",

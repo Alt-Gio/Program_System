@@ -200,6 +200,73 @@ export const markDTCLogsSyncedPublic = mutation({
   },
 });
 
+// ─── Get unsynced activities (for auto-sync to DICT_Program sheets) ─────────
+export const getUnsyncedActivitiesPublic = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const records = await ctx.db
+      .query("activities")
+      .withIndex("by_syncedToSheets", (q) => q.eq("syncedToSheets", false))
+      .take(args.limit ?? 50);
+
+    const enriched = await Promise.all(
+      records.map(async (r) => {
+        const project = await ctx.db.get(r.projectId);
+        const province = await ctx.db.get(r.provinceId);
+        const lgu = r.lguId ? await ctx.db.get(r.lguId) : null;
+        // Find sheet connection for this project
+        const connection = await ctx.db
+          .query("sheetsConnections")
+          .withIndex("by_project", (q) => q.eq("projectId", r.projectId))
+          .first();
+
+        return {
+          _id: r._id,
+          projectId: r.projectId,
+          projectCode: project?.code ?? "",
+          provinceName: province?.name ?? "",
+          lguName: lgu?.name ?? "",
+          month: r.month,
+          year: r.year,
+          activityTitle: r.activityTitle,
+          venue: r.venue,
+          partnerOrganizations: r.partnerOrganizations,
+          startDate: r.startDate,
+          endDate: r.endDate,
+          modeOfConduct: r.modeOfConduct,
+          personnelRaw: r.personnelRaw,
+          participants: r.participants,
+          status: r.status,
+          remarks: r.remarks,
+          afterActivityReport: r.afterActivityReport,
+          fbPostingLink: r.fbPostingLink,
+          rawPhotosLink: r.rawPhotosLink,
+          testimonialsLink: r.testimonialsLink,
+          driveFolderLink: r.driveFolderLink,
+          extraFields: r.extraFields,
+          images: r.images,
+          sheetId: connection?.sheetId,
+          sheetName: connection?.sheetName,
+          sheetSyncEnabled: connection?.syncEnabled ?? false,
+        };
+      })
+    );
+    return enriched;
+  },
+});
+
+// ─── Mark activities as synced to sheets ────────────────────────────────────
+export const markActivitiesSyncedPublic = mutation({
+  args: { ids: v.array(v.id("activities")) },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    for (const id of args.ids) {
+      await ctx.db.patch(id, { syncedToSheets: true, lastSyncedAt: now });
+    }
+    return { marked: args.ids.length };
+  },
+});
+
 export const countPendingPublic = query({
   args: {},
   handler: async (ctx) => {
@@ -215,10 +282,15 @@ export const countPendingPublic = query({
       .query("auditLog")
       .withIndex("by_syncedToSheets", (q) => q.eq("syncedToSheets", false))
       .take(500);
+    const pendingActivities = await ctx.db
+      .query("activities")
+      .withIndex("by_syncedToSheets", (q) => q.eq("syncedToSheets", false))
+      .take(500);
     return {
       attendance: pendingAttendance.length,
       dtcLogs: pendingDTC.length,
       auditLogs: pendingAudit.length,
+      activities: pendingActivities.length,
     };
   },
 });

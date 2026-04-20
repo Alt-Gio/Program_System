@@ -245,7 +245,7 @@ export const createActivity = mutation({
     createdBy: v.string(),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("activities", { ...args, status: "Draft" });
+    return await ctx.db.insert("activities", { ...args, status: "Draft", syncedToSheets: false });
   },
 });
 
@@ -276,7 +276,7 @@ export const updateActivity = mutation({
   },
   handler: async (ctx, args) => {
     const { id, ...patch } = args;
-    await ctx.db.patch(id, patch);
+    await ctx.db.patch(id, { ...patch, syncedToSheets: false });
     return id;
   },
 });

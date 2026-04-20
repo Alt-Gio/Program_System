@@ -6,6 +6,7 @@ const PUBLIC_ROUTES = [
   '/',
   '/signin',
   '/signup',
+  '/dtc-admin',
 ]
 
 export function middleware(request: NextRequest) {

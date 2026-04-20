@@ -164,6 +164,8 @@ export default defineSchema({
     updatedBy: v.optional(v.string()),
     importedFrom: v.optional(v.string()),
     importedAt: v.optional(v.number()),
+    syncedToSheets: v.optional(v.boolean()),
+    lastSyncedAt: v.optional(v.number()),
   })
     .index("by_project", ["projectId"])
     .index("by_province", ["provinceId"])
@@ -171,7 +173,8 @@ export default defineSchema({
     .index("by_year_month", ["year", "month"])
     .index("by_project_year", ["projectId", "year"])
     .index("by_status", ["status"])
-    .index("by_subproject", ["subProjectId"]),
+    .index("by_subproject", ["subProjectId"])
+    .index("by_syncedToSheets", ["syncedToSheets"]),
 
   // ----------------------------------------------------------
   // PROJECT-SPECIFIC SUPPLEMENTAL TABLES

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(npx next *)",
+      "Bash(curl *)",
+      "Bash(ls \"C:\\\\Users\\\\actal\\\\Music\\\\Project\\\\CascadeProjects\\\\windsurf-project\"/middleware.*)",
+      "Bash(ls \"C:\\\\Users\\\\actal\\\\Music\\\\Project\\\\CascadeProjects\\\\windsurf-project\"/src/middleware.*)"
+    ]
+  }
+}

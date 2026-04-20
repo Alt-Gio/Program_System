@@ -257,6 +257,8 @@ export const bulkUpsertFromSheets = mutation({
             updatedBy: args.syncedBy,
             importedFrom: "google_sheets",
             importedAt: now,
+            syncedToSheets: true,
+            lastSyncedAt: now,
           });
           updated++;
         } else {
@@ -268,6 +270,8 @@ export const bulkUpsertFromSheets = mutation({
             createdBy: args.syncedBy,
             importedFrom: "google_sheets",
             importedAt: now,
+            syncedToSheets: true,
+            lastSyncedAt: now,
           });
           inserted++;
         }

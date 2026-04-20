@@ -1,0 +1,102 @@
+/* ============================================================
+   DTC Admin — DICT Region V
+   Standalone styles (scoped via .dtc-admin-root)
+   ============================================================ */
+
+.dtc-admin-root {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: #F0F2F8;
+  color: #1a1f36;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  height: 100vh;
+}
+
+.dtc-admin-root *, .dtc-admin-root *::before, .dtc-admin-root *::after {
+  box-sizing: border-box;
+}
+
+.dtc-admin-root ::-webkit-scrollbar { width: 5px; height: 5px; }
+.dtc-admin-root ::-webkit-scrollbar-track { background: transparent; }
+.dtc-admin-root ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
+
+.dtc-admin-root input,
+.dtc-admin-root button,
+.dtc-admin-root textarea,
+.dtc-admin-root select { font-family: inherit; }
+
+.dtc-admin-root button { cursor: pointer; border: none; background: none; }
+
+/* Sidebar */
+.dtc-sidebar { width: 240px; height: 100vh; display: flex; flex-direction: column; flex-shrink: 0; position: relative; }
+.dtc-sidebar-logo { padding: 24px 20px 20px; border-bottom: 1px solid rgba(255,255,255,0.07); }
+.dtc-sidebar-nav { flex: 1; padding: 12px 10px; overflow-y: auto; }
+.dtc-nav-section-label { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; color: rgba(255,255,255,0.25); padding: 14px 10px 6px; text-transform: uppercase; margin: 0; }
+.dtc-nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px; cursor: pointer; color: rgba(255,255,255,0.5); font-size: 13.5px; font-weight: 500; transition: all 0.15s; margin-bottom: 1px; }
+.dtc-nav-item:hover { color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.06); }
+.dtc-nav-item.active { color: #fff; background: rgba(99,130,255,0.18); }
+.dtc-nav-item.active .dtc-nav-dot { background: #6882FF; }
+.dtc-nav-dot { width: 6px; height: 6px; border-radius: 50%; background: transparent; flex-shrink: 0; margin-left: auto; }
+.dtc-nav-icon { width: 17px; text-align: center; font-size: 14px; flex-shrink: 0; }
+.dtc-sidebar-footer { padding: 16px; border-top: 1px solid rgba(255,255,255,0.07); }
+
+/* Main layout */
+.dtc-app { display: flex; height: 100vh; overflow: hidden; }
+.dtc-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.dtc-topbar { background: #fff; border-bottom: 1px solid #e8eaf0; padding: 0 28px; height: 60px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+.dtc-content { flex: 1; overflow-y: auto; padding: 28px; }
+
+/* Cards */
+.dtc-card { background: #fff; border-radius: 14px; border: 1px solid #e8eaf0; }
+.dtc-stat-card { padding: 22px 24px; }
+
+/* Badges */
+.dtc-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.dtc-badge-green { background: #d1fae5; color: #059669; }
+.dtc-badge-orange { background: #ffedd5; color: #ea580c; }
+.dtc-badge-red { background: #fee2e2; color: #dc2626; }
+.dtc-badge-blue { background: #dbeafe; color: #2563eb; }
+.dtc-badge-gray { background: #f3f4f6; color: #6b7280; }
+.dtc-badge-yellow { background: #fef9c3; color: #a16207; }
+
+/* Table */
+.dtc-admin-root table { width: 100%; border-collapse: collapse; }
+.dtc-admin-root th { font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.07em; padding: 10px 16px; text-align: left; border-bottom: 1px solid #f1f3f9; }
+.dtc-admin-root td { padding: 12px 16px; font-size: 13px; border-bottom: 1px solid #f5f7fc; color: #374151; }
+.dtc-admin-root tr:last-child td { border-bottom: none; }
+.dtc-admin-root tr:hover td { background: #fafbff; }
+
+/* Inputs */
+.dtc-inp { border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 8px 12px; font-size: 13px; outline: none; transition: border-color 0.15s; background: #fff; }
+.dtc-inp:focus { border-color: #0038A8; box-shadow: 0 0 0 3px rgba(0,56,168,0.08); }
+
+/* Buttons */
+.dtc-btn-primary { background: #0038A8; color: #fff; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 600; transition: all 0.15s; }
+.dtc-btn-primary:hover { background: #002d8a; }
+.dtc-btn-ghost { border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 7px 14px; font-size: 13px; font-weight: 500; color: #374151; transition: all 0.15s; background: #fff; }
+.dtc-btn-ghost:hover { border-color: #0038A8; color: #0038A8; background: #f0f5ff; }
+.dtc-btn-danger { background: #fee2e2; color: #dc2626; border-radius: 8px; padding: 7px 14px; font-size: 13px; font-weight: 600; transition: all 0.15s; }
+.dtc-btn-danger:hover { background: #fecaca; }
+
+/* Toggle */
+.dtc-toggle { position: relative; width: 36px; height: 20px; display: inline-block; }
+.dtc-toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+.dtc-toggle-track { position: absolute; inset: 0; background: #d1d5db; border-radius: 20px; transition: 0.2s; cursor: pointer; }
+.dtc-toggle input:checked + .dtc-toggle-track { background: #0038A8; }
+.dtc-toggle-thumb { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; background: white; border-radius: 50%; transition: 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.15); pointer-events: none; }
+.dtc-toggle input:checked ~ .dtc-toggle-thumb { transform: translateX(16px); }
+
+/* Tweaks panel */
+.dtc-tweaks-panel { position: fixed; bottom: 20px; right: 20px; background: #fff; border: 1.5px solid #e5e7eb; border-radius: 14px; padding: 18px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); z-index: 1000; width: 240px; }
+.dtc-tweaks-panel h4 { font-size: 13px; font-weight: 700; color: #374151; margin-bottom: 12px; }
+
+/* Animated pulse */
+@keyframes dtcPulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+.dtc-pulse { animation: dtcPulse 2s infinite; }
+
+/* Notification dot */
+.dtc-notif-dot { width: 8px; height: 8px; background: #CE1126; border-radius: 50%; position: absolute; top: -2px; right: -2px; }
+
+/* Page fade */
+@keyframes dtcFadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+.dtc-page { animation: dtcFadeIn 0.2s ease; }

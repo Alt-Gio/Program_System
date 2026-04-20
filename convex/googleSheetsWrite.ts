@@ -127,6 +127,66 @@ export const checkSyncHealth = internalAction({
   },
 });
 
+// ─── Sync pending activities to project Google Sheets (DICT_Program) ───────
+export const syncPendingActivities = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    try {
+      const result = await callSyncTrigger("syncActivities");
+      console.log("[syncPendingActivities]", result.message);
+      if (result.ok) {
+        await ctx.runMutation(internal.syncMonitor.upsertStatus, {
+          sheetName: "DICT_Program_Activities",
+          sheetId: "auto-sync",
+          status: "success",
+          recordsSynced: result.synced ?? 0,
+        });
+      }
+      return result;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("[syncPendingActivities] Error:", msg);
+      await ctx.runMutation(internal.syncMonitor.upsertStatus, {
+        sheetName: "DICT_Program_Activities",
+        sheetId: "auto-sync",
+        status: "error",
+        lastError: msg.slice(0, 300),
+      });
+      return { ok: false, message: msg };
+    }
+  },
+});
+
+// ─── Sync interns from Google Sheet → Convex (INTERN sheet) ────────────────
+export const syncInternFromSheets = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    try {
+      const result = await callSyncTrigger("syncInterns");
+      console.log("[syncInternFromSheets]", result.message);
+      if (result.ok) {
+        await ctx.runMutation(internal.syncMonitor.upsertStatus, {
+          sheetName: "Intern_Sheet",
+          sheetId: process.env.INTERN_SHEET_ID ?? "",
+          status: "success",
+          recordsSynced: result.synced ?? 0,
+        });
+      }
+      return result;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("[syncInternFromSheets] Error:", msg);
+      await ctx.runMutation(internal.syncMonitor.upsertStatus, {
+        sheetName: "Intern_Sheet",
+        sheetId: process.env.INTERN_SHEET_ID ?? "",
+        status: "error",
+        lastError: msg.slice(0, 300),
+      });
+      return { ok: false, message: msg };
+    }
+  },
+});
+
 // ─── Manual trigger (for Convex HTTP action fallback) ───────────────────────
 export const manualTrigger = internalAction({
   args: { target: v.string() },

@@ -6,7 +6,8 @@ import type { Id } from "@/convex/_generated/dataModel";
 
 // ============================================================
 // Sync Trigger API — runs in Next.js Node.js runtime
-// Handles: health, syncDTC, syncAttendance, syncStatusSheet, setupTabs
+// Handles: health, syncDTC, syncAttendance, syncActivities,
+//          syncInterns, syncStatusSheet, setupTabs, syncAll
 // No Convex "use node" needed — JWT signing runs natively here.
 //
 // POST /api/sync-trigger  { target: string }
@@ -14,7 +15,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
-// ── All 4 Google Sheet IDs ──────────────────────────────────────────────────
+// ── All Google Sheet IDs ────────────────────────────────────────────────────
 const SHEET_IDS = {
   attendance:
     process.env.DICT_ATTENDANCE_LOG_SHEET_ID ||
@@ -31,7 +32,48 @@ const SHEET_IDS = {
   results:
     process.env.GOOGLE_SHEETS_TARGET_ID ||
     "1eQGeP7iSMeJeE4dhG5riBdDpxo5o0rS3Nv8p6WUrhDM",
+  intern:
+    process.env.INTERN_SHEET_ID ||
+    "1r0mDKN8Y6A0y4I-6wVN8td_6UEvg7cNQWEHZm22dHcw",
 };
+
+// ── Standard column aliases for activity → sheet sync ──────────────────────
+const ACTIVITY_ALIASES: Record<string, string[]> = {
+  province:            ["Province"],
+  lgu:                 ["LGU/Municipality Name", "LGU", "Municipality", "LGU Name"],
+  year:                ["Year"],
+  month:               ["Month", "Month (Do not Edit)", "Month Name"],
+  activityTitle:       ["Activity Title", "Title", "Activity Name"],
+  venue:               ["Venue", "Location"],
+  partnerOrganizations:["Name of Partner", "Name of Partner (LGU/NGA/Private)", "Partner Organizations", "Partners"],
+  startDate:           ["Start Date", "Start Date 1/1/2025", "Date Start"],
+  endDate:             ["End Date", "End Date 1/1/2025", "Date End"],
+  modeOfConduct:       ["Mode of Conduct", "Mode", "Conduct Mode"],
+  personnelRaw:        ["DICT Personnel Involve", "Personnel", "DICT Personnel", "Personnel Involved"],
+  ngaMale:             ["NGA Male", "NGA M"],
+  ngaFemale:           ["NGA Female", "NGA F"],
+  lguMale:             ["LGU Male", "LGU M"],
+  lguFemale:           ["LGU Female", "LGU F"],
+  sucMale:             ["SUC Male", "SUC M"],
+  sucFemale:           ["SUC Female", "SUC F"],
+  othersMale:          ["Others Male", "Other Male"],
+  othersFemale:        ["Others Female", "Other Female"],
+  othersLabel:         ["Others Label", "Other Category"],
+  totalParticipants:   ["Total PAX", "Total Participants", "Total"],
+  status:              ["Status", "Status (Don't Edit)", "Status (Do not Edit)"],
+  afterActivityReport: ["After Activity Report", "AAR"],
+  fbPostingLink:       ["FB Posting Link", "Facebook Link", "FB Link"],
+  rawPhotosLink:       ["Raw Photos Link", "Photos", "Photos Link", "Raw Photos"],
+  testimonialsLink:    ["Testimonials Link", "Testimonials"],
+  driveFolderLink:     ["Drive Folder Link", "Drive Link", "Google Drive Link"],
+  remarks:             ["Remarks", "Notes"],
+  lastUpdated:         ["Last Updated", "Date Updated"],
+};
+
+const MONTHS_NAMES = [
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December",
+];
 
 // Required tabs per sheet
 const REQUIRED_TABS: Record<string, string[]> = {
@@ -206,6 +248,17 @@ async function checkSheetAccess(token: string, sheetId: string): Promise<{ title
 }
 
 // ── Format helpers ──────────────────────────────────────────────────────────
+
+function normalizeInternDate(val: string): string {
+  if (!val?.trim()) return "";
+  const s = val.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const mmddyyyy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (mmddyyyy) return `${mmddyyyy[3]}-${mmddyyyy[1].padStart(2, "0")}-${mmddyyyy[2].padStart(2, "0")}`;
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  return s;
+}
 
 function fmtTime(iso?: string | null): string {
   if (!iso) return "";
@@ -390,10 +443,232 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true, message: "Sync status sheet updated" });
       }
 
-      // ─── Sync all: run DTC + Attendance + Status in sequence ─
+      // ─── Sync activities → project Google Sheets (DICT_Program) ──
+      case "syncActivities": {
+        const activities = await convex.query(api.attendanceSync.getUnsyncedActivitiesPublic, { limit: 50 });
+        if (activities.length === 0) {
+          return NextResponse.json({ ok: true, message: "No pending activities to sync", synced: 0 });
+        }
+
+        const token = await getGoogleToken();
+
+        // Group activities by sheetId
+        const bySheet: Record<string, typeof activities> = {};
+        for (const act of activities) {
+          if (!act.sheetId || !act.sheetSyncEnabled) continue;
+          if (!bySheet[act.sheetId]) bySheet[act.sheetId] = [];
+          bySheet[act.sheetId].push(act);
+        }
+
+        const syncedIds: Id<"activities">[] = [];
+        let totalSynced = 0;
+
+        for (const [sheetId, sheetActivities] of Object.entries(bySheet)) {
+          const sheetName = sheetActivities[0].sheetName ?? "Sheet1";
+
+          // Read header row to build column map
+          let headerRow: string[];
+          try {
+            const existingData = await readSheet(token, sheetId, sheetName);
+            headerRow = (existingData[0] ?? []).map((h: string) => h.trim());
+          } catch {
+            console.warn(`[syncActivities] Cannot read headers from sheet ${sheetId}`);
+            continue;
+          }
+
+          if (headerRow.length === 0) continue;
+
+          // Build header→index map
+          const headerIndexMap: Record<string, number> = {};
+          for (let i = 0; i < headerRow.length; i++) {
+            if (headerRow[i]) headerIndexMap[headerRow[i]] = i;
+          }
+
+          const rows: string[][] = [];
+
+          for (const act of sheetActivities) {
+            const p = act.participants;
+            const totalPax = p.nga.male + p.nga.female + p.lgu.male + p.lgu.female +
+              p.suc.male + p.suc.female + p.others.male + p.others.female;
+
+            // Build image URL for the photos column
+            const imageUrls = (act.images ?? []).map((img: any) => img.url).filter(Boolean);
+            const photoValue = imageUrls.length > 0
+              ? (imageUrls.length === 1 ? `=IMAGE("${imageUrls[0]}")` : imageUrls.join("\n"))
+              : (act.rawPhotosLink ?? "");
+
+            const now = new Date();
+            const lastUpdatedStr = `${String(now.getMonth()+1).padStart(2,"0")}/${String(now.getDate()).padStart(2,"0")}/${now.getFullYear()} ${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+
+            const fieldToValue: Record<string, string> = {
+              month: MONTHS_NAMES[(act.month ?? 1) - 1],
+              year: String(act.year ?? new Date().getFullYear()),
+              province: act.provinceName,
+              lgu: act.lguName ?? "",
+              activityTitle: act.activityTitle,
+              venue: act.venue,
+              partnerOrganizations: act.partnerOrganizations.join(", "),
+              startDate: act.startDate,
+              endDate: act.endDate,
+              modeOfConduct: act.modeOfConduct,
+              personnelRaw: act.personnelRaw ?? "",
+              status: act.status,
+              remarks: act.remarks ?? "",
+              afterActivityReport: act.afterActivityReport ?? "",
+              fbPostingLink: act.fbPostingLink ?? "",
+              rawPhotosLink: photoValue,
+              testimonialsLink: act.testimonialsLink ?? "",
+              driveFolderLink: act.driveFolderLink ?? "",
+              ngaMale: String(p.nga.male),
+              ngaFemale: String(p.nga.female),
+              lguMale: String(p.lgu.male),
+              lguFemale: String(p.lgu.female),
+              sucMale: String(p.suc.male),
+              sucFemale: String(p.suc.female),
+              othersMale: String(p.others.male),
+              othersFemale: String(p.others.female),
+              othersLabel: p.others.label ?? "",
+              totalParticipants: String(totalPax),
+              lastUpdated: lastUpdatedStr,
+            };
+
+            // Build the row using header-based column mapping
+            const rowData = new Array(headerRow.length).fill("");
+            for (const [fieldKey, aliases] of Object.entries(ACTIVITY_ALIASES)) {
+              if (fieldToValue[fieldKey] === undefined || fieldToValue[fieldKey] === "") continue;
+              for (const alias of aliases) {
+                const colIdx = headerIndexMap[alias];
+                if (colIdx !== undefined) {
+                  rowData[colIdx] = fieldToValue[fieldKey];
+                  break;
+                }
+              }
+            }
+
+            rows.push(rowData);
+            syncedIds.push(act._id as Id<"activities">);
+          }
+
+          if (rows.length > 0) {
+            await appendRows(token, sheetId, sheetName, rows);
+            totalSynced += rows.length;
+          }
+        }
+
+        // Also mark activities with no sheet connection as synced (nothing to push)
+        const noSheetIds = activities
+          .filter((a) => !a.sheetId || !a.sheetSyncEnabled)
+          .map((a) => a._id as Id<"activities">);
+        const allSyncedIds = [...syncedIds, ...noSheetIds];
+
+        if (allSyncedIds.length > 0) {
+          await convex.mutation(api.attendanceSync.markActivitiesSyncedPublic, { ids: allSyncedIds });
+        }
+
+        return NextResponse.json({
+          ok: true,
+          message: `Synced ${totalSynced} activities to sheets, ${noSheetIds.length} skipped (no sheet connection)`,
+          synced: totalSynced,
+        });
+      }
+
+      // ─── Sync interns from INTERN sheet → Convex ──────────────
+      case "syncInterns": {
+        const token = await getGoogleToken();
+
+        let rawRows: string[][];
+        try {
+          rawRows = await readSheet(token, SHEET_IDS.intern, "Interns");
+        } catch (e) {
+          // Try without tab name (default first sheet)
+          try {
+            rawRows = await readSheet(token, SHEET_IDS.intern, "Sheet1");
+          } catch {
+            return NextResponse.json({ ok: false, message: `Cannot read intern sheet: ${String(e)}` }, { status: 500 });
+          }
+        }
+
+        if (rawRows.length < 2) {
+          return NextResponse.json({ ok: true, message: "Intern sheet has no data rows", synced: 0 });
+        }
+
+        // Parse rows — same column layout as intern-sheets-sync
+        // A(0):FullName B(1):Email C(2):Phone D(3):School E(4):Course
+        // F(5):Department G(6):Supervisor H(7):StartDate I(8):EndDate
+        // J(9):RequiredHours K(10):Status L(11):Notes
+        const parsedRows: any[] = [];
+        const parseErrors: string[] = [];
+
+        for (let i = 1; i < rawRows.length; i++) {
+          const row = rawRows[i];
+          if (!row || row.every((c) => !c?.trim())) continue;
+
+          const fullName = (row[0] ?? "").trim();
+          if (!fullName) { parseErrors.push(`Row ${i+1}: Missing Full Name`); continue; }
+
+          const school = (row[3] ?? "").trim();
+          if (!school) { parseErrors.push(`Row ${i+1}: Missing School`); continue; }
+
+          const course = (row[4] ?? "").trim();
+          if (!course) { parseErrors.push(`Row ${i+1}: Missing Course`); continue; }
+
+          const startDate = normalizeInternDate(row[7] ?? "");
+          if (!startDate) { parseErrors.push(`Row ${i+1}: Missing Start Date`); continue; }
+
+          const endDate = normalizeInternDate(row[8] ?? "");
+          if (!endDate) { parseErrors.push(`Row ${i+1}: Missing End Date`); continue; }
+
+          const reqHours = parseInt(String(row[9] ?? "0").replace(/,/g, "").trim());
+          if (isNaN(reqHours) || reqHours <= 0) {
+            parseErrors.push(`Row ${i+1}: Invalid Required Hours`); continue;
+          }
+
+          const rawStatus = (row[10] ?? "ACTIVE").trim().toLowerCase();
+          const statusMap: Record<string, string> = {
+            active: "ACTIVE", completed: "COMPLETED", inactive: "INACTIVE",
+            "on leave": "ON_LEAVE", "on-leave": "ON_LEAVE", leave: "ON_LEAVE",
+          };
+
+          parsedRows.push({
+            fullName,
+            email: (row[1] ?? "").trim() || undefined,
+            phone: (row[2] ?? "").trim() || undefined,
+            school,
+            course,
+            department: (row[5] ?? "").trim() || undefined,
+            supervisor: (row[6] ?? "").trim() || undefined,
+            startDate,
+            endDate,
+            requiredHours: reqHours,
+            status: statusMap[rawStatus] ?? "ACTIVE",
+            notes: (row[11] ?? "").trim() || undefined,
+            sheetsRowNumber: i + 1,
+          });
+        }
+
+        if (parsedRows.length === 0) {
+          return NextResponse.json({ ok: true, message: "No valid intern rows parsed", synced: 0, parseErrors });
+        }
+
+        const result = await convex.mutation(api.internSheetsSync.bulkUpsertInternsFromSheets, {
+          sheetId: SHEET_IDS.intern,
+          rows: parsedRows,
+          syncedBy: "auto-sync",
+        });
+
+        return NextResponse.json({
+          ok: true,
+          message: `Intern sync: ${result.inserted} inserted, ${result.updated} updated`,
+          synced: result.inserted + result.updated,
+          parseErrors,
+          errors: result.errors,
+        });
+      }
+
+      // ─── Sync all: run DTC + Attendance + Activities + Interns + Status in sequence ─
       case "syncAll": {
         const results: Array<{ target: string; ok: boolean; message: string }> = [];
-        for (const t of ["syncDTC", "syncAttendance", "syncStatusSheet"]) {
+        for (const t of ["syncDTC", "syncAttendance", "syncActivities", "syncInterns", "syncStatusSheet"]) {
           try {
             const inner = await POST(new NextRequest("http://localhost/api/sync-trigger", {
               method: "POST",

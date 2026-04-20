@@ -23,6 +23,7 @@ export const addImage = mutation({
     const existingImages = activity.images || [];
     await ctx.db.patch(args.activityId, {
       images: [...existingImages, newImage],
+      syncedToSheets: false,
     });
 
     return newImage;
@@ -44,6 +45,7 @@ export const removeImage = mutation({
 
     await ctx.db.patch(args.activityId, {
       images: updatedImages,
+      syncedToSheets: false,
     });
   },
 });
@@ -64,6 +66,7 @@ export const updateImageCaption = mutation({
 
     await ctx.db.patch(args.activityId, {
       images: updatedImages,
+      syncedToSheets: false,
     });
   },
 });
