@@ -1,8 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -11,9 +9,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
+type Role = "intern" | "supervisor" | "manager" | "admin";
+
+function landingForRole(role: Role): string {
+  switch (role) {
+    case "intern":
+    case "supervisor":
+      return "/intern-portal";
+    case "manager":
+    case "admin":
+      return "/dashboard";
+    default:
+      return "/";
+  }
+}
+
 export default function SignInPage() {
   const router = useRouter();
-  const login = useMutation(api.auth.login);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,7 +34,6 @@ export default function SignInPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    
     if (!email || !password) {
       toast.error("Please fill in all fields");
       return;
@@ -30,21 +41,29 @@ export default function SignInPage() {
 
     setLoading(true);
     try {
-      const result = await login({ email, password });
-      
-      // Store token in cookies and localStorage
-      document.cookie = `auth_token=${result.token}; path=/; max-age=${30 * 24 * 60 * 60}; SameSite=Lax`;
-      localStorage.setItem("auth_token", result.token);
-      localStorage.setItem("user", JSON.stringify(result.user));
-      
-      toast.success(`Welcome back, ${result.user.fullName}!`);
-      
-      // Redirect to callback URL or dashboard
+      const res = await fetch("/api/auth/signin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Sign-in failed");
+      }
+
+      toast.success(`Welcome back, ${data.user.fullName}`);
+
       const params = new URLSearchParams(window.location.search);
-      const callbackUrl = params.get("callbackUrl") || "/dashboard";
-      router.push(callbackUrl);
+      const callbackUrl = params.get("callbackUrl");
+      const role = data.user.role as Role;
+
+      // Respect callbackUrl only if the role can access it; otherwise bounce
+      // to the role's canonical landing page.
+      const fallback = landingForRole(role);
+      router.push(callbackUrl || fallback);
+      router.refresh();
     } catch (error: any) {
-      toast.error(error.message || "Login failed");
+      toast.error(error.message || "Sign-in failed");
     } finally {
       setLoading(false);
     }
@@ -53,7 +72,6 @@ export default function SignInPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-violet-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Logo/Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-violet-600 text-white mb-4 shadow-lg">
             <span className="text-2xl font-bold">D5</span>
@@ -62,7 +80,6 @@ export default function SignInPage() {
           <p className="text-sm text-gray-500 mt-1">Program Management System</p>
         </div>
 
-        {/* Sign In Card */}
         <Card className="shadow-xl border-0">
           <CardHeader className="space-y-1 pb-4">
             <CardTitle className="text-2xl font-bold flex items-center gap-2">
@@ -70,12 +87,11 @@ export default function SignInPage() {
               Sign In
             </CardTitle>
             <CardDescription>
-              Enter your credentials to access the system
+              One sign-in for interns, supervisors, managers, and admins.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Email */}
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-gray-700">Email Address</label>
                 <div className="relative">
@@ -92,7 +108,6 @@ export default function SignInPage() {
                 </div>
               </div>
 
-              {/* Password */}
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-gray-700">Password</label>
                 <div className="relative">
@@ -116,7 +131,6 @@ export default function SignInPage() {
                 </div>
               </div>
 
-              {/* Submit Button */}
               <Button
                 type="submit"
                 className="w-full h-11 bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white font-semibold shadow-lg"
@@ -136,32 +150,15 @@ export default function SignInPage() {
               </Button>
             </form>
 
-            {/* Sign Up Link */}
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">
-                Don't have an account?{" "}
-                <Link
-                  href="/signup"
-                  className="font-semibold text-blue-600 hover:text-blue-700 hover:underline"
-                >
-                  Sign up
-                </Link>
-              </p>
-            </div>
-
-            {/* Public Access Link */}
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <Link
-                href="/"
-                className="text-xs text-gray-500 hover:text-gray-700 flex items-center justify-center gap-1"
-              >
-                ← Back to public page
+            <div className="mt-6 text-center text-sm text-gray-600">
+              New accounts are invite-only.{" "}
+              <Link href="/" className="font-semibold text-blue-600 hover:underline">
+                Back to home
               </Link>
             </div>
           </CardContent>
         </Card>
 
-        {/* Footer */}
         <p className="text-center text-xs text-gray-500 mt-6">
           DICT Region V — Legazpi City, Bicol
         </p>

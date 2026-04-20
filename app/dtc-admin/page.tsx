@@ -1,52 +1,114 @@
 'use client'
 
-import { useState, useEffect, Fragment } from 'react'
+import { useState, useEffect, Fragment, useMemo, createContext, useContext, useCallback } from 'react'
+import { useQuery, useMutation } from 'convex/react'
+import { api } from '@/convex/_generated/api'
+import type { Id } from '@/convex/_generated/dataModel'
 import './dtc-admin.css'
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-const MOCK_LOGS = [
-  { id: 1, fullName: 'Maria Santos', agency: 'LGU Legazpi', purpose: 'Online Job Application', equipment: ['Desktop Computer'], timeIn: '08:12 AM', timeOut: '10:12 AM', duration: 2, status: 'COMPLETED', rating: 5, pc: 'PC-01' },
-  { id: 2, fullName: 'Juan dela Cruz', agency: 'DepEd Sorsogon', purpose: 'Government Transaction', equipment: ['Internet Only'], timeIn: '08:35 AM', timeOut: null, duration: 1, status: 'ACTIVE', rating: null, pc: null },
-  { id: 3, fullName: 'Ana Reyes', agency: 'SSS', purpose: 'SSS Online Transaction', equipment: ['Desktop Computer', 'Internet Only'], timeIn: '09:00 AM', timeOut: '11:00 AM', duration: 2, status: 'COMPLETED', rating: 4, pc: 'PC-03' },
-  { id: 4, fullName: 'Roberto Lim', agency: 'Private Individual', purpose: 'Freelance Work', equipment: ['Desktop Computer'], timeIn: '09:20 AM', timeOut: null, duration: 3, status: 'ACTIVE', rating: null, pc: 'PC-02' },
-  { id: 5, fullName: 'Carla Mendoza', agency: 'DICT Albay', purpose: 'Digital Literacy / Learning', equipment: ['Desktop Computer'], timeIn: '09:45 AM', timeOut: '10:45 AM', duration: 1, status: 'COMPLETED', rating: 5, pc: 'PC-04' },
-  { id: 6, fullName: 'Eduardo Torres', agency: 'PhilHealth', purpose: 'PhilHealth Online Transaction', equipment: ['Internet Only'], timeIn: '10:00 AM', timeOut: null, duration: 1.5, status: 'ACTIVE', rating: null, pc: null },
-  { id: 7, fullName: 'Liza Bautista', agency: 'BIR Legazpi', purpose: 'Online Business Transaction', equipment: ['Desktop Computer'], timeIn: '10:15 AM', timeOut: '12:15 PM', duration: 2, status: 'COMPLETED', rating: 3, pc: 'PC-05' },
-  { id: 8, fullName: 'Marco Villanueva', agency: 'State University', purpose: 'Online Scholarship Application', equipment: ['Desktop Computer'], timeIn: '10:30 AM', timeOut: null, duration: 2, status: 'OVERDUE', rating: null, pc: 'PC-06' },
-  { id: 9, fullName: 'Sophia Garcia', agency: 'DSWD', purpose: 'Email and Communication', equipment: ['Internet Only'], timeIn: '11:00 AM', timeOut: '11:30 AM', duration: 0.5, status: 'COMPLETED', rating: 5, pc: null },
-  { id: 10, fullName: 'Kenneth Abad', agency: 'LGU Daraga', purpose: 'Resume / CV Preparation', equipment: ['Desktop Computer'], timeIn: '11:15 AM', timeOut: null, duration: 1, status: 'ACTIVE', rating: null, pc: 'PC-07' },
-]
+// ─── Toast Context ────────────────────────────────────────────────────────────
+type Toast = { id: number; type: 'ok' | 'err' | 'info'; msg: string }
+const ToastCtx = createContext<(t: Omit<Toast, 'id'>) => void>(() => {})
+const useToast = () => useContext(ToastCtx)
 
-const MOCK_PCS = [
-  { id: 'PC-01', name: 'PC-01', location: 'Row A', status: 'ONLINE', ip: '192.168.1.101', user: '' },
-  { id: 'PC-02', name: 'PC-02', location: 'Row A', status: 'IN_USE', ip: '192.168.1.102', user: 'Roberto Lim' },
-  { id: 'PC-03', name: 'PC-03', location: 'Row A', status: 'ONLINE', ip: '192.168.1.103', user: '' },
-  { id: 'PC-04', name: 'PC-04', location: 'Row A', status: 'ONLINE', ip: '192.168.1.104', user: '' },
-  { id: 'PC-05', name: 'PC-05', location: 'Row A', status: 'MAINTENANCE', ip: '192.168.1.105', user: '' },
-  { id: 'PC-06', name: 'PC-06', location: 'Row B', status: 'IN_USE', ip: '192.168.1.106', user: 'Marco V.' },
-  { id: 'PC-07', name: 'PC-07', location: 'Row B', status: 'IN_USE', ip: '192.168.1.107', user: 'Kenneth A.' },
-  { id: 'PC-08', name: 'PC-08', location: 'Row B', status: 'ONLINE', ip: '192.168.1.108', user: '' },
-  { id: 'PC-09', name: 'PC-09', location: 'Row B', status: 'OFFLINE', ip: '192.168.1.109', user: '' },
-  { id: 'PC-10', name: 'PC-10', location: 'Row B', status: 'ONLINE', ip: '192.168.1.110', user: '' },
-]
+function ToastProvider({ children }: { children: React.ReactNode }) {
+  const [toasts, setToasts] = useState<Toast[]>([])
+  const push = useCallback((t: Omit<Toast, 'id'>) => {
+    const id = Date.now() + Math.random()
+    setToasts((prev) => [...prev, { ...t, id }])
+    setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 3500)
+  }, [])
+  return (
+    <ToastCtx.Provider value={push}>
+      {children}
+      <div style={{ position: 'fixed', top: 20, right: 20, display: 'flex', flexDirection: 'column', gap: 8, zIndex: 9999 }}>
+        {toasts.map((t) => (
+          <div key={t.id} style={{
+            background: t.type === 'ok' ? '#059669' : t.type === 'err' ? '#dc2626' : '#0038A8',
+            color: '#fff', padding: '10px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)', maxWidth: 380,
+            animation: 'dtc-slide-in 0.2s ease-out',
+          }}>{t.msg}</div>
+        ))}
+      </div>
+    </ToastCtx.Provider>
+  )
+}
 
-const CHART_DATA = [
-  { day: 'Mon', pc: 28, wifi: 14 },
-  { day: 'Tue', pc: 35, wifi: 18 },
-  { day: 'Wed', pc: 42, wifi: 22 },
-  { day: 'Thu', pc: 31, wifi: 16 },
-  { day: 'Fri', pc: 48, wifi: 25 },
-  { day: 'Sat', pc: 20, wifi: 9 },
-  { day: 'Sun', pc: 12, wifi: 5 },
-]
+// ─── Modal Component ──────────────────────────────────────────────────────────
+function Modal({ open, onClose, title, children, width = 520 }: {
+  open: boolean; onClose: () => void; title: string; children: React.ReactNode; width?: number
+}) {
+  if (!open) return null
+  return (
+    <div onClick={onClose}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(2px)' }}>
+      <div onClick={(e) => e.stopPropagation()}
+        style={{ background: '#fff', borderRadius: 14, width, maxWidth: '90vw', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+        <div style={{ padding: '16px 22px', borderBottom: '1px solid #f1f3f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontWeight: 700, fontSize: 15, color: '#1a1f36' }}>{title}</div>
+          <button onClick={onClose} style={{ color: '#9ca3af', padding: 4 }}><Icon name="x" size={18} /></button>
+        </div>
+        <div style={{ padding: 22, overflow: 'auto' }}>{children}</div>
+      </div>
+    </div>
+  )
+}
 
-const MAX_CHART = 60
+// ─── Confirm Dialog Hook ──────────────────────────────────────────────────────
+function useConfirm() {
+  const [state, setState] = useState<{ open: boolean; title: string; msg: string; resolve?: (ok: boolean) => void }>({ open: false, title: '', msg: '' })
+  const confirm = useCallback((title: string, msg: string) => {
+    return new Promise<boolean>((resolve) => setState({ open: true, title, msg, resolve }))
+  }, [])
+  const dialog = (
+    <Modal open={state.open} onClose={() => { state.resolve?.(false); setState((s) => ({ ...s, open: false })) }} title={state.title} width={400}>
+      <div style={{ fontSize: 13, color: '#374151', marginBottom: 18, lineHeight: 1.5 }}>{state.msg}</div>
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <button className="dtc-btn-ghost" onClick={() => { state.resolve?.(false); setState((s) => ({ ...s, open: false })) }}>Cancel</button>
+        <button className="dtc-btn-danger" onClick={() => { state.resolve?.(true); setState((s) => ({ ...s, open: false })) }}>Confirm</button>
+      </div>
+    </Modal>
+  )
+  return { confirm, dialog }
+}
 
-const INITIAL_ANNOUNCEMENTS = [
-  { id: 1, title: 'System Maintenance', body: 'PC-05 under maintenance until further notice.', type: 'MAINTENANCE', active: true, created: 'Apr 19, 2026' },
-  { id: 2, title: 'Holiday Notice', body: 'Office closed on April 25 — Araw ng Kagitingan.', type: 'HOLIDAY', active: false, created: 'Apr 18, 2026' },
-  { id: 3, title: 'New WiFi Password', body: 'WiFi password updated. See front desk for credentials.', type: 'INFO', active: true, created: 'Apr 17, 2026' },
-]
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function fmtTime(iso?: string | null) {
+  if (!iso) return '—'
+  try { return new Date(iso).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true }) }
+  catch { return iso }
+}
+function fmtDate(iso?: string | null) {
+  if (!iso) return '—'
+  try { return new Date(iso).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) }
+  catch { return iso }
+}
+function hoursBetween(start: string, end?: string | null) {
+  const s = new Date(start).getTime()
+  const e = end ? new Date(end).getTime() : Date.now()
+  return Math.max(0, (e - s) / 3_600_000)
+}
+function deriveStatus(log: { timeIn: string; timeOut?: string | null; plannedDurationHours: number }) {
+  if (log.timeOut) return 'COMPLETED'
+  const elapsed = hoursBetween(log.timeIn)
+  if (elapsed > log.plannedDurationHours) return 'OVERDUE'
+  return 'ACTIVE'
+}
+function csvEscape(v: unknown) {
+  const s = v == null ? '' : String(v)
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
+function downloadCsv(filename: string, rows: (string | number | null | undefined)[][]) {
+  const csv = rows.map((r) => r.map(csvEscape).join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 // ─── SVG Icon Component ───────────────────────────────────────────────────────
 const ICON_PATHS: Record<string, string> = {
@@ -72,6 +134,8 @@ const ICON_PATHS: Record<string, string> = {
   eye: 'M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z',
   download: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 4v12m0 0l-4-4m4 4l4-4',
   camera: 'M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z M15 13a3 3 0 11-6 0 3 3 0 016 0z',
+  mail: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
+  shield: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
 }
 
 function Icon({ name, size = 15, color = 'currentColor' }: { name: string; size?: number; color?: string }) {
@@ -123,22 +187,62 @@ function StatCard({ label, value, sub, icon, color, spark, trend }: {
 }
 
 // ─── Dashboard Page ───────────────────────────────────────────────────────────
-function Dashboard() {
+function Dashboard({ onNavigate }: { onNavigate: (page: string) => void }) {
+  const logs = useQuery(api.dtcLogs.getRecent, { limit: 100 }) ?? []
+  const pcs = useQuery(api.dtcPcs.getAll) ?? []
+  const today = new Date().toISOString().slice(0, 10)
+
+  const todayLogs = useMemo(() => logs.filter((l) => l.timeIn.startsWith(today)), [logs, today])
+  const activeCount = todayLogs.filter((l) => !l.timeOut).length
+  const completedCount = todayLogs.filter((l) => l.timeOut).length
+  const ratedLogs = todayLogs.filter((l) => l.satisfactionRating != null)
+  const avgRating = ratedLogs.length
+    ? (ratedLogs.reduce((a, b) => a + (b.satisfactionRating ?? 0), 0) / ratedLogs.length).toFixed(1)
+    : '—'
+  const pcInUse = pcs.filter((p) => p.status === 'IN_USE').length
+
+  // Weekly chart — group last 7 days
+  const weeklyData = useMemo(() => {
+    const days: { day: string; date: string; pc: number; wifi: number }[] = []
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date()
+      d.setDate(d.getDate() - i)
+      const key = d.toISOString().slice(0, 10)
+      const label = d.toLocaleDateString('en-PH', { weekday: 'short' })
+      const dayLogs = logs.filter((l) => l.timeIn.startsWith(key))
+      days.push({
+        day: label,
+        date: key,
+        pc: dayLogs.filter((l) => l.equipmentUsed.includes('Desktop Computer')).length,
+        wifi: dayLogs.filter((l) => l.equipmentUsed.includes('Internet Only')).length,
+      })
+    }
+    return days
+  }, [logs])
+  const maxChart = Math.max(5, ...weeklyData.map((d) => Math.max(d.pc, d.wifi)))
+
+  // Purpose breakdown
+  const purposeBreakdown = useMemo(() => {
+    const counts: Record<string, number> = {}
+    todayLogs.forEach((l) => { counts[l.purpose] = (counts[l.purpose] || 0) + 1 })
+    const total = todayLogs.length || 1
+    const colors = ['#0038A8', '#6882FF', '#059669', '#d97706', '#9ca3af', '#7c3aed']
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([label, count], i) => ({ label, pct: Math.round((count / total) * 100), color: colors[i] ?? '#9ca3af', count }))
+  }, [todayLogs])
+
   const [hoveredBar, setHoveredBar] = useState<number | null>(null)
-  const activeToday = MOCK_LOGS.filter(l => l.status === 'ACTIVE').length
-  const completedToday = MOCK_LOGS.filter(l => l.status === 'COMPLETED').length
-  const ratedLogs = MOCK_LOGS.filter(l => l.rating != null)
-  const avgRating = (ratedLogs.reduce((a, b) => a + (b.rating ?? 0), 0) / ratedLogs.length).toFixed(1)
-  const pcInUse = MOCK_PCS.filter(p => p.status === 'IN_USE').length
 
   return (
     <div className="dtc-page" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* KPIs */}
       <div style={{ display: 'flex', gap: 14 }}>
-        <StatCard label="Active Sessions" value={activeToday} sub="Live right now" icon="user" color="#0038A8" spark={[3,5,4,6,5,4,activeToday]} trend={12} />
-        <StatCard label="Completed Today" value={completedToday} sub="Since 8:00 AM" icon="check" color="#059669" spark={[8,12,10,15,14,12,completedToday]} trend={8} />
-        <StatCard label="PCs In Use" value={`${pcInUse}/${MOCK_PCS.length}`} sub="Workstations" icon="pc" color="#7c3aed" spark={[4,6,5,7,6,5,pcInUse]} trend={-5} />
-        <StatCard label="Avg. Rating" value={`${avgRating}\u2605`} sub="Today's feedback" icon="trend" color="#d97706" spark={[4,4.5,4.2,4.8,4.6,4.7,parseFloat(avgRating)]} trend={3} />
+        <StatCard label="Active Sessions" value={activeCount} sub="Live right now" icon="user" color="#0038A8" spark={weeklyData.map((d) => d.pc + d.wifi)} />
+        <StatCard label="Completed Today" value={completedCount} sub="Since 12:00 AM" icon="check" color="#059669" spark={weeklyData.map((d) => d.pc + d.wifi)} />
+        <StatCard label="PCs In Use" value={`${pcInUse}/${pcs.length}`} sub="Workstations" icon="pc" color="#7c3aed" spark={weeklyData.map((d) => d.pc)} />
+        <StatCard label="Avg. Rating" value={`${avgRating}${avgRating !== '—' ? '\u2605' : ''}`} sub={`From ${ratedLogs.length} ratings`} icon="trend" color="#d97706" />
       </div>
 
       <div style={{ display: 'flex', gap: 14 }}>
@@ -147,7 +251,7 @@ function Dashboard() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <div>
               <div style={{ fontWeight: 700, fontSize: 14, color: '#1a1f36' }}>Weekly Visitors</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>April 14 &ndash; 20, 2026</div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Last 7 days &mdash; Live data</div>
             </div>
             <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#6b7280' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: '#0038A8', display: 'inline-block' }} />Desktop</span>
@@ -155,8 +259,8 @@ function Dashboard() {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 120, paddingBottom: 4 }}>
-            {CHART_DATA.map((d, i) => (
-              <div key={d.day} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, height: '100%' }}
+            {weeklyData.map((d, i) => (
+              <div key={d.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, height: '100%' }}
                 onMouseEnter={() => setHoveredBar(i)} onMouseLeave={() => setHoveredBar(null)}>
                 <div style={{ flex: 1, width: '100%', display: 'flex', alignItems: 'flex-end', gap: 2, position: 'relative' }}>
                   {hoveredBar === i && (
@@ -164,8 +268,8 @@ function Dashboard() {
                       PC: {d.pc} &middot; WiFi: {d.wifi}
                     </div>
                   )}
-                  <div style={{ flex: 1, background: hoveredBar === i ? '#0038A8' : '#0038A8cc', borderRadius: '4px 4px 0 0', height: `${(d.pc / MAX_CHART) * 100}%`, transition: 'all 0.2s' }} />
-                  <div style={{ flex: 1, background: hoveredBar === i ? '#6882FF' : '#6882FFaa', borderRadius: '4px 4px 0 0', height: `${(d.wifi / MAX_CHART) * 100}%`, transition: 'all 0.2s' }} />
+                  <div style={{ flex: 1, background: hoveredBar === i ? '#0038A8' : '#0038A8cc', borderRadius: '4px 4px 0 0', height: `${(d.pc / maxChart) * 100}%`, transition: 'all 0.2s', minHeight: d.pc > 0 ? 2 : 0 }} />
+                  <div style={{ flex: 1, background: hoveredBar === i ? '#6882FF' : '#6882FFaa', borderRadius: '4px 4px 0 0', height: `${(d.wifi / maxChart) * 100}%`, transition: 'all 0.2s', minHeight: d.wifi > 0 ? 2 : 0 }} />
                 </div>
                 <div style={{ fontSize: 10, color: '#9ca3af', fontWeight: 600 }}>{d.day}</div>
               </div>
@@ -173,17 +277,17 @@ function Dashboard() {
           </div>
           <div style={{ display: 'flex', gap: 16, marginTop: 14, padding: '12px 14px', background: '#f8faff', borderRadius: 10 }}>
             <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: 18, fontWeight: 800, color: '#0038A8' }}>{CHART_DATA.reduce((a,b) => a+b.pc,0)}</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: '#0038A8' }}>{weeklyData.reduce((a, b) => a + b.pc, 0)}</div>
               <div style={{ fontSize: 10, color: '#9ca3af', fontWeight: 600 }}>PC Sessions</div>
             </div>
             <div style={{ width: 1, background: '#e5e7eb' }} />
             <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: 18, fontWeight: 800, color: '#6882FF' }}>{CHART_DATA.reduce((a,b) => a+b.wifi,0)}</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: '#6882FF' }}>{weeklyData.reduce((a, b) => a + b.wifi, 0)}</div>
               <div style={{ fontSize: 10, color: '#9ca3af', fontWeight: 600 }}>WiFi Sessions</div>
             </div>
             <div style={{ width: 1, background: '#e5e7eb' }} />
             <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: 18, fontWeight: 800, color: '#059669' }}>{CHART_DATA.reduce((a,b) => a+b.pc+b.wifi,0)}</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: '#059669' }}>{weeklyData.reduce((a, b) => a + b.pc + b.wifi, 0)}</div>
               <div style={{ fontSize: 10, color: '#9ca3af', fontWeight: 600 }}>Total</div>
             </div>
           </div>
@@ -191,33 +295,41 @@ function Dashboard() {
 
         {/* PC Status */}
         <div className="dtc-card" style={{ flex: 1, padding: '20px 22px', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ fontWeight: 700, fontSize: 14, color: '#1a1f36', marginBottom: 4 }}>Workstation Status</div>
-          <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 16 }}>Live overview</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 7, flex: 1 }}>
-            {MOCK_PCS.map(pc => {
-              const colors: Record<string, { bg: string; border: string; dot: string }> = {
-                ONLINE: { bg: '#d1fae5', border: '#6ee7b7', dot: '#059669' },
-                IN_USE: { bg: '#ffedd5', border: '#fcd34d', dot: '#d97706' },
-                OFFLINE: { bg: '#f3f4f6', border: '#d1d5db', dot: '#9ca3af' },
-                MAINTENANCE: { bg: '#fef3c7', border: '#fcd34d', dot: '#d97706' },
-              }
-              const c = colors[pc.status] || colors.OFFLINE
-              return (
-                <div key={pc.id} style={{ background: c.bg, border: `1.5px solid ${c.border}`, borderRadius: 8, padding: '8px 6px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}
-                  title={pc.status === 'IN_USE' ? `${pc.name} \u2014 ${pc.user}` : pc.name}>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: '#374151' }}>{pc.name}</div>
-                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: c.dot, margin: '4px auto 0' }} />
-                </div>
-              )
-            })}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: '#1a1f36' }}>Workstation Status</div>
+            <button className="dtc-btn-ghost" style={{ fontSize: 11 }} onClick={() => onNavigate('workstations')}>Manage &rarr;</button>
           </div>
+          <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 16 }}>Live overview</div>
+          {pcs.length === 0 ? (
+            <div className="dtc-empty" style={{ flex: 1 }}>No workstations registered yet. <br /><button className="dtc-btn-ghost" style={{ color: '#0038A8', marginTop: 8 }} onClick={() => onNavigate('workstations')}>Add one &rarr;</button></div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 7, flex: 1 }}>
+              {pcs.map((pc) => {
+                const colors: Record<string, { bg: string; border: string; dot: string }> = {
+                  ONLINE: { bg: '#d1fae5', border: '#6ee7b7', dot: '#059669' },
+                  IN_USE: { bg: '#ffedd5', border: '#fcd34d', dot: '#d97706' },
+                  OFFLINE: { bg: '#f3f4f6', border: '#d1d5db', dot: '#9ca3af' },
+                  MAINTENANCE: { bg: '#fef3c7', border: '#fcd34d', dot: '#d97706' },
+                }
+                const c = colors[pc.status] || colors.OFFLINE
+                const user = pc.logs?.[0]?.fullName
+                return (
+                  <div key={pc._id} style={{ background: c.bg, border: `1.5px solid ${c.border}`, borderRadius: 8, padding: '8px 6px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}
+                    title={user ? `${pc.name} \u2014 ${user}` : pc.name}>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: '#374151' }}>{pc.name}</div>
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: c.dot, margin: '4px auto 0' }} />
+                  </div>
+                )
+              })}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-            {([
-              { label: 'Available', color: '#059669', count: MOCK_PCS.filter(p=>p.status==='ONLINE').length },
-              { label: 'In Use', color: '#d97706', count: MOCK_PCS.filter(p=>p.status==='IN_USE').length },
-              { label: 'Offline', color: '#9ca3af', count: MOCK_PCS.filter(p=>p.status==='OFFLINE').length },
-              { label: 'Maint.', color: '#d97706', count: MOCK_PCS.filter(p=>p.status==='MAINTENANCE').length },
-            ]).map(s => (
+            {[
+              { label: 'Available', color: '#059669', count: pcs.filter((p) => p.status === 'ONLINE').length },
+              { label: 'In Use', color: '#d97706', count: pcs.filter((p) => p.status === 'IN_USE').length },
+              { label: 'Offline', color: '#9ca3af', count: pcs.filter((p) => p.status === 'OFFLINE').length },
+              { label: 'Maint.', color: '#d97706', count: pcs.filter((p) => p.status === 'MAINTENANCE').length },
+            ].map((s) => (
               <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#6b7280' }}>
                 <div style={{ width: 7, height: 7, borderRadius: '50%', background: s.color }} />
                 <span style={{ fontWeight: 600 }}>{s.count}</span> {s.label}
@@ -234,97 +346,181 @@ function Dashboard() {
             <div style={{ fontWeight: 700, fontSize: 14, color: '#1a1f36' }}>Recent Logbook Entries</div>
             <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 1 }}>Today, {new Date().toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
           </div>
-          <button className="dtc-btn-ghost" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+          <button className="dtc-btn-ghost" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }} onClick={() => onNavigate('logbook')}>
             <Icon name="eye" size={13} /> View All
           </button>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Client</th><th>Agency</th><th>Service</th><th>Time In</th><th>Duration</th><th>Status</th><th>Rating</th>
-            </tr>
-          </thead>
-          <tbody>
-            {MOCK_LOGS.slice(0, 6).map(log => (
-              <tr key={log.id}>
-                <td style={{ fontWeight: 600, color: '#1a1f36' }}>{log.fullName}</td>
-                <td style={{ color: '#6b7280' }}>{log.agency}</td>
-                <td>
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    {log.equipment.map(e => (
-                      <span key={e} className="dtc-badge dtc-badge-blue" style={{ fontSize: 10 }}>{e === 'Desktop Computer' ? '\uD83D\uDDA5\uFE0F PC' : '\uD83D\uDCF6 WiFi'}</span>
-                    ))}
-                  </div>
-                </td>
-                <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>{log.timeIn}</td>
-                <td style={{ color: '#6b7280' }}>{log.duration}h</td>
-                <td>
-                  <span className={`dtc-badge ${log.status === 'ACTIVE' ? 'dtc-badge-green' : log.status === 'OVERDUE' ? 'dtc-badge-red' : 'dtc-badge-gray'}`}>
-                    {log.status === 'ACTIVE' && <span className="dtc-pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: '#059669', display: 'inline-block' }} />}
-                    {log.status}
-                  </span>
-                </td>
-                <td>{log.rating ? '\u2B50'.repeat(log.rating) : <span style={{ color: '#d1d5db', fontSize: 12 }}>&mdash;</span>}</td>
+        {todayLogs.length === 0 ? (
+          <div className="dtc-empty">No entries today. Create one from the Logbook page.</div>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Client</th><th>Agency</th><th>Service</th><th>Time In</th><th>Duration</th><th>Status</th><th>Rating</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {todayLogs.slice(0, 6).map((log) => {
+                const status = deriveStatus(log)
+                const duration = hoursBetween(log.timeIn, log.timeOut).toFixed(1)
+                return (
+                  <tr key={log._id}>
+                    <td style={{ fontWeight: 600, color: '#1a1f36' }}>{log.fullName}</td>
+                    <td style={{ color: '#6b7280' }}>{log.agency}</td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                        {log.equipmentUsed.map((e) => (
+                          <span key={e} className="dtc-badge dtc-badge-blue" style={{ fontSize: 10 }}>{e === 'Desktop Computer' ? '\uD83D\uDDA5\uFE0F PC' : '\uD83D\uDCF6 WiFi'}</span>
+                        ))}
+                      </div>
+                    </td>
+                    <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>{fmtTime(log.timeIn)}</td>
+                    <td style={{ color: '#6b7280' }}>{duration}h</td>
+                    <td>
+                      <span className={`dtc-badge ${status === 'ACTIVE' ? 'dtc-badge-green' : status === 'OVERDUE' ? 'dtc-badge-red' : 'dtc-badge-gray'}`}>
+                        {status === 'ACTIVE' && <span className="dtc-pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: '#059669', display: 'inline-block' }} />}
+                        {status}
+                      </span>
+                    </td>
+                    <td>{log.satisfactionRating ? '\u2B50'.repeat(log.satisfactionRating) : <span style={{ color: '#d1d5db', fontSize: 12 }}>&mdash;</span>}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* Purpose breakdown */}
-      <div className="dtc-card" style={{ padding: '20px 24px' }}>
-        <div style={{ fontWeight: 700, fontSize: 14, color: '#1a1f36', marginBottom: 16 }}>Top Purposes Today</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {[
-            { label: 'Online Job Application', pct: 28, color: '#0038A8' },
-            { label: 'Government Transaction', pct: 22, color: '#6882FF' },
-            { label: 'Digital Literacy / Learning', pct: 18, color: '#059669' },
-            { label: 'SSS / GSIS / Pag-IBIG', pct: 15, color: '#d97706' },
-            { label: 'Email and Communication', pct: 17, color: '#9ca3af' },
-          ].map(p => (
-            <div key={p.label} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ fontSize: 12, color: '#374151', width: 200, flexShrink: 0, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.label}</div>
-              <div style={{ flex: 1, height: 8, background: '#f1f3f9', borderRadius: 4, overflow: 'hidden' }}>
-                <div style={{ width: `${p.pct}%`, height: '100%', background: p.color, borderRadius: 4, transition: 'width 0.6s ease' }} />
+      {purposeBreakdown.length > 0 && (
+        <div className="dtc-card" style={{ padding: '20px 24px' }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: '#1a1f36', marginBottom: 16 }}>Top Purposes Today</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {purposeBreakdown.map((p) => (
+              <div key={p.label} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ fontSize: 12, color: '#374151', width: 220, flexShrink: 0, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.label}</div>
+                <div style={{ flex: 1, height: 8, background: '#f1f3f9', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ width: `${p.pct}%`, height: '100%', background: p.color, borderRadius: 4, transition: 'width 0.6s ease' }} />
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: p.color, width: 48, textAlign: 'right' }}>{p.count} ({p.pct}%)</div>
               </div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: p.color, width: 32, textAlign: 'right' }}>{p.pct}%</div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
 
 // ─── Logbook Page ─────────────────────────────────────────────────────────────
+const PURPOSES = [
+  'Online Job Application', 'Government Transaction', 'Digital Literacy / Learning',
+  'SSS Online Transaction', 'PhilHealth Online Transaction', 'BIR / Business Transaction',
+  'Email and Communication', 'Resume / CV Preparation', 'Research / Study',
+  'Freelance Work', 'Online Scholarship Application', 'Other',
+]
+const SERVICE_TYPES = ['Internet Access', 'Document Preparation', 'Online Transaction', 'Training / Tutorial', 'Other']
+
+type DtcLog = {
+  _id: Id<'dtcLogs'>
+  fullName: string
+  agency: string
+  purpose: string
+  equipmentUsed: string[]
+  pcId?: Id<'dtcPcs'> | null
+  pc?: { _id: Id<'dtcPcs'>; name: string } | null
+  plannedDurationHours: number
+  serviceType: string
+  timeIn: string
+  timeOut?: string | null
+  satisfactionRating?: number | null
+  remarks?: string | null
+  contactEmail?: string | null
+  contactPhone?: string | null
+}
+
 function Logbook() {
+  const logs = (useQuery(api.dtcLogs.getRecent, { limit: 200 }) ?? []) as DtcLog[]
+  const pcs = useQuery(api.dtcPcs.getAll) ?? []
+  const createLog = useMutation(api.dtcLogs.create)
+  const updateLog = useMutation(api.dtcLogs.update)
+  const toast = useToast()
+  const { dialog } = useConfirm()
+
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('ALL')
-  const [selected, setSelected] = useState<typeof MOCK_LOGS[0] | null>(null)
-  const filtered = MOCK_LOGS.filter(l => {
-    const q = search.toLowerCase()
-    const matchSearch = !q || l.fullName.toLowerCase().includes(q) || l.agency.toLowerCase().includes(q) || l.purpose.toLowerCase().includes(q)
-    const matchFilter = filter === 'ALL' || l.status === filter
-    return matchSearch && matchFilter
-  })
+  const [selected, setSelected] = useState<DtcLog | null>(null)
+  const [addOpen, setAddOpen] = useState(false)
+  const [checkoutOpen, setCheckoutOpen] = useState<DtcLog | null>(null)
+
+  const filtered = useMemo(() => {
+    return logs.filter((l) => {
+      const q = search.toLowerCase()
+      const matchSearch = !q || l.fullName.toLowerCase().includes(q) || l.agency.toLowerCase().includes(q) || l.purpose.toLowerCase().includes(q)
+      const status = deriveStatus(l)
+      const matchFilter = filter === 'ALL' || status === filter
+      return matchSearch && matchFilter
+    })
+  }, [logs, search, filter])
+
+  function exportCsv() {
+    const rows: (string | number | null | undefined)[][] = [
+      ['Date', 'Full Name', 'Agency', 'Purpose', 'Service Type', 'Equipment', 'PC', 'Time In', 'Time Out', 'Duration (h)', 'Status', 'Rating', 'Remarks', 'Email', 'Phone'],
+    ]
+    filtered.forEach((l) => rows.push([
+      fmtDate(l.timeIn), l.fullName, l.agency, l.purpose, l.serviceType,
+      l.equipmentUsed.join(' + '), l.pc?.name ?? '',
+      fmtTime(l.timeIn), l.timeOut ? fmtTime(l.timeOut) : '',
+      hoursBetween(l.timeIn, l.timeOut).toFixed(2),
+      deriveStatus(l),
+      l.satisfactionRating ?? '',
+      l.remarks ?? '', l.contactEmail ?? '', l.contactPhone ?? '',
+    ]))
+    downloadCsv(`dtc-logbook-${new Date().toISOString().slice(0, 10)}.csv`, rows)
+    toast({ type: 'ok', msg: `Exported ${filtered.length} rows` })
+  }
+
+  async function handleCheckout(log: DtcLog, rating: number | null, remarks: string) {
+    try {
+      await updateLog({
+        id: log._id,
+        timeOut: new Date().toISOString(),
+        satisfactionRating: rating ?? undefined,
+        remarks: remarks || undefined,
+      })
+      toast({ type: 'ok', msg: `Checked out ${log.fullName}` })
+      setCheckoutOpen(null)
+    } catch (e) {
+      toast({ type: 'err', msg: `Checkout failed: ${String(e)}` })
+    }
+  }
+
+  const activeCount = logs.filter((l) => !l.timeOut).length
 
   return (
     <div className="dtc-page" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <div style={{ fontWeight: 800, fontSize: 20, color: '#1a1f36' }}>Logbook</div>
-          <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>All client entries &mdash; April 20, 2026</div>
+          <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>
+            {logs.length} total &middot; {activeCount} active &middot; Updated live
+          </div>
         </div>
-        <button className="dtc-btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-          <Icon name="export" size={14} color="#fff" /> Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="dtc-btn-ghost" onClick={exportCsv} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+            <Icon name="export" size={14} /> Export CSV
+          </button>
+          <button className="dtc-btn-primary" onClick={() => setAddOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+            <Icon name="plus" size={14} color="#fff" /> New Entry
+          </button>
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: 1 }}>
-          <input className="dtc-inp" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name, agency, purpose\u2026" style={{ width: '100%', paddingLeft: 36 }} />
+          <input className="dtc-inp" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, agency, purpose…" style={{ width: '100%' }} />
         </div>
-        {['ALL', 'ACTIVE', 'COMPLETED', 'OVERDUE'].map(f => (
+        {['ALL', 'ACTIVE', 'COMPLETED', 'OVERDUE'].map((f) => (
           <button key={f} onClick={() => setFilter(f)}
             style={{ padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, border: '1.5px solid', borderColor: filter === f ? '#0038A8' : '#e5e7eb', background: filter === f ? '#0038A8' : '#fff', color: filter === f ? '#fff' : '#6b7280', cursor: 'pointer', transition: 'all 0.15s' }}>
             {f}
@@ -335,35 +531,46 @@ function Logbook() {
       <div className="dtc-card" style={{ overflow: 'hidden' }}>
         <table>
           <thead>
-            <tr><th>#</th><th>Client</th><th>Agency</th><th>Purpose</th><th>Service</th><th>Time In</th><th>PC</th><th>Duration</th><th>Status</th><th>Rating</th><th></th></tr>
+            <tr><th>#</th><th>Client</th><th>Agency</th><th>Purpose</th><th>Service</th><th>Time In</th><th>PC</th><th>Duration</th><th>Status</th><th>Rating</th><th>Actions</th></tr>
           </thead>
           <tbody>
-            {filtered.map(log => (
-              <tr key={log.id} style={{ cursor: 'pointer' }} onClick={() => setSelected(log === selected ? null : log)}>
-                <td style={{ color: '#9ca3af', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}>#{String(log.id).padStart(4,'0')}</td>
-                <td style={{ fontWeight: 600 }}>{log.fullName}</td>
-                <td style={{ color: '#6b7280', fontSize: 12 }}>{log.agency}</td>
-                <td style={{ color: '#6b7280', fontSize: 12, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.purpose}</td>
-                <td>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    {log.equipment.map(e => <span key={e} className={`dtc-badge ${e === 'Desktop Computer' ? 'dtc-badge-blue' : 'dtc-badge-green'}`} style={{ fontSize: 10 }}>{e === 'Desktop Computer' ? '\uD83D\uDDA5\uFE0F' : '\uD83D\uDCF6'}</span>)}
-                  </div>
-                </td>
-                <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>{log.timeIn}</td>
-                <td style={{ color: '#6b7280', fontSize: 12 }}>{log.pc || '\u2014'}</td>
-                <td style={{ color: '#6b7280' }}>{log.duration}h</td>
-                <td>
-                  <span className={`dtc-badge ${log.status === 'ACTIVE' ? 'dtc-badge-green' : log.status === 'OVERDUE' ? 'dtc-badge-red' : 'dtc-badge-gray'}`} style={{ fontSize: 10 }}>
-                    {log.status === 'ACTIVE' && <span className="dtc-pulse" style={{ width: 5, height: 5, borderRadius: '50%', background: '#059669', display: 'inline-block' }} />}
-                    {log.status}
-                  </span>
-                </td>
-                <td style={{ fontSize: 13 }}>{log.rating ? '\u2B50'.repeat(log.rating) : <span style={{ color: '#d1d5db' }}>&mdash;</span>}</td>
-                <td><button style={{ color: '#9ca3af', padding: 4 }}><Icon name="eye" size={14} /></button></td>
-              </tr>
-            ))}
+            {filtered.map((log, idx) => {
+              const status = deriveStatus(log)
+              return (
+                <tr key={log._id}>
+                  <td style={{ color: '#9ca3af', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}>#{String(idx + 1).padStart(4, '0')}</td>
+                  <td style={{ fontWeight: 600, cursor: 'pointer' }} onClick={() => setSelected(log === selected ? null : log)}>{log.fullName}</td>
+                  <td style={{ color: '#6b7280', fontSize: 12 }}>{log.agency}</td>
+                  <td style={{ color: '#6b7280', fontSize: 12, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.purpose}</td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {log.equipmentUsed.map((e) => <span key={e} className={`dtc-badge ${e === 'Desktop Computer' ? 'dtc-badge-blue' : 'dtc-badge-green'}`} style={{ fontSize: 10 }}>{e === 'Desktop Computer' ? '\uD83D\uDDA5\uFE0F' : '\uD83D\uDCF6'}</span>)}
+                    </div>
+                  </td>
+                  <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>{fmtTime(log.timeIn)}</td>
+                  <td style={{ color: '#6b7280', fontSize: 12 }}>{log.pc?.name || '\u2014'}</td>
+                  <td style={{ color: '#6b7280' }}>{hoursBetween(log.timeIn, log.timeOut).toFixed(1)}h</td>
+                  <td>
+                    <span className={`dtc-badge ${status === 'ACTIVE' ? 'dtc-badge-green' : status === 'OVERDUE' ? 'dtc-badge-red' : 'dtc-badge-gray'}`} style={{ fontSize: 10 }}>
+                      {status === 'ACTIVE' && <span className="dtc-pulse" style={{ width: 5, height: 5, borderRadius: '50%', background: '#059669', display: 'inline-block' }} />}
+                      {status}
+                    </span>
+                  </td>
+                  <td style={{ fontSize: 13 }}>{log.satisfactionRating ? '\u2B50'.repeat(log.satisfactionRating) : <span style={{ color: '#d1d5db' }}>&mdash;</span>}</td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {!log.timeOut ? (
+                        <button className="dtc-btn-primary" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setCheckoutOpen(log)}>Check Out</button>
+                      ) : (
+                        <button style={{ color: '#9ca3af', padding: 4 }} onClick={() => setSelected(log === selected ? null : log)}><Icon name="eye" size={14} /></button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
             {filtered.length === 0 && (
-              <tr><td colSpan={11} style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>No entries found.</td></tr>
+              <tr><td colSpan={11} style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>No entries found. {logs.length === 0 && <button className="dtc-btn-ghost" style={{ color: '#0038A8', marginLeft: 6 }} onClick={() => setAddOpen(true)}>Add one &rarr;</button>}</td></tr>
             )}
           </tbody>
         </table>
@@ -380,12 +587,18 @@ function Logbook() {
               ['Full Name', selected.fullName],
               ['Agency', selected.agency],
               ['Purpose', selected.purpose],
-              ['Equipment', selected.equipment.join(', ')],
-              ['Time In', selected.timeIn],
-              ['Time Out', selected.timeOut || 'Still active'],
-              ['Duration', `${selected.duration} hour(s)`],
-              ['Workstation', selected.pc || 'WiFi only'],
-            ] as [string, string][]).map(([k,v]) => (
+              ['Service Type', selected.serviceType],
+              ['Equipment', selected.equipmentUsed.join(', ')],
+              ['Workstation', selected.pc?.name || '\u2014'],
+              ['Time In', fmtTime(selected.timeIn)],
+              ['Time Out', selected.timeOut ? fmtTime(selected.timeOut) : 'Still active'],
+              ['Duration', `${hoursBetween(selected.timeIn, selected.timeOut).toFixed(2)} hour(s)`],
+              ['Planned', `${selected.plannedDurationHours} hour(s)`],
+              ['Rating', selected.satisfactionRating ? '\u2B50'.repeat(selected.satisfactionRating) : '—'],
+              ['Remarks', selected.remarks || '—'],
+              ['Email', selected.contactEmail || '—'],
+              ['Phone', selected.contactPhone || '—'],
+            ] as [string, string][]).map(([k, v]) => (
               <div key={k}>
                 <div style={{ fontSize: 10, color: '#9ca3af', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 3 }}>{k}</div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1f36' }}>{v}</div>
@@ -394,22 +607,238 @@ function Logbook() {
           </div>
         </div>
       )}
+
+      <AddLogModal open={addOpen} onClose={() => setAddOpen(false)} pcs={pcs} onSave={async (data) => {
+        try {
+          await createLog(data)
+          toast({ type: 'ok', msg: `Checked in ${data.fullName}` })
+          setAddOpen(false)
+        } catch (e) { toast({ type: 'err', msg: `Failed: ${String(e)}` }) }
+      }} />
+
+      <CheckoutModal log={checkoutOpen} onClose={() => setCheckoutOpen(null)} onSave={handleCheckout} />
+      {dialog}
     </div>
   )
 }
 
-// ─── Workstations Page ────────────────────────────────────────────────────────
-function Workstations() {
-  const [pcs, setPcs] = useState(MOCK_PCS)
-  const statusColors: Record<string, { bg: string; border: string; dot: string; text: string; label: string }> = {
-    ONLINE: { bg: '#d1fae5', border: '#6ee7b7', dot: '#059669', text: '#059669', label: 'Available' },
-    IN_USE: { bg: '#ffedd5', border: '#fdba74', dot: '#ea580c', text: '#ea580c', label: 'In Use' },
-    OFFLINE: { bg: '#f3f4f6', border: '#d1d5db', dot: '#6b7280', text: '#6b7280', label: 'Offline' },
-    MAINTENANCE: { bg: '#fef9c3', border: '#fcd34d', dot: '#a16207', text: '#a16207', label: 'Maintenance' },
+// ─── Add Log Modal ────────────────────────────────────────────────────────────
+function AddLogModal({ open, onClose, pcs, onSave }: {
+  open: boolean
+  onClose: () => void
+  pcs: Array<{ _id: Id<'dtcPcs'>; name: string; status: string }>
+  onSave: (data: {
+    fullName: string; agency: string; purpose: string; equipmentUsed: string[];
+    pcId?: Id<'dtcPcs'>; plannedDurationHours: number; serviceType: string;
+    contactEmail?: string; contactPhone?: string;
+  }) => Promise<void>
+}) {
+  const [form, setForm] = useState({
+    fullName: '', agency: '', purpose: PURPOSES[0], equipmentUsed: ['Internet Only'] as string[],
+    pcId: '' as string, plannedDurationHours: 1, serviceType: SERVICE_TYPES[0],
+    contactEmail: '', contactPhone: '',
+  })
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (open) setForm({
+      fullName: '', agency: '', purpose: PURPOSES[0], equipmentUsed: ['Internet Only'],
+      pcId: '', plannedDurationHours: 1, serviceType: SERVICE_TYPES[0],
+      contactEmail: '', contactPhone: '',
+    })
+  }, [open])
+
+  const usesPc = form.equipmentUsed.includes('Desktop Computer')
+
+  async function submit() {
+    if (!form.fullName.trim() || !form.agency.trim()) return
+    setSaving(true)
+    await onSave({
+      fullName: form.fullName.trim(),
+      agency: form.agency.trim(),
+      purpose: form.purpose,
+      equipmentUsed: form.equipmentUsed,
+      pcId: usesPc && form.pcId ? (form.pcId as Id<'dtcPcs'>) : undefined,
+      plannedDurationHours: form.plannedDurationHours,
+      serviceType: form.serviceType,
+      contactEmail: form.contactEmail.trim() || undefined,
+      contactPhone: form.contactPhone.trim() || undefined,
+    })
+    setSaving(false)
   }
-  const cycle = (pcId: string) => {
-    const next: Record<string, string> = { ONLINE: 'IN_USE', IN_USE: 'MAINTENANCE', MAINTENANCE: 'OFFLINE', OFFLINE: 'ONLINE' }
-    setPcs(prev => prev.map(p => p.id === pcId ? { ...p, status: next[p.status] } : p))
+
+  const availablePcs = pcs.filter((p) => p.status === 'ONLINE')
+
+  return (
+    <Modal open={open} onClose={onClose} title="New Client Check-In" width={560}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div>
+            <label className="dtc-field-label">Full Name *</label>
+            <input className="dtc-inp" value={form.fullName} onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} placeholder="Juan dela Cruz" style={{ width: '100%' }} />
+          </div>
+          <div>
+            <label className="dtc-field-label">Agency / Organization *</label>
+            <input className="dtc-inp" value={form.agency} onChange={(e) => setForm((f) => ({ ...f, agency: e.target.value }))} placeholder="LGU Legazpi" style={{ width: '100%' }} />
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div>
+            <label className="dtc-field-label">Purpose</label>
+            <select className="dtc-inp" value={form.purpose} onChange={(e) => setForm((f) => ({ ...f, purpose: e.target.value }))} style={{ width: '100%' }}>
+              {PURPOSES.map((p) => <option key={p}>{p}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="dtc-field-label">Service Type</label>
+            <select className="dtc-inp" value={form.serviceType} onChange={(e) => setForm((f) => ({ ...f, serviceType: e.target.value }))} style={{ width: '100%' }}>
+              {SERVICE_TYPES.map((s) => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label className="dtc-field-label">Equipment Used</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {['Internet Only', 'Desktop Computer'].map((opt) => {
+              const checked = form.equipmentUsed.includes(opt)
+              return (
+                <button key={opt} type="button"
+                  onClick={() => setForm((f) => ({ ...f, equipmentUsed: checked ? f.equipmentUsed.filter((x) => x !== opt) : [...f.equipmentUsed, opt] }))}
+                  style={{
+                    flex: 1, padding: '10px 12px', borderRadius: 8, border: '1.5px solid',
+                    borderColor: checked ? '#0038A8' : '#e5e7eb',
+                    background: checked ? '#eff6ff' : '#fff',
+                    color: checked ? '#0038A8' : '#6b7280',
+                    fontSize: 13, fontWeight: 600, textAlign: 'left',
+                  }}>
+                  <span style={{ marginRight: 8 }}>{opt === 'Desktop Computer' ? '\uD83D\uDDA5\uFE0F' : '\uD83D\uDCF6'}</span>{opt}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+        {usesPc && (
+          <div>
+            <label className="dtc-field-label">Assign Workstation</label>
+            <select className="dtc-inp" value={form.pcId} onChange={(e) => setForm((f) => ({ ...f, pcId: e.target.value }))} style={{ width: '100%' }}>
+              <option value="">— Auto / No specific PC —</option>
+              {availablePcs.map((p) => <option key={p._id} value={p._id}>{p.name} (available)</option>)}
+            </select>
+            {availablePcs.length === 0 && <div style={{ fontSize: 11, color: '#d97706', marginTop: 6 }}>No online workstations available right now.</div>}
+          </div>
+        )}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+          <div>
+            <label className="dtc-field-label">Planned Hours</label>
+            <input type="number" min={0.5} max={8} step={0.5} className="dtc-inp" value={form.plannedDurationHours}
+              onChange={(e) => setForm((f) => ({ ...f, plannedDurationHours: parseFloat(e.target.value) || 1 }))} style={{ width: '100%' }} />
+          </div>
+          <div>
+            <label className="dtc-field-label">Email (optional)</label>
+            <input className="dtc-inp" value={form.contactEmail} onChange={(e) => setForm((f) => ({ ...f, contactEmail: e.target.value }))} style={{ width: '100%' }} />
+          </div>
+          <div>
+            <label className="dtc-field-label">Phone (optional)</label>
+            <input className="dtc-inp" value={form.contactPhone} onChange={(e) => setForm((f) => ({ ...f, contactPhone: e.target.value }))} style={{ width: '100%' }} />
+          </div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
+          <button className="dtc-btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="dtc-btn-primary" onClick={submit} disabled={saving || !form.fullName.trim() || !form.agency.trim() || form.equipmentUsed.length === 0}>
+            {saving ? 'Saving…' : 'Check In'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+// ─── Checkout Modal ───────────────────────────────────────────────────────────
+function CheckoutModal({ log, onClose, onSave }: {
+  log: DtcLog | null
+  onClose: () => void
+  onSave: (log: DtcLog, rating: number | null, remarks: string) => Promise<void>
+}) {
+  const [rating, setRating] = useState<number | null>(null)
+  const [remarks, setRemarks] = useState('')
+  useEffect(() => { if (log) { setRating(null); setRemarks('') } }, [log])
+
+  return (
+    <Modal open={!!log} onClose={onClose} title={log ? `Check Out — ${log.fullName}` : ''} width={440}>
+      {log && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ background: '#f8faff', padding: '10px 14px', borderRadius: 8, fontSize: 12, color: '#6b7280' }}>
+            <div>Checked in <b>{fmtTime(log.timeIn)}</b> &middot; {hoursBetween(log.timeIn).toFixed(1)}h ago</div>
+            {log.pc && <div>Workstation: <b>{log.pc.name}</b></div>}
+          </div>
+          <div>
+            <label className="dtc-field-label">Satisfaction Rating</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {[1, 2, 3, 4, 5].map((r) => (
+                <button key={r} onClick={() => setRating(rating === r ? null : r)}
+                  style={{ flex: 1, padding: '14px 0', borderRadius: 8, fontSize: 22, border: '1.5px solid', borderColor: rating && r <= rating ? '#d97706' : '#e5e7eb', background: rating && r <= rating ? '#fef3c7' : '#fff', transition: 'all 0.1s' }}>
+                  {rating && r <= rating ? '\u2B50' : '\u2606'}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="dtc-field-label">Remarks (optional)</label>
+            <textarea className="dtc-inp" value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={3} style={{ width: '100%', resize: 'none' }} placeholder="Feedback, issues, notes…" />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+            <button className="dtc-btn-ghost" onClick={onClose}>Cancel</button>
+            <button className="dtc-btn-primary" onClick={() => onSave(log, rating, remarks)}>Complete Check-Out</button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  )
+}
+
+// ─── Workstations Page ────────────────────────────────────────────────────────
+type DtcPc = {
+  _id: Id<'dtcPcs'>
+  name: string
+  ipAddress: string
+  location?: string
+  status: string
+  lastSeen?: string
+  logs?: Array<{ id: Id<'dtcLogs'>; fullName: string; timeIn: string; plannedDurationHours: number }>
+}
+
+const STATUS_COLORS: Record<string, { bg: string; border: string; dot: string; text: string; label: string }> = {
+  ONLINE: { bg: '#d1fae5', border: '#6ee7b7', dot: '#059669', text: '#059669', label: 'Available' },
+  IN_USE: { bg: '#ffedd5', border: '#fdba74', dot: '#ea580c', text: '#ea580c', label: 'In Use' },
+  OFFLINE: { bg: '#f3f4f6', border: '#d1d5db', dot: '#6b7280', text: '#6b7280', label: 'Offline' },
+  MAINTENANCE: { bg: '#fef9c3', border: '#fcd34d', dot: '#a16207', text: '#a16207', label: 'Maintenance' },
+}
+
+function Workstations() {
+  const pcs = (useQuery(api.dtcPcs.getAll) ?? []) as DtcPc[]
+  const createPc = useMutation(api.dtcPcs.create)
+  const updatePc = useMutation(api.dtcPcs.update)
+  const removePc = useMutation(api.dtcPcs.remove)
+  const toast = useToast()
+  const { confirm, dialog } = useConfirm()
+
+  const [editing, setEditing] = useState<DtcPc | null>(null)
+  const [addOpen, setAddOpen] = useState(false)
+
+  async function changeStatus(pc: DtcPc, status: string) {
+    try {
+      await updatePc({ id: pc._id, status })
+      toast({ type: 'ok', msg: `${pc.name} → ${STATUS_COLORS[status]?.label ?? status}` })
+    } catch (e) { toast({ type: 'err', msg: String(e) }) }
+  }
+
+  async function handleDelete(pc: DtcPc) {
+    const ok = await confirm('Remove workstation?', `Are you sure you want to remove ${pc.name}? This will mark it as inactive.`)
+    if (!ok) return
+    try {
+      await removePc({ id: pc._id })
+      toast({ type: 'ok', msg: `Removed ${pc.name}` })
+    } catch (e) { toast({ type: 'err', msg: String(e) }) }
   }
 
   return (
@@ -417,150 +846,347 @@ function Workstations() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <div style={{ fontWeight: 800, fontSize: 20, color: '#1a1f36' }}>Workstations</div>
-          <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Live PC status &mdash; click to cycle status (demo)</div>
+          <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{pcs.length} registered &middot; Click the status chip to change</div>
         </div>
-        <button className="dtc-btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+        <button className="dtc-btn-primary" onClick={() => setAddOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
           <Icon name="plus" size={14} color="#fff" /> Add Workstation
         </button>
       </div>
 
       <div style={{ display: 'flex', gap: 10 }}>
-        {Object.entries(statusColors).map(([s, c]) => (
+        {Object.entries(STATUS_COLORS).map(([s, c]) => (
           <div key={s} className="dtc-card" style={{ flex: 1, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 10, height: 10, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
             <div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: '#1a1f36' }}>{pcs.filter(p => p.status === s).length}</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#1a1f36' }}>{pcs.filter((p) => p.status === s).length}</div>
               <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 500 }}>{c.label}</div>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="dtc-card" style={{ padding: 22 }}>
-        <div style={{ fontWeight: 700, fontSize: 13, color: '#1a1f36', marginBottom: 4 }}>Floor Layout</div>
-        <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 16 }}>Click any PC to cycle status</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
-          {pcs.map(pc => {
-            const c = statusColors[pc.status] || statusColors.OFFLINE
-            return (
-              <div key={pc.id} onClick={() => cycle(pc.id)}
-                style={{ background: c.bg, border: `2px solid ${c.border}`, borderRadius: 12, padding: '14px 12px', cursor: 'pointer', transition: 'all 0.15s' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                  <span style={{ fontSize: 22 }}>{'\uD83D\uDDA5\uFE0F'}</span>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.dot }} className={pc.status === 'ONLINE' ? 'dtc-pulse' : ''} />
-                </div>
-                <div style={{ fontWeight: 700, fontSize: 13, color: '#1a1f36' }}>{pc.name}</div>
-                <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>{pc.location}</div>
-                <div style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.7)', padding: '2px 7px', borderRadius: 20 }}>
-                  <div style={{ width: 5, height: 5, borderRadius: '50%', background: c.dot }} />
-                  <span style={{ fontSize: 10, fontWeight: 600, color: c.text }}>{c.label}</span>
-                </div>
-                {pc.user && <div style={{ marginTop: 6, fontSize: 10, color: '#6b7280', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pc.user}</div>}
-                <div style={{ marginTop: 4, fontSize: 9, fontFamily: 'JetBrains Mono, monospace', color: '#9ca3af' }}>{pc.ip}</div>
-              </div>
-            )
-          })}
+      {pcs.length === 0 ? (
+        <div className="dtc-card" style={{ padding: 40, textAlign: 'center' }}>
+          <div style={{ fontSize: 32, marginBottom: 10 }}>🖥️</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#1a1f36' }}>No workstations registered</div>
+          <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>Add your first PC to begin tracking usage</div>
+          <button className="dtc-btn-primary" onClick={() => setAddOpen(true)} style={{ marginTop: 16, display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+            <Icon name="plus" size={14} color="#fff" /> Add Workstation
+          </button>
         </div>
-      </div>
-
-      <div className="dtc-card" style={{ overflow: 'hidden' }}>
-        <div style={{ padding: '16px 22px', borderBottom: '1px solid #f1f3f9', fontWeight: 700, fontSize: 13, color: '#1a1f36' }}>PC Registry</div>
-        <table>
-          <thead><tr><th>PC Name</th><th>Location</th><th>IP Address</th><th>Status</th><th>Current User</th><th>Actions</th></tr></thead>
-          <tbody>
-            {pcs.map(pc => {
-              const c = statusColors[pc.status] || statusColors.OFFLINE
-              return (
-                <tr key={pc.id}>
-                  <td style={{ fontWeight: 600 }}>{pc.name}</td>
-                  <td style={{ color: '#6b7280' }}>{pc.location}</td>
-                  <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: '#6b7280' }}>{pc.ip}</td>
-                  <td><span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: c.bg, color: c.text, padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600 }}><div style={{ width: 5, height: 5, borderRadius: '50%', background: c.dot }} />{c.label}</span></td>
-                  <td style={{ color: '#6b7280', fontSize: 12 }}>{pc.user || '\u2014'}</td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button className="dtc-btn-ghost" style={{ padding: '4px 10px', fontSize: 11 }}>Edit</button>
-                      <button className="dtc-btn-danger" style={{ padding: '4px 10px', fontSize: 11 }}>Remove</button>
+      ) : (
+        <>
+          <div className="dtc-card" style={{ padding: 22 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: '#1a1f36', marginBottom: 4 }}>Floor Layout</div>
+            <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 16 }}>Click a card to edit</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
+              {pcs.map((pc) => {
+                const c = STATUS_COLORS[pc.status] || STATUS_COLORS.OFFLINE
+                const user = pc.logs?.[0]?.fullName
+                return (
+                  <div key={pc._id} onClick={() => setEditing(pc)}
+                    style={{ background: c.bg, border: `2px solid ${c.border}`, borderRadius: 12, padding: '14px 12px', cursor: 'pointer', transition: 'all 0.15s' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                      <span style={{ fontSize: 22 }}>{'\uD83D\uDDA5\uFE0F'}</span>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.dot }} className={pc.status === 'ONLINE' ? 'dtc-pulse' : ''} />
                     </div>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: '#1a1f36' }}>{pc.name}</div>
+                    <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>{pc.location || 'No location'}</div>
+                    <div style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.7)', padding: '2px 7px', borderRadius: 20 }}>
+                      <div style={{ width: 5, height: 5, borderRadius: '50%', background: c.dot }} />
+                      <span style={{ fontSize: 10, fontWeight: 600, color: c.text }}>{c.label}</span>
+                    </div>
+                    {user && <div style={{ marginTop: 6, fontSize: 10, color: '#6b7280', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user}</div>}
+                    <div style={{ marginTop: 4, fontSize: 9, fontFamily: 'JetBrains Mono, monospace', color: '#9ca3af' }}>{pc.ipAddress}</div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="dtc-card" style={{ overflow: 'hidden' }}>
+            <div style={{ padding: '16px 22px', borderBottom: '1px solid #f1f3f9', fontWeight: 700, fontSize: 13, color: '#1a1f36' }}>PC Registry</div>
+            <table>
+              <thead><tr><th>PC Name</th><th>Location</th><th>IP Address</th><th>Status</th><th>Current User</th><th>Actions</th></tr></thead>
+              <tbody>
+                {pcs.map((pc) => {
+                  const c = STATUS_COLORS[pc.status] || STATUS_COLORS.OFFLINE
+                  const user = pc.logs?.[0]?.fullName
+                  return (
+                    <tr key={pc._id}>
+                      <td style={{ fontWeight: 600 }}>{pc.name}</td>
+                      <td style={{ color: '#6b7280' }}>{pc.location || '—'}</td>
+                      <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: '#6b7280' }}>{pc.ipAddress}</td>
+                      <td>
+                        <select value={pc.status} onChange={(e) => changeStatus(pc, e.target.value)}
+                          style={{ background: c.bg, color: c.text, padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, border: 'none', cursor: 'pointer' }}>
+                          {Object.entries(STATUS_COLORS).map(([s, v]) => <option key={s} value={s}>{v.label}</option>)}
+                        </select>
+                      </td>
+                      <td style={{ color: '#6b7280', fontSize: 12 }}>{user || '\u2014'}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button className="dtc-btn-ghost" style={{ padding: '4px 10px', fontSize: 11 }} onClick={() => setEditing(pc)}>Edit</button>
+                          <button className="dtc-btn-danger" style={{ padding: '4px 10px', fontSize: 11 }} onClick={() => handleDelete(pc)}>Remove</button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      <PcModal
+        open={addOpen || !!editing}
+        editing={editing}
+        onClose={() => { setAddOpen(false); setEditing(null) }}
+        onSave={async (data) => {
+          try {
+            if (editing) {
+              await updatePc({ id: editing._id, ...data })
+              toast({ type: 'ok', msg: `Updated ${data.name}` })
+            } else {
+              await createPc(data)
+              toast({ type: 'ok', msg: `Added ${data.name}` })
+            }
+            setAddOpen(false); setEditing(null)
+          } catch (e) { toast({ type: 'err', msg: String(e) }) }
+        }}
+      />
+      {dialog}
     </div>
   )
 }
 
-// ─── Announcements Page ───────────────────────────────────────────────────────
-function Announcements() {
-  const [anns, setAnns] = useState(INITIAL_ANNOUNCEMENTS)
-  const [form, setForm] = useState({ title: '', body: '', type: 'INFO' })
-  const typeColors: Record<string, string> = { INFO: 'dtc-badge-blue', WARNING: 'dtc-badge-yellow', MAINTENANCE: 'dtc-badge-orange', HOLIDAY: 'dtc-badge-red' }
-  const typeIcons: Record<string, string> = { INFO: '\u2139\uFE0F', WARNING: '\u26A0\uFE0F', MAINTENANCE: '\uD83D\uDD27', HOLIDAY: '\uD83C\uDF89' }
+// ─── PC Add/Edit Modal ────────────────────────────────────────────────────────
+function PcModal({ open, editing, onClose, onSave }: {
+  open: boolean
+  editing: DtcPc | null
+  onClose: () => void
+  onSave: (data: { name: string; ipAddress: string; location?: string; status?: string }) => Promise<void>
+}) {
+  const [form, setForm] = useState({ name: '', ipAddress: '', location: '', status: 'ONLINE' })
+  const [saving, setSaving] = useState(false)
 
-  const add = () => {
+  useEffect(() => {
+    if (open) {
+      if (editing) setForm({ name: editing.name, ipAddress: editing.ipAddress, location: editing.location || '', status: editing.status })
+      else setForm({ name: '', ipAddress: '', location: '', status: 'ONLINE' })
+    }
+  }, [open, editing])
+
+  async function submit() {
+    if (!form.name.trim() || !form.ipAddress.trim()) return
+    setSaving(true)
+    await onSave({
+      name: form.name.trim(), ipAddress: form.ipAddress.trim(),
+      location: form.location.trim() || undefined, status: form.status,
+    })
+    setSaving(false)
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title={editing ? `Edit ${editing.name}` : 'Add Workstation'} width={460}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div>
+          <label className="dtc-field-label">PC Name *</label>
+          <input className="dtc-inp" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="PC-01" style={{ width: '100%' }} />
+        </div>
+        <div>
+          <label className="dtc-field-label">IP Address *</label>
+          <input className="dtc-inp" value={form.ipAddress} onChange={(e) => setForm((f) => ({ ...f, ipAddress: e.target.value }))} placeholder="192.168.1.101" style={{ width: '100%', fontFamily: 'JetBrains Mono, monospace' }} />
+        </div>
+        <div>
+          <label className="dtc-field-label">Location</label>
+          <input className="dtc-inp" value={form.location} onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))} placeholder="Row A — Window side" style={{ width: '100%' }} />
+        </div>
+        <div>
+          <label className="dtc-field-label">Status</label>
+          <select className="dtc-inp" value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))} style={{ width: '100%' }}>
+            {Object.entries(STATUS_COLORS).map(([s, v]) => <option key={s} value={s}>{v.label}</option>)}
+          </select>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
+          <button className="dtc-btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="dtc-btn-primary" onClick={submit} disabled={saving || !form.name.trim() || !form.ipAddress.trim()}>
+            {saving ? 'Saving…' : editing ? 'Save Changes' : 'Add'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+// ─── Announcements Page ───────────────────────────────────────────────────────
+type Announcement = {
+  _id: Id<'dtcAnnouncements'>
+  title: string
+  body: string
+  type: string
+  isActive: boolean
+  createdAt: number
+  createdBy: string
+}
+
+const ANN_TYPE_COLORS: Record<string, string> = { INFO: 'dtc-badge-blue', WARNING: 'dtc-badge-yellow', MAINTENANCE: 'dtc-badge-orange', HOLIDAY: 'dtc-badge-red' }
+const ANN_TYPE_ICONS: Record<string, string> = { INFO: '\u2139\uFE0F', WARNING: '\u26A0\uFE0F', MAINTENANCE: '\uD83D\uDD27', HOLIDAY: '\uD83C\uDF89' }
+
+function Announcements() {
+  const anns = (useQuery(api.dtcAnnouncements.getAll) ?? []) as Announcement[]
+  const createAnn = useMutation(api.dtcAnnouncements.create)
+  const updateAnn = useMutation(api.dtcAnnouncements.update)
+  const removeAnn = useMutation(api.dtcAnnouncements.remove)
+  const toast = useToast()
+  const { confirm, dialog } = useConfirm()
+
+  const [form, setForm] = useState({ title: '', body: '', type: 'INFO' })
+  const [editing, setEditing] = useState<Announcement | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  async function publish() {
     if (!form.title.trim()) return
-    setAnns(prev => [{ id: Date.now(), ...form, active: true, created: 'Apr 20, 2026' }, ...prev])
-    setForm({ title: '', body: '', type: 'INFO' })
+    setSaving(true)
+    try {
+      if (editing) {
+        await updateAnn({ id: editing._id, title: form.title.trim(), body: form.body.trim(), type: form.type })
+        toast({ type: 'ok', msg: 'Updated announcement' })
+      } else {
+        await createAnn({ title: form.title.trim(), body: form.body.trim(), type: form.type, createdBy: 'Administrator' })
+        toast({ type: 'ok', msg: 'Published announcement' })
+      }
+      setForm({ title: '', body: '', type: 'INFO' })
+      setEditing(null)
+    } catch (e) { toast({ type: 'err', msg: String(e) }) }
+    setSaving(false)
+  }
+
+  function startEdit(a: Announcement) {
+    setEditing(a)
+    setForm({ title: a.title, body: a.body, type: a.type })
+  }
+
+  async function toggleActive(a: Announcement) {
+    try { await updateAnn({ id: a._id, isActive: !a.isActive }) }
+    catch (e) { toast({ type: 'err', msg: String(e) }) }
+  }
+
+  async function handleDelete(a: Announcement) {
+    const ok = await confirm('Delete announcement?', `Permanently delete "${a.title}"?`)
+    if (!ok) return
+    try {
+      await removeAnn({ id: a._id })
+      toast({ type: 'ok', msg: 'Deleted' })
+    } catch (e) { toast({ type: 'err', msg: String(e) }) }
   }
 
   return (
     <div className="dtc-page" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ fontWeight: 800, fontSize: 20, color: '#1a1f36' }}>Announcements</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 20, color: '#1a1f36' }}>Announcements</div>
+          <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{anns.filter((a) => a.isActive).length} active &middot; {anns.length} total</div>
+        </div>
+      </div>
 
       <div className="dtc-card" style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ fontWeight: 700, fontSize: 13, color: '#1a1f36' }}>New Announcement</div>
+        <div style={{ fontWeight: 700, fontSize: 13, color: '#1a1f36', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>{editing ? 'Edit Announcement' : 'New Announcement'}</span>
+          {editing && <button className="dtc-btn-ghost" style={{ fontSize: 11 }} onClick={() => { setEditing(null); setForm({ title: '', body: '', type: 'INFO' }) }}>Cancel Edit</button>}
+        </div>
         <div style={{ display: 'flex', gap: 10 }}>
-          <input className="dtc-inp" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Announcement title\u2026" style={{ flex: 2 }} />
-          <select className="dtc-inp" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} style={{ flex: 1 }}>
-            {['INFO','WARNING','MAINTENANCE','HOLIDAY'].map(t => <option key={t} value={t}>{t}</option>)}
+          <input className="dtc-inp" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Announcement title…" style={{ flex: 2 }} />
+          <select className="dtc-inp" value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))} style={{ flex: 1 }}>
+            {['INFO', 'WARNING', 'MAINTENANCE', 'HOLIDAY'].map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
-        <textarea className="dtc-inp" value={form.body} onChange={e => setForm(f => ({ ...f, body: e.target.value }))} placeholder="Optional body text\u2026" rows={2} style={{ resize: 'none' }} />
+        <textarea className="dtc-inp" value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="Optional body text…" rows={2} style={{ resize: 'none' }} />
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <button className="dtc-btn-primary" onClick={add} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-            <Icon name="plus" size={14} color="#fff" /> Publish
+          <button className="dtc-btn-primary" onClick={publish} disabled={saving || !form.title.trim()} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+            {saving ? 'Saving…' : editing ? 'Save Changes' : <><Icon name="plus" size={14} color="#fff" /> Publish</>}
           </button>
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {anns.map(ann => (
-          <div key={ann.id} className="dtc-card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14, opacity: ann.active ? 1 : 0.5 }}>
-            <span style={{ fontSize: 22 }}>{typeIcons[ann.type]}</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                <span style={{ fontWeight: 700, fontSize: 13, color: '#1a1f36' }}>{ann.title}</span>
-                <span className={`dtc-badge ${typeColors[ann.type]}`} style={{ fontSize: 10 }}>{ann.type}</span>
-                {ann.active && <span className="dtc-badge dtc-badge-green" style={{ fontSize: 10 }}>LIVE</span>}
+      {anns.length === 0 ? (
+        <div className="dtc-empty dtc-card" style={{ padding: 40 }}>📣 No announcements yet. Create one above.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {anns.map((ann) => (
+            <div key={ann._id} className="dtc-card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14, opacity: ann.isActive ? 1 : 0.5 }}>
+              <span style={{ fontSize: 22 }}>{ANN_TYPE_ICONS[ann.type] ?? '📣'}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2, flexWrap: 'wrap' }}>
+                  <span style={{ fontWeight: 700, fontSize: 13, color: '#1a1f36' }}>{ann.title}</span>
+                  <span className={`dtc-badge ${ANN_TYPE_COLORS[ann.type] ?? 'dtc-badge-gray'}`} style={{ fontSize: 10 }}>{ann.type}</span>
+                  {ann.isActive && <span className="dtc-badge dtc-badge-green" style={{ fontSize: 10 }}>LIVE</span>}
+                </div>
+                {ann.body && <div style={{ fontSize: 12, color: '#6b7280' }}>{ann.body}</div>}
+                <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 3 }}>
+                  {fmtDate(new Date(ann.createdAt).toISOString())} &middot; by {ann.createdBy}
+                </div>
               </div>
-              {ann.body && <div style={{ fontSize: 12, color: '#6b7280' }}>{ann.body}</div>}
-              <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 3 }}>{ann.created}</div>
+              <label className="dtc-toggle" title={ann.isActive ? 'Deactivate' : 'Activate'}>
+                <input type="checkbox" checked={ann.isActive} onChange={() => toggleActive(ann)} />
+                <div className="dtc-toggle-track" />
+                <div className="dtc-toggle-thumb" />
+              </label>
+              <button className="dtc-btn-ghost" style={{ padding: '5px 10px', fontSize: 11 }} onClick={() => startEdit(ann)}>Edit</button>
+              <button className="dtc-btn-danger" style={{ padding: '5px 10px', fontSize: 11 }} onClick={() => handleDelete(ann)}>Delete</button>
             </div>
-            <label className="dtc-toggle">
-              <input type="checkbox" checked={ann.active} onChange={() => setAnns(prev => prev.map(a => a.id === ann.id ? { ...a, active: !a.active } : a))} />
-              <div className="dtc-toggle-track" />
-              <div className="dtc-toggle-thumb" />
-            </label>
-            <button className="dtc-btn-danger" style={{ padding: '5px 10px', fontSize: 11 }} onClick={() => setAnns(prev => prev.filter(a => a.id !== ann.id))}>Delete</button>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
+      {dialog}
     </div>
   )
 }
 
 // ─── Settings Page ────────────────────────────────────────────────────────────
 function SettingsPage() {
-  const [settings, setSettings] = useState({ officeOpen: '08:00', officeClose: '17:00', wifiSsid: 'DICT-DTC-RegV', wifiPassword: 'dict2026!', wifiNote: 'Free public WiFi courtesy of DICT Region V', maxSession: 2, allowWalkIn: true, requirePhoto: false })
-  const [saved, setSaved] = useState(false)
-  const save = () => { setSaved(true); setTimeout(() => setSaved(false), 2000) }
+  const live = useQuery(api.dtcSettings.getAll)
+  const bulkUpdate = useMutation(api.dtcSettings.bulkUpdate)
+  const toast = useToast()
+
+  const [settings, setSettings] = useState({
+    officeOpen: '08:00', officeClose: '17:00',
+    wifiSsid: '', wifiPassword: '', wifiNote: '',
+    accessCode: '',
+  })
+  const [dirty, setDirty] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (live) {
+      setSettings({
+        officeOpen: live.officeOpen, officeClose: live.officeClose,
+        wifiSsid: live.wifiSsid, wifiPassword: live.wifiPassword, wifiNote: live.wifiNote,
+        accessCode: live.accessCode,
+      })
+      setDirty(false)
+    }
+  }, [live])
+
+  function update<K extends keyof typeof settings>(key: K, value: (typeof settings)[K]) {
+    setSettings((s) => ({ ...s, [key]: value }))
+    setDirty(true)
+  }
+
+  async function save() {
+    setSaving(true)
+    try {
+      await bulkUpdate({ settings, updatedBy: 'Administrator' })
+      toast({ type: 'ok', msg: 'Settings saved' })
+      setDirty(false)
+    } catch (e) { toast({ type: 'err', msg: String(e) }) }
+    setSaving(false)
+  }
 
   const S = ({ label, sub, children }: { label: string; sub?: string; children: React.ReactNode }) => (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: '1px solid #f5f7fc' }}>
-      <div>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: '1px solid #f5f7fc', gap: 12 }}>
+      <div style={{ flex: 1 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1f36' }}>{label}</div>
         {sub && <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{sub}</div>}
       </div>
@@ -568,59 +1194,50 @@ function SettingsPage() {
     </div>
   )
 
+  if (live === undefined) {
+    return <div className="dtc-page"><div className="dtc-empty">Loading settings…</div></div>
+  }
+
   return (
     <div className="dtc-page" style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 680 }}>
-      <div style={{ fontWeight: 800, fontSize: 20, color: '#1a1f36' }}>Settings</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 20, color: '#1a1f36' }}>Settings</div>
+          <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Shared across all DTC pages {dirty && <span style={{ color: '#d97706', fontWeight: 600 }}>&middot; Unsaved changes</span>}</div>
+        </div>
+      </div>
 
       <div className="dtc-card" style={{ padding: '4px 22px' }}>
         <div style={{ fontWeight: 700, fontSize: 12, color: '#0038A8', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '14px 0 6px' }}>Office Hours</div>
         <S label="Opening Time" sub="Clients can log in after this time">
-          <input type="time" className="dtc-inp" value={settings.officeOpen} onChange={e => setSettings(s => ({ ...s, officeOpen: e.target.value }))} />
+          <input type="time" className="dtc-inp" value={settings.officeOpen} onChange={(e) => update('officeOpen', e.target.value)} />
         </S>
         <S label="Closing Time" sub="Maximum session time is capped here">
-          <input type="time" className="dtc-inp" value={settings.officeClose} onChange={e => setSettings(s => ({ ...s, officeClose: e.target.value }))} />
+          <input type="time" className="dtc-inp" value={settings.officeClose} onChange={(e) => update('officeClose', e.target.value)} />
         </S>
-        <S label="Max Session (hours)" sub="Default duration cap per client">
-          <input type="number" min={0.5} max={8} step={0.5} className="dtc-inp" value={settings.maxSession} onChange={e => setSettings(s => ({ ...s, maxSession: parseFloat(e.target.value) }))} style={{ width: 80, textAlign: 'center' }} />
-        </S>
+
         <div style={{ fontWeight: 700, fontSize: 12, color: '#0038A8', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '14px 0 6px' }}>WiFi Configuration</div>
         <S label="Network SSID" sub="Broadcast name shown to clients">
-          <input className="dtc-inp" value={settings.wifiSsid} onChange={e => setSettings(s => ({ ...s, wifiSsid: e.target.value }))} style={{ width: 220 }} />
+          <input className="dtc-inp" value={settings.wifiSsid} onChange={(e) => update('wifiSsid', e.target.value)} style={{ width: 240 }} />
         </S>
         <S label="Password" sub="Leave blank for open network">
-          <input type="password" className="dtc-inp" value={settings.wifiPassword} onChange={e => setSettings(s => ({ ...s, wifiPassword: e.target.value }))} style={{ width: 220 }} />
+          <input type="text" className="dtc-inp" value={settings.wifiPassword} onChange={(e) => update('wifiPassword', e.target.value)} style={{ width: 240, fontFamily: 'JetBrains Mono, monospace' }} />
         </S>
         <S label="WiFi Note" sub="Shown on the WiFi info screen">
-          <input className="dtc-inp" value={settings.wifiNote} onChange={e => setSettings(s => ({ ...s, wifiNote: e.target.value }))} style={{ width: 280 }} />
+          <input className="dtc-inp" value={settings.wifiNote} onChange={(e) => update('wifiNote', e.target.value)} style={{ width: 320 }} />
         </S>
-        <div style={{ fontWeight: 700, fontSize: 12, color: '#0038A8', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '14px 0 6px' }}>Client Registration</div>
-        <S label="Allow Walk-In Clients" sub="No appointment required">
-          <label className="dtc-toggle">
-            <input type="checkbox" checked={settings.allowWalkIn} onChange={e => setSettings(s => ({ ...s, allowWalkIn: e.target.checked }))} />
-            <div className="dtc-toggle-track" /><div className="dtc-toggle-thumb" />
-          </label>
-        </S>
-        <S label="Require Photo" sub="Mandatory photo capture on log-in">
-          <label className="dtc-toggle">
-            <input type="checkbox" checked={settings.requirePhoto} onChange={e => setSettings(s => ({ ...s, requirePhoto: e.target.checked }))} />
-            <div className="dtc-toggle-track" /><div className="dtc-toggle-thumb" />
-          </label>
-        </S>
-        <div style={{ padding: '16px 0' }}>
-          <button className="dtc-btn-primary" onClick={save} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-            {saved ? <><Icon name="check" size={14} color="#fff" /> Saved!</> : 'Save Changes'}
-          </button>
-        </div>
-      </div>
 
-      <div className="dtc-card" style={{ padding: '4px 22px', border: '1.5px solid #fee2e2', background: '#fffafa' }}>
-        <div style={{ fontWeight: 700, fontSize: 12, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '14px 0 6px' }}>Danger Zone</div>
-        <S label="Clear All Logs" sub="Permanently delete today's logbook entries">
-          <button className="dtc-btn-danger">Clear Logs</button>
+        <div style={{ fontWeight: 700, fontSize: 12, color: '#0038A8', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '14px 0 6px' }}>Access Control</div>
+        <S label="Admin Access Code" sub="Required to open admin panels on the kiosk">
+          <input className="dtc-inp" value={settings.accessCode} onChange={(e) => update('accessCode', e.target.value)} style={{ width: 160, fontFamily: 'JetBrains Mono, monospace' }} />
         </S>
-        <S label="Reset System" sub="Restore all settings to defaults">
-          <button className="dtc-btn-danger" style={{ marginBottom: 16 }}>Reset</button>
-        </S>
+
+        <div style={{ padding: '16px 0', display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button className="dtc-btn-primary" onClick={save} disabled={!dirty || saving} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+            {saving ? 'Saving…' : !dirty ? 'Saved' : <>Save Changes</>}
+          </button>
+          {dirty && <button className="dtc-btn-ghost" onClick={() => { if (live) { setSettings({ officeOpen: live.officeOpen, officeClose: live.officeClose, wifiSsid: live.wifiSsid, wifiPassword: live.wifiPassword, wifiNote: live.wifiNote, accessCode: live.accessCode }); setDirty(false) } }}>Discard</button>}
+        </div>
       </div>
     </div>
   )
@@ -628,25 +1245,90 @@ function SettingsPage() {
 
 // ─── Reports Page ─────────────────────────────────────────────────────────────
 function Reports() {
-  const total = MOCK_LOGS.length
-  const ratings = MOCK_LOGS.filter(l => l.rating != null)
-  const avgRating = ratings.reduce((a,b) => a + (b.rating ?? 0), 0) / ratings.length
-  const dist = [5,4,3,2,1].map(r => ({ r, count: ratings.filter(l => l.rating === r).length }))
+  const logs = (useQuery(api.dtcLogs.getRecent, { limit: 500 }) ?? []) as DtcLog[]
+  const toast = useToast()
+  const today = new Date().toISOString().slice(0, 10)
+
+  const todayLogs = useMemo(() => logs.filter((l) => l.timeIn.startsWith(today)), [logs, today])
+  const total = logs.length
+  const ratings = logs.filter((l) => l.satisfactionRating != null)
+  const avgRating = ratings.length ? ratings.reduce((a, b) => a + (b.satisfactionRating ?? 0), 0) / ratings.length : 0
+  const dist = [5, 4, 3, 2, 1].map((r) => ({ r, count: ratings.filter((l) => l.satisfactionRating === r).length }))
+
+  // Monthly trend for current year
+  const monthlyTrend = useMemo(() => {
+    const year = new Date().getFullYear()
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    return months.map((m, i) => {
+      const prefix = `${year}-${String(i + 1).padStart(2, '0')}`
+      return { m, v: logs.filter((l) => l.timeIn.startsWith(prefix)).length }
+    })
+  }, [logs])
+  const maxMonthly = Math.max(10, ...monthlyTrend.map((d) => d.v))
+
+  // Today status counts
+  const activeCount = todayLogs.filter((l) => deriveStatus(l) === 'ACTIVE').length
+  const completedCount = todayLogs.filter((l) => deriveStatus(l) === 'COMPLETED').length
+  const overdueCount = todayLogs.filter((l) => deriveStatus(l) === 'OVERDUE').length
+
+  function exportFullReport() {
+    const rows: (string | number | null | undefined)[][] = [
+      ['DTC — Full Report', new Date().toLocaleString()],
+      [],
+      ['Summary'],
+      ['Total Clients', total],
+      ['Today — Active', activeCount],
+      ['Today — Completed', completedCount],
+      ['Today — Overdue', overdueCount],
+      ['Average Rating', avgRating.toFixed(2)],
+      ['Rated Logs', ratings.length],
+      [],
+      ['Monthly Trend (current year)'],
+      ['Month', 'Visits'],
+      ...monthlyTrend.map((d) => [d.m, d.v]),
+      [],
+      ['All Log Entries'],
+      ['Date', 'Full Name', 'Agency', 'Purpose', 'Service', 'Equipment', 'PC', 'Time In', 'Time Out', 'Duration (h)', 'Status', 'Rating', 'Remarks'],
+      ...logs.map((l) => [
+        fmtDate(l.timeIn), l.fullName, l.agency, l.purpose, l.serviceType,
+        l.equipmentUsed.join(' + '), l.pc?.name ?? '',
+        fmtTime(l.timeIn), l.timeOut ? fmtTime(l.timeOut) : '',
+        hoursBetween(l.timeIn, l.timeOut).toFixed(2),
+        deriveStatus(l), l.satisfactionRating ?? '', l.remarks ?? '',
+      ]),
+    ]
+    downloadCsv(`dtc-full-report-${today}.csv`, rows)
+    toast({ type: 'ok', msg: 'Full report exported' })
+  }
+
+  const serviceBreakdown = [
+    { label: 'Desktop Computer Only', count: logs.filter((l) => l.equipmentUsed.includes('Desktop Computer') && !l.equipmentUsed.includes('Internet Only')).length, color: '#0038A8' },
+    { label: 'Internet/WiFi Only', count: logs.filter((l) => !l.equipmentUsed.includes('Desktop Computer') && l.equipmentUsed.includes('Internet Only')).length, color: '#6882FF' },
+    { label: 'Both Services', count: logs.filter((l) => l.equipmentUsed.includes('Desktop Computer') && l.equipmentUsed.includes('Internet Only')).length, color: '#059669' },
+  ]
 
   return (
     <div className="dtc-page" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ fontWeight: 800, fontSize: 20, color: '#1a1f36' }}>Reports &amp; Analytics</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 20, color: '#1a1f36' }}>Reports &amp; Analytics</div>
+          <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>All-time &middot; {total} total log entries</div>
+        </div>
+        <button className="dtc-btn-primary" onClick={exportFullReport} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+          <Icon name="export" size={14} color="#fff" /> Export Full Report
+        </button>
+      </div>
 
       <div style={{ display: 'flex', gap: 14 }}>
         <div className="dtc-card" style={{ flex: 1, padding: 22 }}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: '#1a1f36', marginBottom: 16 }}>Monthly Trend (2026)</div>
+          <div style={{ fontWeight: 700, fontSize: 13, color: '#1a1f36', marginBottom: 16 }}>Monthly Trend ({new Date().getFullYear()})</div>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 120, paddingBottom: 4 }}>
-            {[{m:'Jan',v:182},{m:'Feb',v:241},{m:'Mar',v:198},{m:'Apr',v:156},{m:'May',v:0},{m:'Jun',v:0},{m:'Jul',v:0},{m:'Aug',v:0},{m:'Sep',v:0},{m:'Oct',v:0},{m:'Nov',v:0},{m:'Dec',v:0}].map(d => (
-              <div key={d.m} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:3, height:'100%' }}>
-                <div style={{ flex:1, width:'100%', display:'flex', alignItems:'flex-end' }}>
-                  <div style={{ width:'100%', background: d.v > 0 ? '#0038A8' : '#f1f3f9', borderRadius:'4px 4px 0 0', height: d.v > 0 ? `${(d.v/300)*100}%` : '8%', transition:'height 0.4s' }} />
+            {monthlyTrend.map((d) => (
+              <div key={d.m} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, height: '100%' }} title={`${d.m}: ${d.v}`}>
+                <div style={{ flex: 1, width: '100%', display: 'flex', alignItems: 'flex-end' }}>
+                  <div style={{ width: '100%', background: d.v > 0 ? '#0038A8' : '#f1f3f9', borderRadius: '4px 4px 0 0', height: d.v > 0 ? `${(d.v / maxMonthly) * 100}%` : '8%', transition: 'height 0.4s', minHeight: d.v > 0 ? 4 : undefined }} />
                 </div>
-                <div style={{ fontSize:9, color:'#9ca3af', fontWeight:600 }}>{d.m}</div>
+                <div style={{ fontSize: 9, color: '#9ca3af', fontWeight: 600 }}>{d.m}</div>
               </div>
             ))}
           </div>
@@ -656,11 +1338,11 @@ function Reports() {
           <div style={{ fontWeight: 700, fontSize: 13, color: '#1a1f36', marginBottom: 4 }}>Satisfaction Score</div>
           <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 16 }}>Based on {ratings.length} ratings</div>
           <div style={{ textAlign: 'center', marginBottom: 16 }}>
-            <div style={{ fontSize: 48, fontWeight: 800, color: '#d97706', lineHeight: 1 }}>{avgRating.toFixed(1)}</div>
-            <div style={{ fontSize: 22, marginTop: 4 }}>{'\u2B50'.repeat(Math.round(avgRating))}</div>
+            <div style={{ fontSize: 48, fontWeight: 800, color: '#d97706', lineHeight: 1 }}>{ratings.length ? avgRating.toFixed(1) : '—'}</div>
+            {ratings.length > 0 && <div style={{ fontSize: 22, marginTop: 4 }}>{'\u2B50'.repeat(Math.round(avgRating))}</div>}
             <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>out of 5.0</div>
           </div>
-          {dist.map(({ r, count }) => (
+          {ratings.length > 0 && dist.map(({ r, count }) => (
             <div key={r} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
               <span style={{ fontSize: 11, color: '#6b7280', width: 14 }}>{r}{'\u2605'}</span>
               <div style={{ flex: 1, height: 7, background: '#f1f3f9', borderRadius: 4, overflow: 'hidden' }}>
@@ -674,19 +1356,17 @@ function Reports() {
 
       <div style={{ display: 'flex', gap: 14 }}>
         <div className="dtc-card" style={{ flex: 1, padding: 22 }}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: '#1a1f36', marginBottom: 16 }}>Service Breakdown</div>
-          {[
-            { label: 'Desktop Computer Only', count: MOCK_LOGS.filter(l => l.equipment.includes('Desktop Computer') && !l.equipment.includes('Internet Only')).length, color: '#0038A8' },
-            { label: 'Internet/WiFi Only', count: MOCK_LOGS.filter(l => !l.equipment.includes('Desktop Computer') && l.equipment.includes('Internet Only')).length, color: '#6882FF' },
-            { label: 'Both Services', count: MOCK_LOGS.filter(l => l.equipment.includes('Desktop Computer') && l.equipment.includes('Internet Only')).length, color: '#059669' },
-          ].map(s => (
+          <div style={{ fontWeight: 700, fontSize: 13, color: '#1a1f36', marginBottom: 16 }}>Service Breakdown (all-time)</div>
+          {total === 0 ? (
+            <div className="dtc-empty">No data yet.</div>
+          ) : serviceBreakdown.map((s) => (
             <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
               <div style={{ width: 10, height: 10, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
               <div style={{ flex: 1, fontSize: 12, color: '#374151', fontWeight: 500 }}>{s.label}</div>
               <div style={{ flex: 2, height: 8, background: '#f1f3f9', borderRadius: 4, overflow: 'hidden' }}>
                 <div style={{ width: `${(s.count / total) * 100}%`, height: '100%', background: s.color, borderRadius: 4 }} />
               </div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: s.color, width: 24 }}>{s.count}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: s.color, width: 36, textAlign: 'right' }}>{s.count}</div>
             </div>
           ))}
         </div>
@@ -695,20 +1375,17 @@ function Reports() {
           <div style={{ fontWeight: 700, fontSize: 13, color: '#1a1f36', marginBottom: 16 }}>Today&apos;s Summary</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {[
-              { label: 'Total Clients', value: total, color: '#0038A8' },
-              { label: 'Active Now', value: MOCK_LOGS.filter(l => l.status === 'ACTIVE').length, color: '#059669' },
-              { label: 'Completed', value: MOCK_LOGS.filter(l => l.status === 'COMPLETED').length, color: '#6b7280' },
-              { label: 'Overdue', value: MOCK_LOGS.filter(l => l.status === 'OVERDUE').length, color: '#dc2626' },
-            ].map(s => (
+              { label: 'Total Clients Today', value: todayLogs.length, color: '#0038A8' },
+              { label: 'Active Now', value: activeCount, color: '#059669' },
+              { label: 'Completed Today', value: completedCount, color: '#6b7280' },
+              { label: 'Overdue', value: overdueCount, color: '#dc2626' },
+            ].map((s) => (
               <div key={s.label} style={{ background: '#f8faff', borderRadius: 10, padding: '14px 16px' }}>
                 <div style={{ fontSize: 24, fontWeight: 800, color: s.color }}>{s.value}</div>
                 <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{s.label}</div>
               </div>
             ))}
           </div>
-          <button className="dtc-btn-primary" style={{ marginTop: 16, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 13 }}>
-            <Icon name="export" size={14} color="#fff" /> Export Full Report
-          </button>
         </div>
       </div>
     </div>
@@ -901,6 +1578,205 @@ function CVStation() {
   )
 }
 
+// ─── Invites Page ────────────────────────────────────────────────────────────
+function InvitesPage() {
+  const [email, setEmail] = useState('')
+  const [role, setRole] = useState<'intern' | 'supervisor' | 'manager' | 'admin'>('intern')
+  const [sending, setSending] = useState(false)
+  const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+  const [invites, setInvites] = useState<any[]>([])
+  const [loadingList, setLoadingList] = useState(true)
+
+  async function loadInvites() {
+    setLoadingList(true)
+    try {
+      const resp = await fetch('/api/auth/invite/list', { credentials: 'include' })
+      if (resp.ok) {
+        const data = await resp.json()
+        setInvites(data.invites ?? [])
+      } else {
+        setInvites([])
+      }
+    } catch {
+      setInvites([])
+    }
+    setLoadingList(false)
+  }
+
+  useEffect(() => { loadInvites() }, [])
+
+  async function handleSend(e: React.FormEvent) {
+    e.preventDefault()
+    setMsg(null)
+    if (!email.trim()) return
+    setSending(true)
+    try {
+      const resp = await fetch('/api/auth/invite/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email: email.trim(), role }),
+      })
+      const data = await resp.json()
+      if (!resp.ok) throw new Error(data.error || 'Failed to send invite')
+      setMsg({
+        kind: 'ok',
+        text: data.emailSent
+          ? `Invite sent to ${email}`
+          : `Invite created, but email failed: ${data.emailError ?? 'unknown'}`,
+      })
+      setEmail('')
+      loadInvites()
+    } catch (e: any) {
+      setMsg({ kind: 'err', text: e.message || 'Failed to send invite' })
+    }
+    setSending(false)
+  }
+
+  async function revoke(id: string) {
+    if (!confirm('Revoke this invite?')) return
+    try {
+      const resp = await fetch('/api/auth/invite/revoke', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ inviteId: id }),
+      })
+      if (!resp.ok) {
+        const d = await resp.json().catch(() => ({}))
+        throw new Error(d.error || 'Revoke failed')
+      }
+      loadInvites()
+    } catch (e: any) {
+      alert(e.message || 'Revoke failed')
+    }
+  }
+
+  return (
+    <div className="dtc-page" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ fontWeight: 800, fontSize: 20, color: '#1a1f36' }}>Invites</div>
+
+      <div className="dtc-card" style={{ padding: 22 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 10, background: '#eef2ff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Icon name="mail" size={22} color="#4338ca" />
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: '#1a1f36' }}>Send an invite</div>
+            <div style={{ fontSize: 11, color: '#6b7280' }}>
+              The recipient gets an email with a link + one-time code. Invites expire in 7 days.
+            </div>
+          </div>
+        </div>
+
+        <form onSubmit={handleSend} style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <div style={{ flex: 2, minWidth: 220 }}>
+            <label style={{ fontSize: 11, color: '#6b7280', fontWeight: 600 }}>Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="person@example.com"
+              style={{
+                width: '100%', padding: '10px 12px', borderRadius: 8,
+                border: '1px solid #e5e7eb', fontSize: 13, marginTop: 4,
+              }}
+              required
+            />
+          </div>
+          <div style={{ flex: 1, minWidth: 140 }}>
+            <label style={{ fontSize: 11, color: '#6b7280', fontWeight: 600 }}>Role</label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value as any)}
+              style={{
+                width: '100%', padding: '10px 12px', borderRadius: 8,
+                border: '1px solid #e5e7eb', fontSize: 13, marginTop: 4, background: '#fff',
+              }}
+            >
+              <option value="intern">Intern</option>
+              <option value="supervisor">Supervisor</option>
+              <option value="manager">Manager</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <button
+            type="submit"
+            className="dtc-btn-primary"
+            style={{ padding: '10px 18px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}
+            disabled={sending}
+          >
+            <Icon name="plus" size={14} color="#fff" />
+            {sending ? 'Sending…' : 'Send invite'}
+          </button>
+        </form>
+
+        {msg && (
+          <div style={{
+            marginTop: 14, padding: 10, borderRadius: 8, fontSize: 12,
+            background: msg.kind === 'ok' ? '#ecfdf5' : '#fef2f2',
+            border: `1px solid ${msg.kind === 'ok' ? '#a7f3d0' : '#fecaca'}`,
+            color: msg.kind === 'ok' ? '#065f46' : '#991b1b',
+          }}>{msg.text}</div>
+        )}
+      </div>
+
+      <div className="dtc-card" style={{ padding: 22 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, color: '#1a1f36', marginBottom: 12 }}>
+          Recent invites
+        </div>
+        {loadingList ? (
+          <div style={{ fontSize: 12, color: '#6b7280' }}>Loading…</div>
+        ) : invites.length === 0 ? (
+          <div style={{ fontSize: 12, color: '#6b7280' }}>No invites yet.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {invites.map((inv) => (
+              <div key={inv.id} style={{
+                display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto',
+                gap: 12, alignItems: 'center', padding: '10px 12px',
+                background: '#f8faff', borderRadius: 8, fontSize: 12,
+              }}>
+                <div style={{ fontWeight: 600, color: '#1a1f36', wordBreak: 'break-all' }}>{inv.email}</div>
+                <div style={{ color: '#374151', textTransform: 'capitalize' }}>{inv.role}</div>
+                <div>
+                  <span style={{
+                    padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+                    background:
+                      inv.status === 'used' ? '#d1fae5' :
+                      inv.status === 'expired' ? '#fee2e2' : '#fef3c7',
+                    color:
+                      inv.status === 'used' ? '#065f46' :
+                      inv.status === 'expired' ? '#991b1b' : '#92400e',
+                  }}>{inv.status}</span>
+                </div>
+                <div style={{ color: '#6b7280' }}>
+                  {new Date(inv.createdAt).toLocaleDateString()}
+                </div>
+                <div>
+                  {inv.status === 'pending' && (
+                    <button
+                      onClick={() => revoke(inv.id)}
+                      style={{
+                        fontSize: 11, padding: '4px 10px', borderRadius: 6,
+                        background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca',
+                        cursor: 'pointer', fontWeight: 600,
+                      }}
+                    >Revoke</button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function Kv({ k, v }: { k: string; v: string }) {
   return (
     <div>
@@ -923,27 +1799,30 @@ const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', section: 'Overview' },
   { id: 'logbook', label: 'Logbook', icon: 'logbook', section: 'Manage' },
   { id: 'workstations', label: 'Workstations', icon: 'pc', section: null },
-  { id: 'announcements', label: 'Announcements', icon: 'announce', section: null, badge: 2 },
+  { id: 'announcements', label: 'Announcements', icon: 'announce', section: null },
   { id: 'reports', label: 'Reports', icon: 'reports', section: 'Analytics' },
   { id: 'cvstation', label: 'CV Station', icon: 'camera', section: 'Devices' },
+  { id: 'invites', label: 'Invites', icon: 'mail', section: 'Users' },
   { id: 'settings', label: 'Settings', icon: 'settings', section: null },
 ]
 
-const PAGES: Record<string, React.ComponentType> = {
-  dashboard: Dashboard,
-  logbook: Logbook,
-  workstations: Workstations,
-  announcements: Announcements,
-  settings: SettingsPage,
-  reports: Reports,
-  cvstation: CVStation,
+export default function DTCAdminPage() {
+  return (
+    <ToastProvider>
+      <DTCAdminInner />
+    </ToastProvider>
+  )
 }
 
-export default function DTCAdminPage() {
+function DTCAdminInner() {
   const [page, setPage] = useState('dashboard')
   const [now, setNow] = useState(new Date())
   const [tweaks, setTweaks] = useState<Tweaks>(TWEAK_DEFAULTS)
   const [showTweaks, setShowTweaks] = useState(false)
+
+  // Live badges in sidebar
+  const activeSessions = useQuery(api.dtcLogs.getActiveSessions) ?? []
+  const activeAnnouncements = useQuery(api.dtcAnnouncements.getActive) ?? []
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000)
@@ -966,7 +1845,19 @@ export default function DTCAdminPage() {
     window.parent.postMessage({ type: '__edit_mode_set_keys', edits: next }, '*')
   }
 
-  const PageComp = PAGES[page] ?? Dashboard
+  function renderPage() {
+    switch (page) {
+      case 'dashboard': return <Dashboard onNavigate={setPage} />
+      case 'logbook': return <Logbook />
+      case 'workstations': return <Workstations />
+      case 'announcements': return <Announcements />
+      case 'reports': return <Reports />
+      case 'cvstation': return <CVStation />
+      case 'invites': return <InvitesPage />
+      case 'settings': return <SettingsPage />
+      default: return <Dashboard onNavigate={setPage} />
+    }
+  }
   const fmt = (d: Date) => d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 
   return (
@@ -993,7 +1884,12 @@ export default function DTCAdminPage() {
 
           <nav className="dtc-sidebar-nav">
             {NAV_ITEMS.map((item, i) => {
-              const prevSection = i > 0 ? NAV_ITEMS[i-1].section : null
+              const prevSection = i > 0 ? NAV_ITEMS[i - 1].section : null
+              const liveBadge: number | null =
+                item.id === 'logbook' ? activeSessions.length :
+                item.id === 'announcements' ? activeAnnouncements.length :
+                null
+              const showBadge = liveBadge !== null && liveBadge > 0
               return (
                 <Fragment key={item.id}>
                   {item.section && item.section !== prevSection && (
@@ -1003,8 +1899,8 @@ export default function DTCAdminPage() {
                     style={page === item.id ? { background: `${tweaks.accentColor}30` } : {}}>
                     <span className="dtc-nav-icon"><Icon name={item.icon} size={15} color={page === item.id ? '#fff' : 'rgba(255,255,255,0.5)'} /></span>
                     <span>{item.label}</span>
-                    {item.badge && <span style={{ background: '#CE1126', color: '#fff', fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 10, marginLeft: 'auto' }}>{item.badge}</span>}
-                    {!item.badge && <div className="dtc-nav-dot" />}
+                    {showBadge && <span style={{ background: item.id === 'logbook' ? '#059669' : '#CE1126', color: '#fff', fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 10, marginLeft: 'auto' }}>{liveBadge}</span>}
+                    {!showBadge && <div className="dtc-nav-dot" />}
                   </div>
                 </Fragment>
               )
@@ -1054,7 +1950,7 @@ export default function DTCAdminPage() {
           </div>
 
           <div className="dtc-content">
-            <PageComp />
+            {renderPage()}
           </div>
         </div>
 

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { readFile, stat } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
+import { fetchQuery } from "convex/nextjs";
+import { api } from "@/convex/_generated/api";
+import { SESSION_COOKIE } from "@/lib/session";
 
 // ============================================================
 // Admin-gated download of the packaged CV Station .exe
@@ -26,11 +29,25 @@ const EXE_FILENAME = "DICT-FaceCheckin.exe";
 const EXE_PATH = path.join(process.cwd(), "downloads", EXE_FILENAME);
 const VERSION = "1.0.0";
 
-function requireAdmin(req: NextRequest): NextResponse | null {
-  const token = req.cookies.get("auth_token")?.value;
+async function requireAdmin(req: NextRequest): Promise<NextResponse | null> {
+  const token = req.cookies.get(SESSION_COOKIE)?.value;
   if (!token) {
     return NextResponse.json(
       { ok: false, error: "Unauthorized — admin sign-in required" },
+      { status: 401 }
+    );
+  }
+  try {
+    const user = await fetchQuery(api.auth.getCurrentUser, { token });
+    if (!user || user.role !== "admin") {
+      return NextResponse.json(
+        { ok: false, error: "Admin role required" },
+        { status: 403 }
+      );
+    }
+  } catch {
+    return NextResponse.json(
+      { ok: false, error: "Invalid or expired session" },
       { status: 401 }
     );
   }
@@ -38,7 +55,7 @@ function requireAdmin(req: NextRequest): NextResponse | null {
 }
 
 export async function GET(req: NextRequest) {
-  const unauthorized = requireAdmin(req);
+  const unauthorized = await requireAdmin(req);
   if (unauthorized) return unauthorized;
 
   const meta = req.nextUrl.searchParams.get("meta");

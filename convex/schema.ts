@@ -12,19 +12,40 @@ export default defineSchema({
   // AUTHENTICATION
   // ----------------------------------------------------------
 
-  /** System users with role-based access */
+  /**
+   * System users with role-based access.
+   * Valid role values: "intern" | "supervisor" | "manager" | "admin"
+   *   - intern     → intern portal only
+   *   - supervisor → intern portal + supervisor pages
+   *   - manager    → admin/activity areas (NOT intern portal)
+   *   - admin      → full access (NOT intern portal)
+   */
   users: defineTable({
     email: v.string(),
     passwordHash: v.string(),
     fullName: v.string(),
-    role: v.string(), // "admin", "user", "viewer"
-    googleEmail: v.optional(v.string()), // For Google Sheets sync access
+    role: v.string(),
+    googleEmail: v.optional(v.string()),
     isActive: v.boolean(),
     createdAt: v.number(),
     lastLoginAt: v.optional(v.number()),
   })
     .index("by_email", ["email"])
     .index("by_role", ["role"]),
+
+  /** Admin-issued invites for new user registration (single-use, OTP-gated) */
+  invites: defineTable({
+    email: v.string(),
+    token: v.string(),
+    role: v.string(), // intern | supervisor | manager | admin
+    createdBy: v.id("users"),
+    expiresAt: v.number(),
+    usedAt: v.optional(v.number()),
+    usedByUserId: v.optional(v.id("users")),
+    createdAt: v.number(),
+  })
+    .index("by_token", ["token"])
+    .index("by_email", ["email"]),
 
   /** Active user sessions */
   sessions: defineTable({

@@ -6,29 +6,35 @@ import { SESSION_COOKIE, sessionCookieOptions } from "@/lib/session";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/**
- * Legacy /api/auth/login — forwards to Convex auth.signIn. Kept so older
- * callers (pages that still POST here) keep working. New code should hit
- * /api/auth/signin.
- */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const email: string = body.email ?? body.username ?? "";
     const password: string = body.password ?? "";
+
     if (!email || !password) {
       return NextResponse.json(
         { error: "Email and password are required" },
         { status: 400 }
       );
     }
-    const result = await fetchMutation(api.auth.signIn, { email, password });
-    const res = NextResponse.json({ success: true, user: result.user });
+
+    const result = await fetchMutation(api.auth.signIn, {
+      email,
+      password,
+    });
+
+    const res = NextResponse.json({
+      success: true,
+      user: result.user,
+    });
     res.cookies.set(SESSION_COOKIE, result.token, sessionCookieOptions());
     return res;
   } catch (error: any) {
     const msg = String(error?.message ?? "Sign-in failed");
-    const status = /invalid|disabled/i.test(msg) ? 401 : 500;
+    // Convex throws bare Error; surface a clean 401 for credential errors.
+    const status =
+      /invalid|disabled|not authenticated/i.test(msg) ? 401 : 500;
     return NextResponse.json({ error: msg }, { status });
   }
 }
