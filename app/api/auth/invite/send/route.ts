@@ -30,18 +30,32 @@ export async function POST(req: NextRequest) {
       process.env.APP_URL ||
       new URL(req.url).origin;
 
-    const emailResult = await fetchAction(api.emails.sendInvite, {
-      email: invite.email,
-      role: invite.role,
-      token: invite.token,
-      appUrl,
-    });
+    const acceptUrl = `${appUrl.replace(/\/$/, "")}/accept-invite?token=${encodeURIComponent(invite.token)}`;
+
+    let emailSent = false;
+    let emailError: string | undefined;
+    try {
+      const emailResult = await fetchAction(api.emails.sendInvite, {
+        email: invite.email,
+        role: invite.role,
+        token: invite.token,
+        appUrl,
+      });
+      emailSent = !!emailResult.ok;
+      emailError = emailResult.error;
+    } catch (err: any) {
+      // Invite row was already created; surface the email error without failing the whole request
+      emailError = String(err?.message ?? "Email dispatch failed");
+    }
 
     return NextResponse.json({
       success: true,
       inviteId: invite.inviteId,
-      emailSent: emailResult.ok,
-      emailError: emailResult.error,
+      email: invite.email,
+      role: invite.role,
+      acceptUrl,
+      emailSent,
+      emailError,
     });
   } catch (error: any) {
     const msg = String(error?.message ?? "Failed to send invite");

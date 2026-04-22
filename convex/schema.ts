@@ -146,6 +146,9 @@ export default defineSchema({
 
     activityTitle: v.string(),
     venue: v.string(),
+    // Venue map pin (lat/lng). Separate from the venue text so the name
+    // "Legazpi City Hall" and the exact coordinates can diverge.
+    coordinates: v.optional(v.object({ lat: v.number(), lng: v.number() })),
     partnerOrganizations: v.array(v.string()),
     startDate: v.string(),
     endDate: v.string(),
@@ -376,11 +379,16 @@ export default defineSchema({
     lastSyncedAt: v.optional(v.number()),
     sheetRowNumber: v.optional(v.number()),
     createdAt: v.number(),
+    /** Client-generated UUID for deduping replays from the offline queue. */
+    clientId: v.optional(v.string()),
+    /** True when the submission originated from the SW offline queue. */
+    submittedOffline: v.optional(v.boolean()),
   })
     .index("by_timeIn", ["timeIn"])
     .index("by_pcId", ["pcId"])
     .index("by_createdAt", ["createdAt"])
-    .index("by_syncedToSheets", ["syncedToSheets"]),
+    .index("by_syncedToSheets", ["syncedToSheets"])
+    .index("by_clientId", ["clientId"]),
 
   /** DTC computer workstations */
   dtcPcs: defineTable({
@@ -785,5 +793,35 @@ export default defineSchema({
   })
     .index("by_sheets_id", ["sheetsInternId"])
     .index("by_convex_id", ["convexInternId"])
+    .index("by_email", ["email"]),
+
+  /**
+   * Public Meeting Hall booking requests.
+   * Submitted from the public /meeting-hall page. `clientId` dedupes
+   * retries from the offline queue / service worker background sync.
+   */
+  meetingHallBookings: defineTable({
+    clientId: v.string(),
+    fullName: v.string(),
+    designation: v.optional(v.string()),
+    agency: v.string(),
+    email: v.string(),
+    phone: v.optional(v.string()),
+    date: v.string(),
+    timeSlot: v.string(),
+    attendees: v.string(),
+    eventType: v.string(),
+    purpose: v.optional(v.string()),
+    status: v.string(), // "pending" | "approved" | "rejected" | "cancelled"
+    submittedAt: v.number(),
+    submittedOffline: v.boolean(),
+    userAgent: v.optional(v.string()),
+    reviewedBy: v.optional(v.id("users")),
+    reviewedAt: v.optional(v.number()),
+    reviewNote: v.optional(v.string()),
+  })
+    .index("by_clientId", ["clientId"])
+    .index("by_status", ["status"])
+    .index("by_submittedAt", ["submittedAt"])
     .index("by_email", ["email"]),
 });

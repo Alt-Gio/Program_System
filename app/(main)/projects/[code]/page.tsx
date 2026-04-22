@@ -13,11 +13,10 @@ import {
   CheckCircle2, ChevronRight, ExternalLink, Filter, FileSpreadsheet, Loader2,
 } from "lucide-react";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -55,23 +54,27 @@ export default function ProjectPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [showDescriptionModal, setShowDescriptionModal] = useState(false);
   const [showAddActivity, setShowAddActivity] = useState(false);
+  const [selectedYear, setSelectedYear] = useState<number>(CURRENT_YEAR);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const [selectedQuarter, setSelectedQuarter] = useState<number | null>(null);
+  const [flyToCoords, setFlyToCoords] = useState<{ lat: number; lng: number; ts: number } | null>(null);
 
   const project = useQuery(api.projects.getByCode, { code: projectCode });
 
   const stats = useQuery(
     api.activities.projectStats,
-    project?._id ? { projectId: project._id, year: CURRENT_YEAR } : "skip"
+    project?._id ? { projectId: project._id, year: selectedYear } : "skip"
   );
 
   const provincePins = useQuery(
     api.activities.activitiesByProvince,
-    project?._id ? { projectId: project._id, year: CURRENT_YEAR } : "skip"
+    project?._id ? { projectId: project._id, year: selectedYear } : "skip"
   );
 
   const activities = useQuery(
     api.activities.listActivities,
     project?._id
-      ? { projectId: project._id, provinceId: selectedProvince ? (selectedProvince as any) : undefined, year: CURRENT_YEAR }
+      ? { projectId: project._id, provinceId: selectedProvince ? (selectedProvince as any) : undefined, year: selectedYear }
       : "skip"
   );
 
@@ -114,17 +117,37 @@ export default function ProjectPage() {
   
   const projectLogo = `/logo/${projectCode.toLowerCase() === 'egov' ? 'egov_ph' : projectCode.toLowerCase() === 'wifi' ? 'freewifi' : projectCode.toLowerCase() === 'cyber' ? 'cybersecurity' : projectCode.toLowerCase() === 'ilcdb' || projectCode.toLowerCase() === 'iidb' ? 'iidb' : projectCode.toLowerCase()}_logo.png`;
 
-  const monthData = MONTHS.map((m, i) => ({
+  const QUARTER_MONTHS: Record<number, number[]> = { 1:[1,2,3], 2:[4,5,6], 3:[7,8,9], 4:[10,11,12] };
+
+  const yearMonthData = MONTHS.map((m, i) => ({
     name: m.slice(0, 3),
     count: stats?.byMonth?.[i + 1] ?? 0,
+    monthNum: i + 1,
   }));
 
   const validated = (stats?.byStatus?.validated ?? 0) + (stats?.byStatus?.reported ?? 0);
   const completionRate = getCompletionRate(validated, stats?.totalActivities ?? 0);
 
-  const filteredActivities = (activities ?? []).filter(
-    a => statusFilter === "all" || a.status === statusFilter
-  );
+  const displayActivities = (activities ?? [])
+    .filter(a => {
+      const matchesProv = !selectedProvince || a.provinceId === selectedProvince;
+      const matchesStatus = statusFilter === "all" || a.status === statusFilter;
+      const matchesPeriod = selectedMonth
+        ? a.month === selectedMonth
+        : selectedQuarter
+          ? QUARTER_MONTHS[selectedQuarter].includes(a.month)
+          : true;
+      return matchesProv && matchesStatus && matchesPeriod;
+    })
+    .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+
+  const handleProvinceSelect = (provId: string | null) => {
+    setSelectedProvince(provId);
+    if (provId !== null) {
+      const pin = (provincePins ?? []).find(p => p.provinceId === provId);
+      if (pin?.lat && pin?.lng) setFlyToCoords({ lat: pin.lat, lng: pin.lng, ts: Date.now() });
+    }
+  };
 
   return (
     <div className="space-y-4 md:space-y-5">
@@ -144,17 +167,6 @@ export default function ProjectPage() {
               <h1 className="text-lg sm:text-2xl font-bold text-gray-900 leading-tight">{projectDef.name}</h1>
               <p className="text-xs sm:text-sm text-gray-600 mt-0.5 sm:mt-1">{projectDef.shortName}</p>
             </div>
-          </div>
-          <div className="flex flex-wrap gap-1.5 sm:gap-2 mt-2 sm:mt-3">
-            <span className="text-[10px] sm:text-xs bg-gray-100 text-gray-600 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full">{projectDef.division}</span>
-            {projectDef.requirementNote && (
-              <span className="text-[10px] sm:text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full">
-                {projectDef.requirementNote}
-              </span>
-            )}
-            {projectDef.targetSectors.slice(0, 3).map(s => (
-              <span key={s} className="text-[10px] sm:text-xs bg-blue-50 text-blue-700 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full">{s}</span>
-            ))}
           </div>
         </div>
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
@@ -265,36 +277,11 @@ export default function ProjectPage() {
         </DialogContent>
       </Dialog>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
-        {[
-          { label: "Total Activities", icon: <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: projectDef.color }} />, value: stats?.totalActivities ?? 0, sub: `FY ${CURRENT_YEAR}`, bg: `${projectDef.color}12` },
-          { label: "Total Participants", icon: <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-600" />, value: stats?.totalParticipants ?? 0, sub: "beneficiaries", bg: "#7c3aed12" },
-          { label: "Validated / Reported", icon: <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-600" />, value: validated, sub: `${completionRate}% rate`, bg: "#16a34a12" },
-          { label: "Provinces Covered", icon: <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600" />, value: (provincePins ?? []).filter(p => p.activityCount > 0).length, sub: "of 6 provinces", bg: "#d9770612" },
-        ].map(k => (
-          <Card key={k.label}>
-            <CardContent className="p-3 sm:p-4 md:p-5">
-              <div className="flex items-start justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider text-gray-400 truncate">{k.label}</p>
-                  <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 mt-0.5 sm:mt-1">{numberWithCommas(k.value)}</p>
-                  <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5 sm:mt-1">{k.sub}</p>
-                </div>
-                <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0 ml-1 sm:ml-2" style={{ backgroundColor: k.bg }}>
-                  {k.icon}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
       {/* Province Distribution + Map - Side by Side */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 sm:gap-4 md:gap-5">
-        {/* LEFT - Province Distribution (2/3 width) */}
-        <div className="xl:col-span-2">
-          <Card className="border-2" style={{ borderColor: `${projectDef.color}30` }}>
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4 md:gap-5">
+        {/* LEFT - Province Distribution (compact) */}
+        <div className="xl:col-span-1 h-full">
+          <Card className="border-2 h-full flex flex-col" style={{ borderColor: `${projectDef.color}30` }}>
             <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6 pt-3 sm:pt-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-0">
                 <div>
@@ -317,8 +304,8 @@ export default function ProjectPage() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="pb-3 sm:pb-4 px-3 sm:px-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3">
+            <CardContent className="flex-1 flex flex-col pb-3 sm:pb-4 px-3 sm:px-6">
+              <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 grid-rows-2 gap-1.5">
                 {provinces?.map((prov, idx) => {
                   const pin = (provincePins ?? []).find(p => p.provinceId === prov._id);
                   const count = pin?.activityCount ?? 0;
@@ -329,10 +316,10 @@ export default function ProjectPage() {
                   return (
                     <button
                       key={prov._id}
-                      onClick={() => setSelectedProvince(isSelected ? null : prov._id)}
+                      onClick={() => handleProvinceSelect(isSelected ? null : prov._id)}
                       disabled={count === 0}
                       className={cn(
-                        "text-left p-2.5 sm:p-3 rounded-lg sm:rounded-xl border-2 transition-all w-full relative overflow-hidden",
+                        "text-left p-2 rounded-lg border-2 transition-all w-full h-full relative overflow-hidden",
                         count === 0
                           ? "opacity-40 cursor-not-allowed bg-gray-50 border-gray-200"
                           : "cursor-pointer hover:shadow-md active:scale-[0.98]",
@@ -342,7 +329,7 @@ export default function ProjectPage() {
                       )}
                     >
                       {/* Header with ranking badge */}
-                      <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                      <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
                           <div
                             className={cn(
@@ -371,16 +358,16 @@ export default function ProjectPage() {
                       </div>
 
                       {/* Stats in compact layout */}
-                      <div className="space-y-1 sm:space-y-1.5 mb-1.5 sm:mb-2">
+                      <div className="space-y-0.5 mb-1">
                         <div className="flex items-center justify-between">
                           <p className="text-[9px] sm:text-[10px] font-medium text-gray-500 uppercase">Activities</p>
-                          <p className="text-base sm:text-lg font-bold" style={{ color: count > 0 ? projectDef.color : "#9ca3af" }}>
+                          <p className="text-sm font-bold" style={{ color: count > 0 ? projectDef.color : "#9ca3af" }}>
                             {count}
                           </p>
                         </div>
                         <div className="flex items-center justify-between">
                           <p className="text-[9px] sm:text-[10px] font-medium text-gray-500 uppercase">Participants</p>
-                          <p className="text-base sm:text-lg font-bold text-violet-600">{pax > 0 ? numberWithCommas(pax) : "0"}</p>
+                          <p className="text-sm font-bold text-violet-600">{pax > 0 ? numberWithCommas(pax) : "0"}</p>
                         </div>
                       </div>
 
@@ -410,12 +397,18 @@ export default function ProjectPage() {
           </Card>
         </div>
 
-        {/* RIGHT - Map (1/3 width) */}
+        {/* RIGHT - Map (enlarged) */}
         <div className="xl:col-span-1">
           <Card className="overflow-hidden h-full">
             <CardHeader className="pb-2 pt-3 px-3 sm:px-6">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-[11px] sm:text-xs font-semibold text-gray-700">Activity Map — Region V</CardTitle>
+                <CardTitle className="text-[11px] sm:text-xs font-semibold text-gray-700">Activity Map — Region V
+                  {selectedProvince && (
+                    <span className="ml-2 text-[9px] font-medium px-1.5 py-0.5 rounded-full" style={{ background: `${projectDef.color}20`, color: projectDef.color }}>
+                      {provinceMap[selectedProvince]?.name ?? ""}
+                    </span>
+                  )}
+                </CardTitle>
                 <Link href="/map">
                   <Button variant="ghost" size="sm" className="text-xs gap-1 h-6 sm:h-7 px-2">
                     <ExternalLink className="w-3 h-3" />
@@ -424,148 +417,223 @@ export default function ProjectPage() {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="h-[300px] sm:h-[350px] md:h-[400px]">
-                <ProjectMap pins={provincePins ?? []} projectColor={projectDef.color}
-                  onProvinceClick={setSelectedProvince} selectedProvince={selectedProvince} />
+              <div className="h-[380px] sm:h-[450px] md:h-[520px]">
+                <ProjectMap
+                  pins={provincePins ?? []}
+                  projectColor={projectDef.color}
+                  onProvinceClick={handleProvinceSelect}
+                  selectedProvince={selectedProvince}
+                  flyToCoords={flyToCoords}
+                />
               </div>
             </CardContent>
           </Card>
         </div>
       </div>
 
-      {/* Tabs - Monthly (default) and Activities only */}
-      <Tabs defaultValue="monthly">
-        <TabsList className="w-full sm:w-auto">
-          <TabsTrigger value="monthly" className="flex-1 sm:flex-none text-xs sm:text-sm">Monthly</TabsTrigger>
-          <TabsTrigger value="activities" className="flex-1 sm:flex-none text-xs sm:text-sm">Activities</TabsTrigger>
-        </TabsList>
+      {/* Full-year chart + Activity list */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
 
-        <TabsContent value="monthly" className="mt-3 sm:mt-4">
-          <Card>
-            <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
-              <CardTitle className="text-xs sm:text-sm font-semibold">{projectDef.shortName} — Monthly Trend</CardTitle>
-              <CardDescription className="text-[10px] sm:text-xs">FY {CURRENT_YEAR}</CardDescription>
-            </CardHeader>
-            <CardContent className="px-2 sm:px-6 pb-3 sm:pb-6">
-              <ResponsiveContainer width="100%" height={180} className="sm:hidden">
-                <BarChart data={monthData} barSize={14}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                  <XAxis dataKey="name" tick={{ fontSize: 9 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 9 }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ fontSize: 10, borderRadius: 8 }} cursor={{ fill: "#f9fafb" }} />
-                  <Bar dataKey="count" name="Activities" fill={projectDef.color} radius={[3, 3, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-              <ResponsiveContainer width="100%" height={220} className="hidden sm:block">
-                <BarChart data={monthData} barSize={22}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} cursor={{ fill: "#f9fafb" }} />
-                  <Bar dataKey="count" name="Activities" fill={projectDef.color} radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mt-2 sm:mt-3">
-            {[{q:"Q1",months:[1,2,3]},{q:"Q2",months:[4,5,6]},{q:"Q3",months:[7,8,9]},{q:"Q4",months:[10,11,12]}].map(({q, months}) => {
-              const total = months.reduce((s, m) => s + (stats?.byMonth?.[m] ?? 0), 0);
-              return (
-                <Card key={q}>
-                  <CardContent className="p-3 sm:p-4 text-center">
-                    <p className="text-[10px] sm:text-xs text-gray-500 font-medium">{q}</p>
-                    <p className="text-xl sm:text-2xl font-bold mt-0.5 sm:mt-1" style={{ color: projectDef.color }}>{total}</p>
-                    <p className="text-[10px] sm:text-xs text-gray-400">activities</p>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="activities" className="mt-3 sm:mt-4">
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-3 px-1">
-            <Filter className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400 shrink-0" />
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-28 sm:w-36 h-7 sm:h-8 text-[11px] sm:text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="Draft">Draft</SelectItem>
-                <SelectItem value="Submitted">Submitted</SelectItem>
-                <SelectItem value="Validated">Validated</SelectItem>
-                <SelectItem value="Reported">Reported</SelectItem>
-              </SelectContent>
-            </Select>
-            {selectedProvince && (
-              <button onClick={() => setSelectedProvince(null)}
-                className="text-[10px] sm:text-xs text-blue-600 bg-blue-50 px-2 py-0.5 sm:py-1 rounded-full flex items-center gap-1 hover:bg-blue-100 active:scale-95 transition-transform">
-                <span className="max-w-[100px] sm:max-w-none truncate">{provinceMap[selectedProvince]?.name}</span> ✕
-              </button>
-            )}
-            <span className="text-[10px] sm:text-xs text-gray-400 ml-auto">{filteredActivities.length} activities</span>
-          </div>
-
-          {!activities ? (
-            <div className="space-y-2 sm:space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-16 sm:h-20 w-full rounded-lg sm:rounded-xl" />)}</div>
-          ) : filteredActivities.length === 0 ? (
-            <Card>
-              <CardContent className="py-10 sm:py-14 text-center px-4">
-                <Globe className="w-8 h-8 sm:w-10 sm:h-10 mx-auto mb-2 sm:mb-3 text-gray-200" />
-                <p className="text-xs sm:text-sm text-gray-500 mb-3 sm:mb-4">No activities match your filter.</p>
-                <Link href={`/activities/new?project=${projectCode.toLowerCase()}`}>
-                  <Button size="sm" variant="outline" className="gap-1 sm:gap-1.5 text-xs"><Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Add Activity</Button>
-                </Link>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-2">
-              {filteredActivities.map(a => {
-                const total = calcTotal(a.participants);
-                const prov = provinceMap[a.provinceId];
-                return (
-                  <Link key={a._id} href={`/activities/${a._id}`}>
-                    <div className="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 bg-white rounded-lg sm:rounded-xl border border-gray-100 hover:border-blue-200 hover:shadow-sm active:scale-[0.99] transition-all cursor-pointer group">
-                      <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0 mt-1.5 sm:mt-2" style={{ backgroundColor: projectDef.color }} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="text-xs sm:text-sm font-semibold text-gray-900 group-hover:text-blue-700 line-clamp-2 sm:truncate">{a.activityTitle}</p>
-                          <span className={cn("text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full font-medium shrink-0 border whitespace-nowrap", getStatusColor(a.status))}>
-                            {a.status}
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap gap-2 sm:gap-3 mt-1 sm:mt-1.5 text-[10px] sm:text-xs text-gray-500">
-                          <span className="flex items-center gap-0.5 sm:gap-1"><MapPin className="w-2.5 h-2.5 sm:w-3 sm:h-3 shrink-0" /><span className="truncate max-w-[120px] sm:max-w-none">{prov?.name ?? a.venue}</span></span>
-                          <span className="flex items-center gap-0.5 sm:gap-1 whitespace-nowrap"><Calendar className="w-2.5 h-2.5 sm:w-3 sm:h-3 shrink-0" />{formatDate(a.startDate, "MMM d, yyyy")}</span>
-                          {total > 0 && <span className="flex items-center gap-0.5 sm:gap-1 whitespace-nowrap"><Users className="w-2.5 h-2.5 sm:w-3 sm:h-3 shrink-0" />{numberWithCommas(total)} pax</span>}
-                          <span className="text-gray-400 hidden sm:inline">{a.modeOfConduct}</span>
-                        </div>
-                      </div>
-                      <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-300 group-hover:text-blue-400 shrink-0 mt-0.5 sm:mt-1 transition-colors" />
-                    </div>
-                  </Link>
-                );
-              })}
+        {/* Left – interactive full-year bar chart */}
+        <Card>
+          <CardHeader className="px-3 sm:px-5 py-3 sm:py-4">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <CardTitle className="text-xs sm:text-sm font-semibold">Monthly Trend</CardTitle>
+                <CardDescription className="text-[10px] sm:text-xs flex items-center gap-1">
+                  {selectedMonth ? MONTHS[selectedMonth - 1] : "Full Year"} · FY {selectedYear}
+                  {selectedMonth && (
+                    <button onClick={() => setSelectedMonth(null)} className="ml-1 text-blue-500 hover:text-blue-700 leading-none">✕</button>
+                  )}
+                </CardDescription>
+              </div>
+              <Select value={String(selectedYear)} onValueChange={v => { setSelectedYear(Number(v)); setSelectedMonth(null); setSelectedQuarter(null); }}>
+                <SelectTrigger className="w-24 h-7 text-[11px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {[2024, 2025, 2026, 2027].map(y => (
+                    <SelectItem key={y} value={String(y)}>FY {y}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          )}
-        </TabsContent>
-      </Tabs>
+          </CardHeader>
+          <CardContent className="px-1 sm:px-2 pb-3 sm:pb-4">
+            <ResponsiveContainer width="100%" height={190}>
+              <BarChart data={yearMonthData} barSize={13} margin={{ left: -14, right: 4 }}
+                onClick={(data) => {
+                  if (!data?.activePayload?.[0]) return;
+                  const mn = (data.activePayload[0].payload as any).monthNum as number;
+                  setSelectedMonth(selectedMonth === mn ? null : mn);
+                  setSelectedQuarter(null);
+                }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 9 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 9 }} axisLine={false} tickLine={false} width={26} />
+                <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} cursor={{ fill: "#f3f4f6" }} />
+                <Bar dataKey="count" name="Activities" radius={[3, 3, 0, 0]} cursor="pointer">
+                  {yearMonthData.map((entry) => {
+                    const isHighlighted =
+                      (selectedMonth === null && selectedQuarter === null) ||
+                      selectedMonth === entry.monthNum ||
+                      (selectedQuarter !== null && QUARTER_MONTHS[selectedQuarter].includes(entry.monthNum));
+                    return (
+                      <Cell
+                        key={`cell-${entry.monthNum}`}
+                        fill={isHighlighted ? projectDef.color : `${projectDef.color}28`}
+                      />
+                    );
+                  })}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
 
-      {/* ── Add Activity CTA section ── */}
-      <div className="rounded-xl sm:rounded-2xl border-2 border-dashed p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0"
-        style={{ borderColor: `${projectDef.color}30`, background: `${projectDef.color}04` }}>
-        <div className="flex-1">
-          <p className="text-xs sm:text-sm font-bold text-gray-800">Record a new {projectDef.shortName} activity</p>
-          <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5 sm:mt-1">
-            Saves to database{" "}
-            <span className="font-medium" style={{ color: projectDef.color }}>and syncs to Google Sheet</span>
-            {" "}if connected in Settings.
-          </p>
-        </div>
-        <Button onClick={() => setShowAddActivity(true)} className="gap-1.5 sm:gap-2 shrink-0 w-full sm:w-auto text-xs sm:text-sm"
-          style={{ backgroundColor: projectDef.color }}>
-          <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Add Activity
-        </Button>
+        {/* Right – activity list, filtered by month / quarter */}
+        <Card className="flex flex-col">
+          <CardHeader className="px-3 sm:px-5 py-3 sm:py-4">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div>
+                <CardTitle className="text-xs sm:text-sm font-semibold">Activities</CardTitle>
+                <CardDescription className="text-[10px] sm:text-xs">
+                  {selectedMonth ? MONTHS[selectedMonth - 1] : selectedQuarter ? `Q${selectedQuarter}` : `All · FY ${selectedYear}`}
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {selectedProvince && (
+                  <button onClick={() => setSelectedProvince(null)}
+                    className="text-[9px] sm:text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 hover:bg-blue-100">
+                    <span className="truncate max-w-[60px]">{provinceMap[selectedProvince]?.name}</span> ✕
+                  </button>
+                )}
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-24 h-7 text-[10px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="Draft">Draft</SelectItem>
+                    <SelectItem value="Submitted">Submitted</SelectItem>
+                    <SelectItem value="Validated">Validated</SelectItem>
+                    <SelectItem value="Reported">Reported</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
+                  style={{ background: `${projectDef.color}15`, color: projectDef.color }}>
+                  {displayActivities.length}
+                </span>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="px-3 sm:px-4 pb-3 sm:pb-4 flex-1">
+            {!activities ? (
+              <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-10 w-full rounded-lg" />)}</div>
+            ) : displayActivities.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-gray-300">
+                <Calendar className="w-8 h-8 mb-2" />
+                <p className="text-[10px] sm:text-xs text-center">
+                  {selectedMonth ? `No activities in ${MONTHS[selectedMonth - 1]}` : selectedQuarter ? `No Q${selectedQuarter} activities` : "No activities yet"}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-1.5 max-h-[210px] overflow-y-auto pr-1">
+                {displayActivities.map(a => {
+                  const prov = provinceMap[a.provinceId];
+                  const total = calcTotal(a.participants);
+                  return (
+                    <div key={a._id} className="flex items-stretch rounded-lg border border-gray-100 hover:border-blue-200 hover:bg-blue-50/40 transition-all group overflow-hidden">
+                      <Link href={`/activities/${a._id}`} className="flex items-start gap-2 p-2 sm:p-2.5 flex-1 min-w-0">
+                        <div className="w-1.5 h-1.5 rounded-full shrink-0 mt-1.5" style={{ backgroundColor: projectDef.color }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[10px] sm:text-xs font-semibold text-gray-900 group-hover:text-blue-700 truncate">{a.activityTitle}</p>
+                          <div className="flex items-center gap-2 mt-0.5 text-[9px] sm:text-[10px] text-gray-400">
+                            <span className="whitespace-nowrap">{formatDate(a.startDate, "MMM d, yyyy")}</span>
+                            {prov && <span className="truncate max-w-[80px]">{prov.name}</span>}
+                            {total > 0 && <span className="whitespace-nowrap">{numberWithCommas(total)} pax</span>}
+                          </div>
+                        </div>
+                        <span className={cn("text-[8px] sm:text-[9px] px-1 py-0.5 rounded-full font-medium shrink-0 border whitespace-nowrap self-start mt-0.5", getStatusColor(a.status))}>{a.status}</span>
+                      </Link>
+                      {a.provinceId && (
+                        <button
+                          title="Locate on map"
+                          onClick={() => handleProvinceSelect(a.provinceId)}
+                          className="px-1.5 border-l border-gray-100 text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-colors shrink-0 flex items-center"
+                        >
+                          <MapPin className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Q1–Q4 clickable quarter cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+        {([{q:1,label:"Q1",months:[1,2,3]},{q:2,label:"Q2",months:[4,5,6]},{q:3,label:"Q3",months:[7,8,9]},{q:4,label:"Q4",months:[10,11,12]}] as const).map(({q, label, months}) => {
+          const qTotal = (months as readonly number[]).reduce((s, m) => s + (stats?.byMonth?.[m] ?? 0), 0);
+          const isActive = selectedQuarter === q;
+          return (
+            <button
+              key={label}
+              onClick={() => { setSelectedQuarter(selectedQuarter === q ? null : q); setSelectedMonth(null); }}
+              className={cn(
+                "text-center p-3 sm:p-4 rounded-xl border-2 transition-all w-full",
+                isActive ? "shadow-md" : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"
+              )}
+              style={isActive ? { borderColor: projectDef.color, background: `${projectDef.color}08` } : {}}
+            >
+              <p className="text-[10px] sm:text-xs font-semibold" style={{ color: isActive ? projectDef.color : "#9ca3af" }}>{label}</p>
+              <p className="text-xl sm:text-2xl font-bold mt-0.5 sm:mt-1" style={{ color: isActive ? projectDef.color : "#111827" }}>{qTotal}</p>
+              <p className="text-[10px] sm:text-xs text-gray-400">activities</p>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Extra Field Schema cards (unique per project, from lib/types.ts) ── */}
+      {projectDef.extraFieldSchema.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-2 sm:mb-3 px-0.5">
+            <p className="text-xs sm:text-sm font-bold text-gray-700">{projectDef.shortName} — Tracked Metrics</p>
+            <Button onClick={() => setShowAddActivity(true)} size="sm" className="gap-1.5 text-xs"
+              style={{ backgroundColor: projectDef.color }}>
+              <Plus className="w-3.5 h-3.5" /> Add Activity
+            </Button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
+            {projectDef.extraFieldSchema.map(field => (
+              <Card key={field.key}>
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-start justify-between gap-1 mb-1.5">
+                    <p className="text-[8px] sm:text-[9px] font-semibold uppercase tracking-wider text-gray-400 truncate">{field.group ?? "General"}</p>
+                    <span className={cn(
+                      "text-[8px] sm:text-[9px] px-1.5 py-0.5 rounded-full font-medium shrink-0",
+                      field.type === "number" ? "bg-blue-50 text-blue-600" :
+                      field.type === "select" ? "bg-purple-50 text-purple-600" :
+                      field.type === "url"    ? "bg-green-50 text-green-600" :
+                      "bg-gray-100 text-gray-500"
+                    )}>{field.type}</span>
+                  </div>
+                  <p className="text-[10px] sm:text-xs font-semibold text-gray-800 leading-tight">{field.label}</p>
+                  {field.options && (
+                    <div className="flex flex-wrap gap-0.5 mt-1.5">
+                      {field.options.map(opt => (
+                        <span key={opt} className="text-[8px] sm:text-[9px] bg-gray-100 text-gray-500 px-1 py-0.5 rounded">{opt}</span>
+                      ))}
+                    </div>
+                  )}
+                  {field.required && (
+                    <span className="inline-block mt-1.5 text-[8px] sm:text-[9px] text-red-500 font-semibold">Required</span>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Add Activity Dialog */}
       {project && (
@@ -582,16 +650,29 @@ export default function ProjectPage() {
 }
 
 // ── Project Map Component ────────────────────────────────────
-function ProjectMap({ pins, projectColor, onProvinceClick, selectedProvince }: {
+function ProjectMap({ pins, projectColor, onProvinceClick, selectedProvince, flyToCoords }: {
   pins: ProvPin[];
   projectColor: string;
   onProvinceClick: (id: string | null) => void;
   selectedProvince: string | null;
+  flyToCoords?: { lat: number; lng: number; ts: number } | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<any>(null);
   const markersRef   = useRef<Map<string, any>>(new Map());
   const [mapReady, setMapReady] = useState(false);
+
+  // Fly to province when triggered
+  useEffect(() => {
+    if (!flyToCoords || !mapRef.current || !mapReady) return;
+    mapRef.current.flyTo({
+      center: [flyToCoords.lng, flyToCoords.lat],
+      zoom: 10,
+      duration: 1200,
+      essential: true,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flyToCoords]);
 
   // Init map once
   useEffect(() => {

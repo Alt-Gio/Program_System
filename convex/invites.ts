@@ -105,6 +105,7 @@ export const list = query({
       id: i._id,
       email: i.email,
       role: i.role,
+      token: i.token,
       createdAt: i.createdAt,
       expiresAt: i.expiresAt,
       usedAt: i.usedAt,
@@ -114,6 +115,45 @@ export const list = query({
           ? ("expired" as const)
           : ("pending" as const),
     }));
+  },
+});
+
+/** Admin: fetch a single invite by id (used by the resend endpoint). */
+export const getForAdmin = query({
+  args: {
+    sessionToken: v.string(),
+    inviteId: v.id("invites"),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx, args.sessionToken);
+    const invite = await ctx.db.get(args.inviteId);
+    if (!invite) return null;
+    return {
+      id: invite._id,
+      email: invite.email,
+      role: invite.role,
+      token: invite.token,
+      expiresAt: invite.expiresAt,
+      usedAt: invite.usedAt,
+    };
+  },
+});
+
+/** Admin: extend an invite's expiry back to 7 days from now (used on resend). */
+export const touchExpiry = mutation({
+  args: {
+    sessionToken: v.string(),
+    inviteId: v.id("invites"),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx, args.sessionToken);
+    const invite = await ctx.db.get(args.inviteId);
+    if (!invite) throw new Error("Invite not found");
+    if (invite.usedAt) throw new Error("Cannot resend a used invite");
+    await ctx.db.patch(args.inviteId, {
+      expiresAt: Date.now() + INVITE_TTL_MS,
+    });
+    return { success: true };
   },
 });
 

@@ -398,3 +398,15 @@ export const cleanupSessions = mutation({
     return { deleted: expired.length };
   },
 });
+
+/** DEV ONLY — wipe all users and sessions so bootstrapFirstAdmin can run again. */
+export const dangerClearUsers = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const users = await ctx.db.query("users").collect();
+    for (const u of users) await ctx.db.delete(u._id);
+    const sessions = await ctx.db.query("sessions").collect();
+    for (const s of sessions) await ctx.db.delete(s._id);
+    return { usersDeleted: users.length, sessionsDeleted: sessions.length };
+  },
+});

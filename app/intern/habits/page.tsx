@@ -6,6 +6,10 @@ import { api } from "@/convex/_generated/api";
 import { Flame, Plus, Trash2, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Id } from "@/convex/_generated/dataModel";
+import { enqueue, generateClientId } from "@/lib/offline-queue";
+
+const HABITS_ENDPOINT = "/api/intern/habits/toggle";
+const HABITS_STORE = "internHabitsQueue" as const;
 
 const EMOJI_PRESETS = ["✅","📚","💪","🧘","💧","🚶","📝","💡","🎯","🔥","⏰","💬","🍎","😴","🧠","✍️"];
 const MOOD_LABELS: Record<string, string> = { DAILY: "Daily", WEEKDAYS: "Weekdays" };
@@ -40,11 +44,39 @@ export default function HabitsPage() {
 
   useEffect(() => { setToken(localStorage.getItem("intern_token")); }, []);
 
-  const data       = useQuery(api.internPortal.getHabitsForToday, token ? { token } : "skip");
+  const liveData   = useQuery(api.internPortal.getHabitsForToday, token ? { token } : "skip");
   const seedMut    = useMutation(api.internPortal.seedDefaultHabits);
-  const toggleMut  = useMutation(api.internPortal.toggleHabit);
   const addMut     = useMutation(api.internPortal.addHabit);
   const removeMut  = useMutation(api.internPortal.removeHabit);
+
+  // Optimistic overrides for offline toggles: habitId -> desired completed state.
+  // Cleared when Convex sends fresh data that agrees with our override.
+  const [overrides, setOverrides] = useState<Record<string, boolean>>({});
+
+  const data = (() => {
+    if (!liveData) return liveData;
+    if (Object.keys(overrides).length === 0) return liveData;
+    const habits = liveData.habits.map((h: any) =>
+      overrides[h.id] !== undefined && overrides[h.id] !== h.completedToday
+        ? { ...h, completedToday: overrides[h.id] }
+        : h
+    );
+    const completedToday = habits.filter((h: any) => h.completedToday).length;
+    return { ...liveData, habits, completedToday };
+  })();
+
+  // Reconcile overrides once live data catches up.
+  useEffect(() => {
+    if (!liveData) return;
+    setOverrides((prev) => {
+      const next: Record<string, boolean> = {};
+      for (const [id, val] of Object.entries(prev)) {
+        const live = liveData.habits.find((h: any) => h.id === id);
+        if (live && live.completedToday !== val) next[id] = val;
+      }
+      return next;
+    });
+  }, [liveData]);
 
   useEffect(() => {
     if (token && data !== undefined && data?.totalToday === 0) {
@@ -54,7 +86,30 @@ export default function HabitsPage() {
 
   async function handleToggle(habitId: string) {
     if (!token) return;
-    await toggleMut({ token, habitId: habitId as Id<"internHabits"> });
+    const current = data?.habits.find((h: any) => h.id === habitId);
+    const desiredCompleted = !(current?.completedToday ?? false);
+    setOverrides((o) => ({ ...o, [habitId]: desiredCompleted }));
+    const today = new Date().toISOString().slice(0, 10);
+    const payload = {
+      clientId: generateClientId(),
+      token,
+      habitId,
+      desiredCompleted,
+      date: today,
+      submittedOffline: typeof navigator !== "undefined" && !navigator.onLine,
+    };
+    try {
+      const res = await fetch(HABITS_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok && res.status !== 202) throw new Error("toggle failed");
+    } catch {
+      try {
+        await enqueue(HABITS_STORE, payload);
+      } catch {}
+    }
   }
 
   async function handleAdd() {

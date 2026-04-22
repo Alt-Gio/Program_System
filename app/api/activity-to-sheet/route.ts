@@ -50,6 +50,7 @@ const STANDARD_ALIASES: Record<string, string[]> = {
   driveFolderLink:     ["Drive Folder Link", "Drive Link", "Google Drive Link"],
   remarks:             ["Remarks", "Notes"],
   lastUpdated:         ["Last Updated", "Date Updated"],
+  coordinates:         ["Coordinates", "Coords", "Lat/Lng", "Latitude/Longitude"],
 };
 
 export async function POST(request: NextRequest) {
@@ -72,6 +73,7 @@ export async function POST(request: NextRequest) {
         barangay?: string;
         activityTitle: string;
         venue: string;
+        coordinates?: { lat: number; lng: number } | null;
         partnerOrganizations: string[];
         startDate: string;
         endDate: string;
@@ -220,6 +222,9 @@ export async function POST(request: NextRequest) {
       othersLabel:         activity.participants.others.label ?? "",
       totalParticipants:   String(totalPax),
       lastUpdated:         lastUpdatedStr,
+      coordinates:         activity.coordinates
+        ? `${activity.coordinates.lat.toFixed(5)},${activity.coordinates.lng.toFixed(5)}`
+        : "",
     };
 
     // ── Merge extra fields ──

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Id } from "@/convex/_generated/dataModel";
+import { useQueryWithSnapshot } from "@/lib/useQueryWithSnapshot";
 
 // ─── colours & helpers ────────────────────────────────────────
 const PRI_COLOR: Record<string, string> = {
@@ -462,13 +463,14 @@ export default function SupervisorDashboardPage() {
     setToken(t);
   }, [router]);
 
-  const supervisor  = useQuery(api.supervisors.getMyProfile, token ? { token } : "skip");
-  const overview    = useQuery(api.internPortal.getSupervisorOverview);
-  const projects    = useQuery(api.supervisorTools.getProjects, token ? { token } : "skip");
-  const unreadCounts = useQuery(api.supervisorTools.getUnreadCounts, token ? { token } : "skip");
+  const snapKey = token ? `supervisor:${token.slice(0, 16)}` : null;
+  const supervisor  = useQueryWithSnapshot(api.supervisors.getMyProfile, token ? { token } : "skip", snapKey && `${snapKey}:me`);
+  const overview    = useQueryWithSnapshot(api.internPortal.getSupervisorOverview, {}, snapKey && `${snapKey}:overview`);
+  const projects    = useQueryWithSnapshot(api.supervisorTools.getProjects, token ? { token } : "skip", snapKey && `${snapKey}:projects`);
+  const unreadCounts = useQueryWithSnapshot(api.supervisorTools.getUnreadCounts, token ? { token } : "skip", snapKey && `${snapKey}:unread`);
   const updateProject  = useMutation(api.supervisorTools.updateProject);
   const deleteProject  = useMutation(api.supervisorTools.deleteProject);
-  const allFences      = useQuery(api.supervisorTools.getAllGeoFences, token ? { token } : "skip");
+  const allFences      = useQueryWithSnapshot(api.supervisorTools.getAllGeoFences, token ? { token } : "skip", snapKey && `${snapKey}:fences`);
   const createFence    = useMutation(api.supervisorTools.createGeoFence);
   const updateFence    = useMutation(api.supervisorTools.updateGeoFence);
   const deleteFence    = useMutation(api.supervisorTools.deleteGeoFence);

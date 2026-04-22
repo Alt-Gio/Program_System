@@ -48,8 +48,17 @@ export const issue = mutation({
 });
 
 /**
- * Verify an OTP for (contact, purpose). On success, marks it verified so it
- * cannot be reused. The caller is responsible for acting on the verification.
+ * Verify an OTP for (contact, purpose).
+ *
+ * Idempotent within the 10-minute TTL: the first call marks the code verified
+ * and returns success; subsequent calls with the same code/contact/purpose
+ * also return success as long as the code hasn't expired. This lets the
+ * accept-invite UI do a "check code" round before the final "create user"
+ * round without the second check failing because the first already flagged
+ * the code as used.
+ *
+ * A code can still only be consumed for *its* purpose, and still cannot be
+ * used after it expires or is deleted, so replay risk is bounded by the TTL.
  */
 export const verify = mutation({
   args: {
@@ -65,10 +74,7 @@ export const verify = mutation({
       .collect();
 
     const match = rows.find(
-      (r) =>
-        !r.verified &&
-        r.purpose === args.purpose &&
-        r.code === args.code
+      (r) => r.purpose === args.purpose && r.code === args.code,
     );
 
     if (!match) return { success: false, error: "Invalid code" } as const;
@@ -77,7 +83,9 @@ export const verify = mutation({
       return { success: false, error: "Code expired" } as const;
     }
 
-    await ctx.db.patch(match._id, { verified: true });
+    if (!match.verified) {
+      await ctx.db.patch(match._id, { verified: true });
+    }
     return { success: true } as const;
   },
 });

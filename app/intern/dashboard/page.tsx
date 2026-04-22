@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { useQueryWithSnapshot } from "@/lib/useQueryWithSnapshot";
 import Link from "next/link";
 import { CheckCircle2, Clock, ListTodo, Calendar, Flame, BookOpen, Target, Trophy, AlertCircle, QrCode, MessageSquare, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -41,11 +42,12 @@ export default function InternDashboardPage() {
   const [token, setToken] = useState<string | null>(null);
   useEffect(() => { setToken(localStorage.getItem("intern_token")); }, []);
 
-  const data        = useQuery(api.internAuth.getMyData,           token ? { token } : "skip");
-  const habitData   = useQuery(api.internPortal.getHabitsForToday, token ? { token } : "skip");
-  const pastLogs    = useQuery(api.internPortal.listDailyLogs,     token ? { token } : "skip");
-  const goals       = useQuery(api.internPortal.listGoals,         token ? { token } : "skip");
-  const allMessages = useQuery(api.supervisorTools.getInternMessages, token ? { internToken: token } : "skip");
+  const snapKey = token ? `intern:${token.slice(0, 16)}` : null;
+  const data        = useQueryWithSnapshot(api.internAuth.getMyData,           token ? { token } : "skip", snapKey && `${snapKey}:me`);
+  const habitData   = useQueryWithSnapshot(api.internPortal.getHabitsForToday, token ? { token } : "skip", snapKey && `${snapKey}:habits`);
+  const pastLogs    = useQueryWithSnapshot(api.internPortal.listDailyLogs,     token ? { token } : "skip", snapKey && `${snapKey}:logs`);
+  const goals       = useQueryWithSnapshot(api.internPortal.listGoals,         token ? { token } : "skip", snapKey && `${snapKey}:goals`);
+  const allMessages = useQueryWithSnapshot(api.supervisorTools.getInternMessages, token ? { internToken: token } : "skip", snapKey && `${snapKey}:msgs`);
   const unreadMsgs  = useMemo(() => allMessages?.filter((m: any) => m.senderType === "supervisor" && !m.readAt).length ?? 0, [allMessages]);
 
   const today    = useMemo(() => new Date().toISOString().slice(0, 10), []);

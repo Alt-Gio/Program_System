@@ -15,17 +15,58 @@ export const create = mutation({
     serviceType: v.string(),
     contactEmail: v.optional(v.string()),
     contactPhone: v.optional(v.string()),
+    /** Stable UUID from the browser — dedupes replays from the offline queue. */
+    clientId: v.optional(v.string()),
+    /** True when coming from the service-worker offline queue. */
+    submittedOffline: v.optional(v.boolean()),
+    /** Original client time-in, used when syncing an offline record. */
+    clientTimeIn: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const timeIn = new Date().toISOString();
-    
-    // If PC is selected, mark it as IN_USE
-    if (args.pcId) {
-      await ctx.db.patch(args.pcId, { status: "IN_USE" });
+    // Dedup offline replays by clientId.
+    if (args.clientId) {
+      const existing = await ctx.db
+        .query("dtcLogs")
+        .withIndex("by_clientId", (q) => q.eq("clientId", args.clientId))
+        .first();
+      if (existing) {
+        return { id: existing._id, timeIn: existing.timeIn, duplicate: true };
+      }
     }
 
+    // Preserve the client's original check-in time when replaying an
+    // offline submission; otherwise stamp server time.
+    const timeIn =
+      args.submittedOffline && args.clientTimeIn
+        ? args.clientTimeIn
+        : new Date().toISOString();
+
+    // If PC is selected, only lock it when it's still free. Offline
+    // replays may arrive after someone else has already taken it — in
+    // that case drop the pcId and let the log record without a lock.
+    let effectivePcId = args.pcId;
+    if (args.pcId) {
+      const pc = await ctx.db.get(args.pcId);
+      if (!pc || pc.status !== "ONLINE") {
+        effectivePcId = undefined;
+      } else {
+        await ctx.db.patch(args.pcId, { status: "IN_USE" });
+      }
+    }
+
+    const {
+      clientId: _cid,
+      submittedOffline: _off,
+      clientTimeIn: _cti,
+      pcId: _pc,
+      ...rest
+    } = args;
+
     const logId = await ctx.db.insert("dtcLogs", {
-      ...args,
+      ...rest,
+      pcId: effectivePcId,
+      clientId: args.clientId,
+      submittedOffline: args.submittedOffline ?? false,
       timeIn,
       timeOut: undefined,
       satisfactionRating: undefined,
@@ -40,17 +81,18 @@ export const create = mutation({
       entityId: logId,
       userName: args.fullName,
       timestamp: timeIn,
-      method: "WALK_IN",
-      pcId: args.pcId ?? undefined,
+      method: args.submittedOffline ? "WALK_IN_OFFLINE" : "WALK_IN",
+      pcId: effectivePcId ?? undefined,
       metadata: JSON.stringify({
         agency: args.agency,
         purpose: args.purpose,
         serviceType: args.serviceType,
         equipmentUsed: args.equipmentUsed,
+        submittedOffline: args.submittedOffline ?? false,
       }),
     });
 
-    return { id: logId, timeIn };
+    return { id: logId, timeIn, duplicate: false };
   },
 });
 

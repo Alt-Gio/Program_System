@@ -1,6 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  countQueued,
+  drainLocalQueue,
+  enqueueBooking,
+  generateClientId,
+  type BookingPayload,
+} from "@/lib/meeting-hall-offline";
 
 const CSS = `
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -533,20 +540,88 @@ html { scroll-behavior: smooth; }
 /* Divider */
 .mh-divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent); margin: 0 48px; }
 
+/* Connectivity banner */
+.mh-net-banner {
+  position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+  z-index: 250;
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 10px 18px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 600; letter-spacing: 0.01em;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+  max-width: calc(100vw - 32px);
+}
+.mh-net-banner.offline {
+  background: rgba(244,63,94,0.16);
+  border: 1px solid rgba(244,63,94,0.35);
+  color: #fecdd3;
+}
+.mh-net-banner.queued {
+  background: rgba(245,158,11,0.14);
+  border: 1px solid rgba(245,158,11,0.35);
+  color: #fde68a;
+}
+.mh-net-banner.online {
+  background: rgba(34,197,94,0.14);
+  border: 1px solid rgba(34,197,94,0.35);
+  color: #bbf7d0;
+}
+.mh-net-dot { width: 7px; height: 7px; border-radius: 50%; }
+.mh-net-banner.offline .mh-net-dot { background: #f43f5e; }
+.mh-net-banner.queued .mh-net-dot { background: #f59e0b; animation: mhPulse 1.6s infinite; }
+.mh-net-banner.online .mh-net-dot { background: #22c55e; }
+.mh-net-btn {
+  background: rgba(255,255,255,0.1); color: inherit;
+  border: 1px solid rgba(255,255,255,0.15);
+  padding: 5px 11px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
+  cursor: pointer; transition: background 0.15s;
+}
+.mh-net-btn:hover { background: rgba(255,255,255,0.18); }
+
 /* Responsive */
 @media (max-width: 860px) {
   .mh-info-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 768px) {
-  .mh-header { padding: 14px 20px; }
+  .mh-header { padding: 12px 16px; }
   .mh-nav { display: none; }
-  .mh-amenity-grid { grid-template-columns: 1fr 1fr; }
-  .mh-section, .mh-info { padding-left: 20px; padding-right: 20px; }
-  .mh-footer { padding: 28px 20px; }
-  .mh-form-row { grid-template-columns: 1fr; }
-  .mh-modal-head, .mh-modal-body, .mh-modal-foot { padding-left: 22px; padding-right: 22px; }
+  .mh-logo-sub { display: none; }
+  .mh-logo-name { font-size: 12px; }
+  .mh-btn-book { padding: 8px 16px; font-size: 12px; }
+  .mh-amenity-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .mh-amenity { padding: 20px; }
+  .mh-section { padding: 70px 18px; }
+  .mh-info { padding: 0 18px 48px; }
+  .mh-footer { padding: 28px 18px; }
+  .mh-form-row { grid-template-columns: 1fr; gap: 0; }
+  .mh-modal { border-radius: 20px; max-height: calc(100vh - 32px); }
+  .mh-modal-head { padding: 20px 20px 16px; }
+  .mh-modal-body { padding: 20px 20px 8px; }
+  .mh-modal-foot { padding: 14px 20px 22px; }
+  .mh-modal-head h2 { font-size: 18px; }
   .mh-stats { flex-wrap: wrap; }
-  .mh-stat { flex: 1 1 50%; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .mh-stat { flex: 1 1 50%; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 18px 12px; }
+  .mh-stat-val { font-size: 24px; }
+  .mh-hero { padding: 110px 18px 48px; }
+  .mh-hero-sub { font-size: 14.5px; margin-bottom: 36px; }
+  .mh-cta-wrap { margin-top: 32px; }
+  .mh-btn-primary, .mh-btn-ghost { width: 100%; justify-content: center; }
+  /* iOS Safari zooms on inputs below 16px — lift to 16px on mobile. */
+  .mh-field input, .mh-field select, .mh-field textarea { font-size: 16px; padding: 12px 14px; }
+  .mh-net-banner { font-size: 12px; padding: 9px 14px; }
+}
+@media (max-width: 480px) {
+  .mh-amenity-grid { grid-template-columns: 1fr; }
+  .mh-section { padding: 56px 16px; }
+  .mh-footer { flex-direction: column; align-items: flex-start; }
+}
+
+/* Safe-area insets (installed PWA on iOS/Android with notches) */
+@supports (padding: max(0px)) {
+  .mh-header { padding-top: max(16px, env(safe-area-inset-top)); }
+  .mh-footer { padding-bottom: max(40px, env(safe-area-inset-bottom)); }
+  .mh-net-banner { bottom: max(18px, env(safe-area-inset-bottom)); }
 }
 `;
 
@@ -576,11 +651,18 @@ const initialForm: FormState = {
   purpose: "",
 };
 
+type SubmissionOutcome = "synced" | "queued";
+
 export default function MeetingHallPage() {
   const [bookingOpen, setBookingOpen] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [outcome, setOutcome] = useState<SubmissionOutcome | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(initialForm);
+  const [isOnline, setIsOnline] = useState(true);
+  const [queuedCount, setQueuedCount] = useState(0);
+  const [draining, setDraining] = useState(false);
 
   const cardRef = useRef<HTMLDivElement>(null);
   const shineRef = useRef<HTMLDivElement>(null);
@@ -664,8 +746,74 @@ export default function MeetingHallPage() {
     }
   }, [bookingOpen]);
 
+  // Service worker registration + online/offline + queue drain
+  useEffect(() => {
+    let cancelled = false;
+
+    // SW registration is handled globally by <ServiceWorkerRegistrar />.
+
+    const refreshCount = async () => {
+      const n = await countQueued();
+      if (!cancelled) setQueuedCount(n);
+    };
+
+    const drain = async () => {
+      if (!navigator.onLine) return;
+      setDraining(true);
+      try {
+        // Nudge the SW (does nothing if Background Sync already handled it).
+        if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: "dtc-drain",
+          });
+        }
+        await drainLocalQueue();
+      } finally {
+        if (!cancelled) setDraining(false);
+        await refreshCount();
+      }
+    };
+
+    const onOnline = () => {
+      setIsOnline(true);
+      drain();
+    };
+    const onOffline = () => setIsOnline(false);
+
+    setIsOnline(navigator.onLine);
+    refreshCount();
+    if (navigator.onLine) drain();
+
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+
+    const onSwMessage = (evt: MessageEvent) => {
+      if (evt.data?.type === "dtc-sync-result") refreshCount();
+    };
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.addEventListener("message", onSwMessage);
+    }
+
+    // Support the manifest shortcut ?open=book
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("open") === "book") setBookingOpen(true);
+    } catch {}
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.removeEventListener("message", onSwMessage);
+      }
+    };
+  }, []);
+
   function openBooking() {
     setSuccess(false);
+    setOutcome(null);
+    setSubmitError(null);
     setBookingOpen(true);
   }
   function closeBooking() {
@@ -674,8 +822,24 @@ export default function MeetingHallPage() {
       if (success) {
         setForm(initialForm);
         setSuccess(false);
+        setOutcome(null);
       }
     }, 300);
+  }
+
+  async function manualRetry() {
+    setDraining(true);
+    try {
+      if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: "dtc-hall-drain",
+        });
+      }
+      await drainLocalQueue();
+    } finally {
+      setDraining(false);
+      setQueuedCount(await countQueued());
+    }
   }
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -695,10 +859,63 @@ export default function MeetingHallPage() {
     e.preventDefault();
     if (!canSubmit || submitting) return;
     setSubmitting(true);
-    // No backend wired yet — simulate a brief round-trip so the UX feels real.
-    await new Promise((r) => setTimeout(r, 700));
-    setSubmitting(false);
-    setSuccess(true);
+    setSubmitError(null);
+
+    const payload: BookingPayload = {
+      clientId: generateClientId(),
+      fullName: form.fullName.trim(),
+      designation: form.designation.trim() || undefined,
+      agency: form.agency.trim(),
+      email: form.email.trim(),
+      phone: form.phone.trim() || undefined,
+      date: form.date,
+      timeSlot: form.timeSlot,
+      attendees: form.attendees,
+      eventType: form.eventType,
+      purpose: form.purpose.trim() || undefined,
+      clientSubmittedAt: Date.now(),
+      submittedOffline: !navigator.onLine,
+    };
+
+    try {
+      const res = await fetch("/api/meeting-hall/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {}
+
+      if (res.status === 202 && data?.queued) {
+        // SW intercepted an offline POST and queued it.
+        setOutcome("queued");
+        setSuccess(true);
+        setQueuedCount(await countQueued());
+      } else if (res.ok && data?.ok) {
+        setOutcome("synced");
+        setSuccess(true);
+      } else {
+        throw new Error(data?.error || `Server responded ${res.status}`);
+      }
+    } catch (networkErr) {
+      // Network dead and SW didn't intercept (e.g. first visit before SW
+      // activated, or no SW support). Fall back to local IDB queue.
+      try {
+        await enqueueBooking(payload);
+        setOutcome("queued");
+        setSuccess(true);
+        setQueuedCount(await countQueued());
+      } catch (idbErr: any) {
+        setSubmitError(
+          idbErr?.message || "Couldn't save your request. Please try again."
+        );
+      }
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -1102,12 +1319,46 @@ export default function MeetingHallPage() {
                 </div>
 
                 <div className="mh-modal-foot">
+                  {submitError && (
+                    <div
+                      style={{
+                        marginBottom: 10,
+                        padding: "10px 14px",
+                        background: "rgba(244,63,94,0.1)",
+                        border: "1px solid rgba(244,63,94,0.3)",
+                        borderRadius: 10,
+                        fontSize: 12.5,
+                        color: "#fecdd3",
+                      }}
+                    >
+                      {submitError}
+                    </div>
+                  )}
+                  {!isOnline && (
+                    <div
+                      style={{
+                        marginBottom: 10,
+                        padding: "10px 14px",
+                        background: "rgba(245,158,11,0.1)",
+                        border: "1px solid rgba(245,158,11,0.3)",
+                        borderRadius: 10,
+                        fontSize: 12.5,
+                        color: "#fde68a",
+                      }}
+                    >
+                      You're offline — we'll save your request and submit it automatically when you reconnect.
+                    </div>
+                  )}
                   <button
                     type="submit"
                     className="mh-btn-submit"
                     disabled={!canSubmit || submitting}
                   >
-                    {submitting ? "Submitting…" : "Submit Booking Request →"}
+                    {submitting
+                      ? "Submitting…"
+                      : isOnline
+                        ? "Submit Booking Request →"
+                        : "Save Request (Offline) →"}
                   </button>
                   <p
                     style={{
@@ -1129,13 +1380,46 @@ export default function MeetingHallPage() {
                 <button className="mh-modal-close" onClick={closeBooking} aria-label="Close">×</button>
               </div>
               <div className="mh-success">
-                <div className="mh-success-icon">✓</div>
-                <h3>Request submitted</h3>
-                <p>
-                  Thanks, <b style={{ color: "rgba(255,255,255,0.75)" }}>{form.fullName || "friend"}</b>.
-                  We'll review your booking and send a confirmation to{" "}
-                  <b style={{ color: "rgba(255,255,255,0.75)" }}>{form.email}</b> within 1–2 business days.
-                </p>
+                <div
+                  className="mh-success-icon"
+                  style={
+                    outcome === "queued"
+                      ? {
+                          background: "rgba(245,158,11,0.14)",
+                          borderColor: "rgba(245,158,11,0.38)",
+                        }
+                      : undefined
+                  }
+                >
+                  {outcome === "queued" ? "⏱" : "✓"}
+                </div>
+                <h3>
+                  {outcome === "queued"
+                    ? "Saved — waiting for connection"
+                    : "Request submitted"}
+                </h3>
+                {outcome === "queued" ? (
+                  <p>
+                    You're offline, but your request is safely saved on this
+                    device. It will be submitted automatically the moment{" "}
+                    <b style={{ color: "rgba(255,255,255,0.75)" }}>
+                      {form.email}
+                    </b>{" "}
+                    is reachable. You can close this tab — it'll still go through.
+                  </p>
+                ) : (
+                  <p>
+                    Thanks,{" "}
+                    <b style={{ color: "rgba(255,255,255,0.75)" }}>
+                      {form.fullName || "friend"}
+                    </b>
+                    . We'll review your booking and send a confirmation to{" "}
+                    <b style={{ color: "rgba(255,255,255,0.75)" }}>
+                      {form.email}
+                    </b>{" "}
+                    within 1–2 business days.
+                  </p>
+                )}
                 <button className="mh-btn-primary" onClick={closeBooking}>
                   Close
                 </button>
@@ -1144,6 +1428,37 @@ export default function MeetingHallPage() {
           )}
         </div>
       </div>
+
+      {/* Connectivity banner */}
+      {(!isOnline || queuedCount > 0) && !bookingOpen && (
+        <div
+          className={`mh-net-banner ${
+            !isOnline ? "offline" : queuedCount > 0 ? "queued" : "online"
+          }`}
+          role="status"
+          aria-live="polite"
+        >
+          <span className="mh-net-dot" />
+          {!isOnline && queuedCount === 0 && <span>Offline — this page still works.</span>}
+          {!isOnline && queuedCount > 0 && (
+            <span>
+              Offline · {queuedCount} request{queuedCount === 1 ? "" : "s"} waiting to sync
+            </span>
+          )}
+          {isOnline && queuedCount > 0 && (
+            <>
+              <span>
+                {draining ? "Syncing…" : `${queuedCount} pending`}
+              </span>
+              {!draining && (
+                <button className="mh-net-btn" onClick={manualRetry}>
+                  Sync now
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

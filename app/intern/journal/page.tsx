@@ -3,9 +3,19 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { BookOpen, Plus, Check, Trash2, Target, ChevronDown, ChevronUp } from "lucide-react";
+import { BookOpen, Plus, Check, Trash2, Target, ChevronDown, ChevronUp, WifiOff, CloudUpload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Id } from "@/convex/_generated/dataModel";
+import {
+  enqueue,
+  countQueued,
+  generateClientId,
+  requestSwDrain,
+  drainQueue,
+} from "@/lib/offline-queue";
+
+const JOURNAL_ENDPOINT = "/api/intern/journal/upsert";
+const JOURNAL_STORE = "internJournalQueue" as const;
 
 const MOODS = [
   { key: "GREAT", emoji: "🌟", label: "Great",  color: "bg-yellow-400/20 border-yellow-400/30 text-yellow-300" },
@@ -38,7 +48,6 @@ export default function JournalPage() {
   const pastLogs  = useQuery(api.internPortal.listDailyLogs, token ? { token } : "skip");
   const goals     = useQuery(api.internPortal.listGoals,     token ? { token } : "skip");
 
-  const saveMut    = useMutation(api.internPortal.upsertDailyLog);
   const addGoalMut = useMutation(api.internPortal.addGoal);
   const toggleGoal = useMutation(api.internPortal.toggleGoal);
   const deleteGoal = useMutation(api.internPortal.deleteGoal);
@@ -46,10 +55,44 @@ export default function JournalPage() {
   const [form,       setForm]       = useState<LogForm>({ ...EMPTY });
   const [saved,      setSaved]      = useState(false);
   const [saving,     setSaving]     = useState(false);
+  const [savedOffline, setSavedOffline] = useState(false);
   const [goalInput,  setGoalInput]  = useState("");
   const [showGoals,  setShowGoals]  = useState(true);
   const [showPast,   setShowPast]   = useState(false);
   const [expandedLog, setExpandedLog] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState(true);
+  const [queuedCount, setQueuedCount] = useState(0);
+
+  useEffect(() => {
+    if (typeof navigator === "undefined") return;
+    setIsOnline(navigator.onLine);
+    const onOnline = () => {
+      setIsOnline(true);
+      requestSwDrain();
+      drainQueue(JOURNAL_STORE, JOURNAL_ENDPOINT).then(() =>
+        countQueued(JOURNAL_STORE).then(setQueuedCount)
+      );
+    };
+    const onOffline = () => setIsOnline(false);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    countQueued(JOURNAL_STORE).then(setQueuedCount);
+    const onSw = (e: MessageEvent) => {
+      if (e.data?.type === "dtc-sync-result") {
+        countQueued(JOURNAL_STORE).then(setQueuedCount);
+      }
+    };
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.addEventListener("message", onSw);
+    }
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.removeEventListener("message", onSw);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (todayLog === undefined) return;
@@ -72,17 +115,46 @@ export default function JournalPage() {
   async function handleSave() {
     if (!token) return;
     setSaving(true);
+    setSavedOffline(false);
+    const payload = {
+      clientId: generateClientId(),
+      token,
+      date: today,
+      accomplishments: form.accomplishments || undefined,
+      mood:            form.mood            || undefined,
+      learnings:       form.learnings       || undefined,
+      challenges:      form.challenges      || undefined,
+      tomorrowPlan:    form.tomorrowPlan    || undefined,
+      submittedOffline: typeof navigator !== "undefined" && !navigator.onLine,
+    };
     try {
-      await saveMut({
-        token, date: today,
-        accomplishments: form.accomplishments || undefined,
-        mood:            form.mood            || undefined,
-        learnings:       form.learnings       || undefined,
-        challenges:      form.challenges      || undefined,
-        tomorrowPlan:    form.tomorrowPlan    || undefined,
+      const res = await fetch(JOURNAL_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
-      setSaved(true);
-    } finally { setSaving(false); }
+      if (res.status === 202) {
+        setSavedOffline(true);
+        setSaved(true);
+        countQueued(JOURNAL_STORE).then(setQueuedCount);
+      } else if (res.ok) {
+        setSaved(true);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error || "Save failed");
+      }
+    } catch {
+      try {
+        await enqueue(JOURNAL_STORE, payload);
+        setSavedOffline(true);
+        setSaved(true);
+        countQueued(JOURNAL_STORE).then(setQueuedCount);
+      } catch {
+        // last-ditch: leave `saved` false so user can retry
+      }
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleAddGoal() {
@@ -111,6 +183,38 @@ export default function JournalPage() {
           {new Date().toLocaleDateString("en-PH", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
         </p>
       </div>
+
+      {(!isOnline || queuedCount > 0) && (
+        <div
+          className={cn(
+            "flex items-center gap-2 rounded-xl px-3 py-2 text-xs",
+            !isOnline
+              ? "bg-amber-500/10 border border-amber-500/30 text-amber-200"
+              : "bg-indigo-500/10 border border-indigo-500/30 text-indigo-200"
+          )}
+        >
+          {!isOnline ? <WifiOff className="w-4 h-4" /> : <CloudUpload className="w-4 h-4" />}
+          <span className="flex-1">
+            {!isOnline && queuedCount === 0 && "You're offline. Entries save locally."}
+            {!isOnline && queuedCount > 0 &&
+              `You're offline. ${queuedCount} entry${queuedCount === 1 ? "" : "ies"} waiting to sync.`}
+            {isOnline && queuedCount > 0 && `Syncing ${queuedCount} saved entry${queuedCount === 1 ? "" : "ies"}…`}
+          </span>
+          {isOnline && queuedCount > 0 && (
+            <button
+              onClick={() => {
+                requestSwDrain();
+                drainQueue(JOURNAL_STORE, JOURNAL_ENDPOINT).then(() =>
+                  countQueued(JOURNAL_STORE).then(setQueuedCount)
+                );
+              }}
+              className="text-indigo-200 font-semibold underline"
+            >
+              Sync now
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Mood selector */}
       <div>
@@ -153,13 +257,17 @@ export default function JournalPage() {
       <button onClick={handleSave} disabled={saving || !hasContent}
         className={cn(
           "w-full rounded-2xl py-3.5 font-bold text-sm flex items-center justify-center gap-2 transition-all",
-          saved
+          saved && savedOffline
+            ? "bg-amber-500/20 border border-amber-500/30 text-amber-200"
+            : saved
             ? "bg-green-500/20 border border-green-500/30 text-green-300"
             : "bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-40"
         )}>
         {saving
           ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          : saved
+          : saved && savedOffline
+            ? <><CloudUpload className="w-4 h-4" />Saved offline — will sync</>
+            : saved
             ? <><Check className="w-4 h-4" />Saved!</>
             : "Save Today's Entry"
         }

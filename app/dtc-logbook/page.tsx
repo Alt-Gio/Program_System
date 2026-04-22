@@ -5,6 +5,17 @@ import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import type { Id } from '@/convex/_generated/dataModel'
 import { format, addHours, setHours, setMinutes, setSeconds } from 'date-fns'
+import {
+  countQueued,
+  drainQueue,
+  enqueue,
+  generateClientId,
+  requestSwDrain,
+} from '@/lib/offline-queue'
+import { loadSnapshot, saveSnapshot } from '@/lib/dtc-logbook-cache'
+
+const LOGBOOK_ENDPOINT = '/api/dtc-logbook/log'
+const LOGBOOK_STORE = 'dtcLogbookQueue' as const
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const PURPOSE_SUGGESTIONS = [
@@ -494,9 +505,10 @@ function PcFloorGrid({ pcs, selectedId, onSelect, now }: {
 }
 
 // ─── Success Screen ────────────────────────────────────────────────────────────
-function SuccessScreen({ log, photo, officeCloseStr, onReset, onRate }: {
+function SuccessScreen({ log, photo, officeCloseStr, onReset, onRate, queued = false }: {
   log: SubmittedLog; photo: string | null; officeCloseStr: string
   onReset: () => void; onRate: (rating: number) => Promise<void>
+  queued?: boolean
 }) {
   const [countdown, setCountdown] = useState(12)
   const [rating, setRating] = useState(0)
@@ -532,25 +544,38 @@ function SuccessScreen({ log, photo, officeCloseStr, onReset, onRate }: {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl p-8 max-w-sm w-full text-center border border-gray-100">
         <div className="relative inline-block mb-4">
-          <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto">
+          <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto ${queued ? 'bg-amber-100' : 'bg-green-100'}`}>
             {photo
-              ? <img src={photo} className="w-20 h-20 rounded-full object-cover border-4 border-green-300" alt="" />
-              : <svg className="w-10 h-10 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                </svg>
+              ? <img src={photo} className={`w-20 h-20 rounded-full object-cover border-4 ${queued ? 'border-amber-300' : 'border-green-300'}`} alt="" />
+              : queued
+                ? <svg className="w-10 h-10 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                : <svg className="w-10 h-10 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
             }
           </div>
           {photo && (
-            <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-green-500 flex items-center justify-center border-2 border-white">
-              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-              </svg>
+            <div className={`absolute -bottom-1 -right-1 w-8 h-8 rounded-full flex items-center justify-center border-2 border-white ${queued ? 'bg-amber-500' : 'bg-green-500'}`}>
+              {queued
+                ? <span className="text-white text-xs font-bold">⏱</span>
+                : <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+              }
             </div>
           )}
         </div>
 
-        <h2 className="text-2xl font-bold text-[#0038A8] mb-1">You&apos;re Logged In!</h2>
-        <p className="text-gray-400 text-sm mb-5">Welcome, {log.fullName}!</p>
+        <h2 className="text-2xl font-bold text-[#0038A8] mb-1">
+          {queued ? 'Saved Offline' : 'You\u2019re Logged In!'}
+        </h2>
+        <p className="text-gray-400 text-sm mb-5">
+          {queued
+            ? `Your entry is stored on this device, ${log.fullName}. It will sync automatically when the connection is back.`
+            : `Welcome, ${log.fullName}!`}
+        </p>
 
         <div className="bg-gray-50 rounded-xl p-4 space-y-2.5 mb-4">
           <SRow label="Time In" value={format(new Date(log.timeIn), 'hh:mm:ss a')} />
@@ -563,7 +588,11 @@ function SuccessScreen({ log, photo, officeCloseStr, onReset, onRate }: {
           ⏰ Please finish and step out by <strong>{officeCloseStr}</strong>
         </div>
 
-        {!ratingSubmitted ? (
+        {queued ? (
+          <div className="mb-5 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-xs text-amber-800">
+            You can close this tab — your entry will still be submitted once the device reconnects. Rating will be available next time.
+          </div>
+        ) : !ratingSubmitted ? (
           <div className="mb-5 bg-blue-50 rounded-2xl px-4 py-4">
             <p className="text-sm font-semibold text-gray-700 mb-3">How would you rate our service today?</p>
             <div className="flex justify-center gap-2 mb-1">
@@ -646,12 +675,100 @@ export default function DTCLogbookPage() {
   const streamRef = useRef<MediaStream | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
-  // Convex data
-  const settings = useQuery(api.dtcSettings.getAll)
-  const pcs = useQuery(api.dtcPcs.getAll)
-  const announcements = useQuery(api.dtcAnnouncements.getActive)
-  const createLog = useMutation(api.dtcLogs.create)
+  // Offline-aware state
+  const [isOnline, setIsOnline] = useState(true)
+  const [queuedCount, setQueuedCount] = useState(0)
+  const [draining, setDraining] = useState(false)
+  const [submittedQueued, setSubmittedQueued] = useState(false)
+
+  // Last-known snapshots for offline hydration
+  const [settingsSnap, setSettingsSnap] = useState<any>(null)
+  const [pcsSnap, setPcsSnap] = useState<any>(null)
+  const [announcementsSnap, setAnnouncementsSnap] = useState<any>(null)
+
+  // Convex data (live when online, null while offline/loading)
+  const liveSettings = useQuery(api.dtcSettings.getAll)
+  const livePcs = useQuery(api.dtcPcs.getAll)
+  const liveAnnouncements = useQuery(api.dtcAnnouncements.getActive)
+  // Submission is posted to /api/dtc-logbook/log so the service worker can
+  // intercept and queue offline writes. Rating updates still go through
+  // Convex directly because they only run when online.
   const updateLog = useMutation(api.dtcLogs.update)
+
+  // Merge live data with cached snapshots so the form still works offline.
+  // Cast to preserve the Convex query's return type through the fallback.
+  const settings = (liveSettings ?? settingsSnap) as typeof liveSettings
+  const pcs = (livePcs ?? pcsSnap) as typeof livePcs
+  const announcements = (liveAnnouncements ?? announcementsSnap) as typeof liveAnnouncements
+
+  // Persist fresh reads to localStorage whenever Convex returns new data.
+  useEffect(() => {
+    if (liveSettings) saveSnapshot('settings', liveSettings)
+  }, [liveSettings])
+  useEffect(() => {
+    if (livePcs) saveSnapshot('pcs', livePcs)
+  }, [livePcs])
+  useEffect(() => {
+    if (liveAnnouncements) saveSnapshot('announcements', liveAnnouncements)
+  }, [liveAnnouncements])
+
+  // Hydrate from snapshots on first mount + set up online/offline listeners.
+  useEffect(() => {
+    setSettingsSnap(loadSnapshot('settings'))
+    setPcsSnap(loadSnapshot('pcs'))
+    setAnnouncementsSnap(loadSnapshot('announcements'))
+
+    let cancelled = false
+    const refreshQueue = async () => {
+      const n = await countQueued(LOGBOOK_STORE)
+      if (!cancelled) setQueuedCount(n)
+    }
+    const drain = async () => {
+      if (!navigator.onLine) return
+      setDraining(true)
+      try {
+        requestSwDrain()
+        await drainQueue(LOGBOOK_STORE, LOGBOOK_ENDPOINT)
+      } finally {
+        if (!cancelled) setDraining(false)
+        await refreshQueue()
+      }
+    }
+    const onOnline = () => { setIsOnline(true); drain() }
+    const onOffline = () => setIsOnline(false)
+
+    setIsOnline(navigator.onLine)
+    refreshQueue()
+    if (navigator.onLine) drain()
+    window.addEventListener('online', onOnline)
+    window.addEventListener('offline', onOffline)
+
+    const onSwMessage = (evt: MessageEvent) => {
+      if (evt.data?.type === 'dtc-sync-result') refreshQueue()
+    }
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', onSwMessage)
+    }
+    return () => {
+      cancelled = true
+      window.removeEventListener('online', onOnline)
+      window.removeEventListener('offline', onOffline)
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', onSwMessage)
+      }
+    }
+  }, [])
+
+  const manualRetry = useCallback(async () => {
+    setDraining(true)
+    try {
+      requestSwDrain()
+      await drainQueue(LOGBOOK_STORE, LOGBOOK_ENDPOINT)
+    } finally {
+      setDraining(false)
+      setQueuedCount(await countQueued(LOGBOOK_STORE))
+    }
+  }, [])
 
   // Clock tick
   useEffect(() => {
@@ -775,36 +892,79 @@ export default function DTCLogbookPage() {
   const handleSubmit = async (selectedPcId?: string) => {
     setSubmitting(true)
     setSubmitError(null)
-    try {
-      const finalPcId = (selectedPcId || form.pcId || null) as Id<'dtcPcs'> | undefined
-      const result = await createLog({
-        fullName: form.fullName.trim(),
-        agency: form.agency.trim(),
-        purpose: form.purpose.trim(),
-        equipmentUsed: form.equipmentUsed,
-        pcId: finalPcId || undefined,
-        photoDataUrl: photo || undefined,
-        plannedDurationHours: effectiveDuration,
-        serviceType: 'SELF_SERVICE',
-        contactEmail: form.contactEmail.trim() || undefined,
-        contactPhone: form.contactPhone.trim() || undefined,
-      })
+    setSubmittedQueued(false)
 
-      // Find PC info for display
-      const selectedPc = pcs?.find(p => p._id === (finalPcId || form.pcId))
+    const finalPcId = (selectedPcId || form.pcId || '') as string
+    const clientTimeIn = new Date().toISOString()
+    const clientId = generateClientId()
 
+    const payload = {
+      clientId,
+      fullName: form.fullName.trim(),
+      agency: form.agency.trim(),
+      purpose: form.purpose.trim(),
+      equipmentUsed: form.equipmentUsed,
+      pcId: finalPcId || undefined,
+      photoDataUrl: photo || undefined,
+      plannedDurationHours: effectiveDuration,
+      serviceType: 'SELF_SERVICE',
+      contactEmail: form.contactEmail.trim() || undefined,
+      contactPhone: form.contactPhone.trim() || undefined,
+      submittedOffline: typeof navigator !== 'undefined' && !navigator.onLine,
+      clientTimeIn,
+    }
+
+    const selectedPc = pcs?.find((p: any) => p._id === finalPcId)
+
+    // Helper: finalize the UI for either synced or queued outcomes.
+    const showSuccess = (opts: {
+      queued: boolean
+      logId?: string
+      timeIn: string
+    }) => {
       setSubmittedLog({
-        id: result.id as Id<'dtcLogs'>,
-        timeIn: result.timeIn,
+        id: (opts.logId ?? `local:${clientId}`) as Id<'dtcLogs'>,
+        timeIn: opts.timeIn,
         fullName: form.fullName.trim(),
         plannedDurationHours: effectiveDuration,
         pc: selectedPc ? { name: selectedPc.name } : null,
       })
+      setSubmittedQueued(opts.queued)
       stopCamera()
       setStep('success')
-    } catch (err: unknown) {
-      setSubmitError(err instanceof Error ? err.message : 'Submission failed. Please try again.')
-      setStep('form')
+    }
+
+    try {
+      const res = await fetch(LOGBOOK_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      let data: any = null
+      try { data = await res.json() } catch {}
+
+      if (res.status === 202 && data?.queued) {
+        setQueuedCount(await countQueued(LOGBOOK_STORE))
+        showSuccess({ queued: true, timeIn: clientTimeIn })
+      } else if (res.ok && data?.ok) {
+        showSuccess({ queued: false, logId: data.id, timeIn: data.timeIn })
+      } else {
+        throw new Error(data?.error || `Server responded ${res.status}`)
+      }
+    } catch (networkErr) {
+      // Network dead (or SW didn't intercept). Queue locally and show success.
+      try {
+        await enqueue(LOGBOOK_STORE, payload)
+        setQueuedCount(await countQueued(LOGBOOK_STORE))
+        showSuccess({ queued: true, timeIn: clientTimeIn })
+      } catch (idbErr: unknown) {
+        setSubmitError(
+          idbErr instanceof Error
+            ? idbErr.message
+            : 'Submission failed. Please try again.'
+        )
+        setStep('form')
+      }
     } finally {
       setSubmitting(false)
     }
@@ -876,6 +1036,7 @@ export default function DTCLogbookPage() {
           officeCloseStr={officeCloseStr}
           onReset={resetForm}
           onRate={handleRate}
+          queued={submittedQueued}
         />
       </>
     )
@@ -1135,6 +1296,48 @@ export default function DTCLogbookPage() {
       )}
 
       <main className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-4">
+        {/* Connectivity / queue banner */}
+        {(!isOnline || queuedCount > 0) && (
+          <div
+            role="status"
+            aria-live="polite"
+            className={`rounded-2xl px-4 py-3 flex items-center gap-3 border-2 ${
+              !isOnline
+                ? 'bg-amber-50 border-amber-300 text-amber-900'
+                : 'bg-blue-50 border-blue-200 text-blue-900'
+            }`}
+          >
+            <span className="text-xl flex-shrink-0">
+              {!isOnline ? '📡' : draining ? '🔄' : '⏱️'}
+            </span>
+            <div className="flex-1 text-sm">
+              {!isOnline && queuedCount === 0 && (
+                <span><strong>You're offline.</strong> You can still sign in — we'll sync when you reconnect.</span>
+              )}
+              {!isOnline && queuedCount > 0 && (
+                <span>
+                  <strong>Offline —</strong> {queuedCount} entr{queuedCount === 1 ? 'y' : 'ies'} saved on this device, waiting to sync.
+                </span>
+              )}
+              {isOnline && queuedCount > 0 && (
+                <span>
+                  {draining
+                    ? 'Syncing saved entries…'
+                    : `${queuedCount} entr${queuedCount === 1 ? 'y' : 'ies'} waiting to sync.`}
+                </span>
+              )}
+            </div>
+            {isOnline && queuedCount > 0 && !draining && (
+              <button
+                onClick={manualRetry}
+                className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 flex-shrink-0"
+              >
+                Sync now
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Hero */}
         <div className="bg-[#0038A8] text-white rounded-2xl p-5 flex items-center justify-between">
           <div>

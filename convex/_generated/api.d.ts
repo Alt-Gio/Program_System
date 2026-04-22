@@ -32,6 +32,7 @@ import type * as internSheetsSync from "../internSheetsSync.js";
 import type * as internTasks from "../internTasks.js";
 import type * as interns from "../interns.js";
 import type * as invites from "../invites.js";
+import type * as meetingHall from "../meetingHall.js";
 import type * as otp from "../otp.js";
 import type * as otpCodes from "../otpCodes.js";
 import type * as personnel from "../personnel.js";
@@ -78,6 +79,7 @@ declare const fullApi: ApiFromModules<{
   internTasks: typeof internTasks;
   interns: typeof interns;
   invites: typeof invites;
+  meetingHall: typeof meetingHall;
   otp: typeof otp;
   otpCodes: typeof otpCodes;
   personnel: typeof personnel;

@@ -1235,6 +1235,15 @@ export default function FrontPage() {
                 🎓 Intern Logbook
               </button>
             </Link>
+            <Link href="/event">
+              <button className={cn(
+                "px-8 py-4 rounded-xl font-bold text-base transition-all hover:scale-105 shadow-lg",
+                "bg-gradient-to-br from-violet-600 via-fuchsia-500 to-cyan-500 text-white",
+                "shadow-violet-500/30 border border-violet-400/30"
+              )}>
+                ✨ Events Calendar
+              </button>
+            </Link>
           </div>
 
           {/* Staff Portal Links */}

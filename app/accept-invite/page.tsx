@@ -33,6 +33,14 @@ export default function AcceptInvitePage() {
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setTimeout(() => setResendCooldown((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendCooldown]);
 
   const inviteState = useMemo(() => {
     if (invite === undefined) return "loading" as const;
@@ -48,7 +56,9 @@ export default function AcceptInvitePage() {
 
   async function sendOtp() {
     if (!invite || inviteState !== "ok") return;
+    if (resendCooldown > 0) return;
     setLoading(true);
+    setErrorDetail(null);
     try {
       const res = await fetch("/api/auth/otp/send", {
         method: "POST",
@@ -59,9 +69,14 @@ export default function AcceptInvitePage() {
           inviteToken: token,
         }),
       });
-      const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error || "Failed to send code");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        const msg = data.error || `Failed to send code (HTTP ${res.status})`;
+        setErrorDetail(msg);
+        throw new Error(msg);
+      }
       setOtpSent(true);
+      setResendCooldown(30);
       toast.success(`Code sent to ${invite.email}`);
     } catch (e: any) {
       toast.error(e.message || "Failed to send code");
@@ -77,6 +92,7 @@ export default function AcceptInvitePage() {
       return;
     }
     setLoading(true);
+    setErrorDetail(null);
     try {
       const res = await fetch("/api/auth/otp/verify", {
         method: "POST",
@@ -87,8 +103,12 @@ export default function AcceptInvitePage() {
           code: otp,
         }),
       });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || "Invalid code");
+      const data = await res.json().catch(() => ({}));
+      if (!data.success) {
+        const msg = data.error || "Invalid code";
+        setErrorDetail(msg);
+        throw new Error(msg);
+      }
       setStep("password");
     } catch (e: any) {
       toast.error(e.message || "Invalid code");
@@ -104,20 +124,30 @@ export default function AcceptInvitePage() {
     if (password !== confirm) return toast.error("Passwords don't match");
 
     setLoading(true);
+    setErrorDetail(null);
     try {
       const res = await fetch("/api/auth/invite/redeem", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           inviteToken: token,
-          fullName,
+          fullName: fullName.trim(),
           password,
           otpCode: otp,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Signup failed");
-      toast.success("Account created");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = data.error || `Signup failed (HTTP ${res.status})`;
+        setErrorDetail(msg);
+        // If the OTP window lapsed, send the user back to the OTP step
+        if (/otp|code|verify/i.test(msg)) {
+          setStep("otp");
+          setOtp("");
+        }
+        throw new Error(msg);
+      }
+      toast.success("Account created — welcome!");
       setStep("done");
       setTimeout(() => {
         router.push(landingForRole(data.user.role));
@@ -194,6 +224,11 @@ export default function AcceptInvitePage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                {errorDetail && (
+                  <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+                    {errorDetail}
+                  </div>
+                )}
                 {!otpSent ? (
                   <Button
                     onClick={sendOtp}
@@ -201,7 +236,7 @@ export default function AcceptInvitePage() {
                     className="w-full h-11"
                   >
                     <Mail className="w-4 h-4 mr-2" />
-                    Send verification code
+                    {loading ? "Sending…" : "Send verification code"}
                   </Button>
                 ) : (
                   <form onSubmit={verifyOtp} className="space-y-4">
@@ -217,13 +252,18 @@ export default function AcceptInvitePage() {
                       />
                       <p className="text-xs text-gray-500">
                         Sent to {invite.email}.{" "}
-                        <button type="button" onClick={sendOtp} className="text-blue-600 hover:underline">
-                          Resend
+                        <button
+                          type="button"
+                          onClick={sendOtp}
+                          disabled={resendCooldown > 0 || loading}
+                          className="text-blue-600 hover:underline disabled:text-gray-400 disabled:no-underline"
+                        >
+                          {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend"}
                         </button>
                       </p>
                     </div>
                     <Button type="submit" disabled={loading || otp.length !== 6} className="w-full h-11">
-                      Verify code <ArrowRight className="w-4 h-4 ml-2" />
+                      {loading ? "Verifying…" : (<>Verify code <ArrowRight className="w-4 h-4 ml-2" /></>)}
                     </Button>
                   </form>
                 )}
@@ -238,6 +278,11 @@ export default function AcceptInvitePage() {
                 <CardDescription>Finish creating your DICT account.</CardDescription>
               </CardHeader>
               <CardContent>
+                {errorDetail && (
+                  <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+                    {errorDetail}
+                  </div>
+                )}
                 <form onSubmit={completeSignup} className="space-y-4">
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-gray-700">Full name</label>
@@ -246,6 +291,8 @@ export default function AcceptInvitePage() {
                       onChange={(e) => setFullName(e.target.value)}
                       placeholder="Juan Dela Cruz"
                       className="h-11"
+                      autoComplete="name"
+                      required
                     />
                   </div>
                   <div className="space-y-2">
@@ -256,6 +303,8 @@ export default function AcceptInvitePage() {
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="At least 8 characters"
                       className="h-11"
+                      autoComplete="new-password"
+                      required
                     />
                   </div>
                   <div className="space-y-2">
@@ -265,10 +314,12 @@ export default function AcceptInvitePage() {
                       value={confirm}
                       onChange={(e) => setConfirm(e.target.value)}
                       className="h-11"
+                      autoComplete="new-password"
+                      required
                     />
                   </div>
                   <Button type="submit" disabled={loading} className="w-full h-11">
-                    Create account <ArrowRight className="w-4 h-4 ml-2" />
+                    {loading ? "Creating account…" : (<>Create account <ArrowRight className="w-4 h-4 ml-2" /></>)}
                   </Button>
                 </form>
               </CardContent>

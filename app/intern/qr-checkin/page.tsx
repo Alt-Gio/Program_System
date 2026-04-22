@@ -6,6 +6,10 @@ import { api } from "@/convex/_generated/api";
 import { ScanLine, CheckCircle2, LogOut, Clock, Calendar, AlertCircle, Wifi } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { enqueue, generateClientId } from "@/lib/offline-queue";
+
+const CHECKIN_ENDPOINT = "/api/intern/qr/checkin";
+const CHECKIN_STORE = "internCheckinQueue" as const;
 
 type CheckResult = { action: "checked_in" | "checked_out"; time: string; hours: number | null } | null;
 
@@ -40,7 +44,6 @@ export default function QrCheckinPage() {
 
   useEffect(() => { setToken(localStorage.getItem("intern_token")); }, []);
 
-  const checkInMut = useMutation(api.internAuth.checkIn);
   const data = useQuery(api.internAuth.getMyData, token ? { token } : "skip");
 
   const today = new Date().toISOString().slice(0, 10);
@@ -53,11 +56,37 @@ export default function QrCheckinPage() {
     if (!token) return;
     setError("");
     setLoading(true);
+    const payload = {
+      clientId: generateClientId(),
+      token,
+      submittedOffline: typeof navigator !== "undefined" && !navigator.onLine,
+    };
     try {
-      const res = await checkInMut({ token });
-      setResult(res);
+      const res = await fetch(CHECKIN_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.status === 202 && json?.queued) {
+        setResult({ action: "checked_in", time: new Date().toISOString(), hours: null });
+      } else if (res.ok) {
+        setResult(json as CheckResult);
+      } else {
+        throw new Error(json?.error || "Check-in failed");
+      }
     } catch (err: any) {
-      setError(err.message ?? "Something went wrong.");
+      // If this was a network failure, queue it locally for replay.
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        try {
+          await enqueue(CHECKIN_STORE, payload);
+          setResult({ action: "checked_in", time: new Date().toISOString(), hours: null });
+        } catch {
+          setError("Couldn't save offline check-in.");
+        }
+      } else {
+        setError(err?.message ?? "Something went wrong.");
+      }
     } finally { setLoading(false); }
   }
 

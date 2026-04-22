@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Fragment, useMemo, createContext, useContext, useCallback } from 'react'
+import { useState, useEffect, Fragment, useMemo, useRef, createContext, useContext, useCallback } from 'react'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import type { Id } from '@/convex/_generated/dataModel'
@@ -814,6 +814,11 @@ const STATUS_COLORS: Record<string, { bg: string; border: string; dot: string; t
   MAINTENANCE: { bg: '#fef9c3', border: '#fcd34d', dot: '#a16207', text: '#a16207', label: 'Maintenance' },
 }
 
+const GRID_STORAGE_KEY = 'dtc-admin-workstation-grid'
+const GRID_OPTIONS = [3, 4, 5, 6, 8, 10] as const
+const DENSITY_OPTIONS = ['comfy', 'compact'] as const
+type Density = typeof DENSITY_OPTIONS[number]
+
 function Workstations() {
   const pcs = (useQuery(api.dtcPcs.getAll) ?? []) as DtcPc[]
   const createPc = useMutation(api.dtcPcs.create)
@@ -824,6 +829,26 @@ function Workstations() {
 
   const [editing, setEditing] = useState<DtcPc | null>(null)
   const [addOpen, setAddOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const [filterStatus, setFilterStatus] = useState<string | null>(null)
+  const [gridCols, setGridCols] = useState<number>(5)
+  const [density, setDensity] = useState<Density>('comfy')
+
+  // Restore persisted grid preferences.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const raw = localStorage.getItem(GRID_STORAGE_KEY)
+      if (!raw) return
+      const saved = JSON.parse(raw)
+      if (typeof saved.cols === 'number' && GRID_OPTIONS.includes(saved.cols)) setGridCols(saved.cols)
+      if (DENSITY_OPTIONS.includes(saved.density)) setDensity(saved.density)
+    } catch {}
+  }, [])
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    localStorage.setItem(GRID_STORAGE_KEY, JSON.stringify({ cols: gridCols, density }))
+  }, [gridCols, density])
 
   async function changeStatus(pc: DtcPc, status: string) {
     try {
@@ -841,12 +866,28 @@ function Workstations() {
     } catch (e) { toast({ type: 'err', msg: String(e) }) }
   }
 
+  const q = search.trim().toLowerCase()
+  const filteredPcs = pcs.filter((pc) => {
+    if (filterStatus && pc.status !== filterStatus) return false
+    if (!q) return true
+    return (
+      pc.name.toLowerCase().includes(q) ||
+      pc.ipAddress.toLowerCase().includes(q) ||
+      (pc.location || '').toLowerCase().includes(q)
+    )
+  })
+
+  const cardPadding = density === 'compact' ? '10px 10px' : '14px 12px'
+  const nameSize = density === 'compact' ? 11 : 13
+  const iconSize = density === 'compact' ? 16 : 22
+  const showExtras = density === 'comfy'
+
   return (
     <div className="dtc-page" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <div style={{ fontWeight: 800, fontSize: 20, color: '#1a1f36' }}>Workstations</div>
-          <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{pcs.length} registered &middot; Click the status chip to change</div>
+          <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{pcs.length} registered &middot; Click a card to edit · Click a status chip to change</div>
         </div>
         <button className="dtc-btn-primary" onClick={() => setAddOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
           <Icon name="plus" size={14} color="#fff" /> Add Workstation
@@ -854,15 +895,41 @@ function Workstations() {
       </div>
 
       <div style={{ display: 'flex', gap: 10 }}>
-        {Object.entries(STATUS_COLORS).map(([s, c]) => (
-          <div key={s} className="dtc-card" style={{ flex: 1, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 10, height: 10, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
-            <div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: '#1a1f36' }}>{pcs.filter((p) => p.status === s).length}</div>
-              <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 500 }}>{c.label}</div>
-            </div>
-          </div>
-        ))}
+        {Object.entries(STATUS_COLORS).map(([s, c]) => {
+          const count = pcs.filter((p) => p.status === s).length
+          const active = filterStatus === s
+          return (
+            <button
+              key={s}
+              onClick={() => setFilterStatus(active ? null : s)}
+              className="dtc-card"
+              style={{
+                flex: 1, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10,
+                cursor: 'pointer', textAlign: 'left',
+                border: active ? `2px solid ${c.dot}` : undefined,
+                background: active ? c.bg : undefined,
+              }}
+            >
+              <div style={{ width: 10, height: 10, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: '#1a1f36' }}>{count}</div>
+                <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 500 }}>{c.label}</div>
+              </div>
+            </button>
+          )
+        })}
+        {filterStatus && (
+          <button
+            onClick={() => setFilterStatus(null)}
+            style={{
+              fontSize: 11, padding: '6px 12px', borderRadius: 8,
+              background: '#f1f3f9', color: '#374151', border: '1px solid #e5e7eb',
+              cursor: 'pointer', fontWeight: 600, alignSelf: 'center',
+            }}
+          >
+            Clear filter
+          </button>
+        )}
       </div>
 
       {pcs.length === 0 ? (
@@ -877,39 +944,136 @@ function Workstations() {
       ) : (
         <>
           <div className="dtc-card" style={{ padding: 22 }}>
-            <div style={{ fontWeight: 700, fontSize: 13, color: '#1a1f36', marginBottom: 4 }}>Floor Layout</div>
-            <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 16 }}>Click a card to edit</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
-              {pcs.map((pc) => {
-                const c = STATUS_COLORS[pc.status] || STATUS_COLORS.OFFLINE
-                const user = pc.logs?.[0]?.fullName
-                return (
-                  <div key={pc._id} onClick={() => setEditing(pc)}
-                    style={{ background: c.bg, border: `2px solid ${c.border}`, borderRadius: 12, padding: '14px 12px', cursor: 'pointer', transition: 'all 0.15s' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                      <span style={{ fontSize: 22 }}>{'\uD83D\uDDA5\uFE0F'}</span>
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.dot }} className={pc.status === 'ONLINE' ? 'dtc-pulse' : ''} />
-                    </div>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: '#1a1f36' }}>{pc.name}</div>
-                    <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>{pc.location || 'No location'}</div>
-                    <div style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.7)', padding: '2px 7px', borderRadius: 20 }}>
-                      <div style={{ width: 5, height: 5, borderRadius: '50%', background: c.dot }} />
-                      <span style={{ fontSize: 10, fontWeight: 600, color: c.text }}>{c.label}</span>
-                    </div>
-                    {user && <div style={{ marginTop: 6, fontSize: 10, color: '#6b7280', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user}</div>}
-                    <div style={{ marginTop: 4, fontSize: 9, fontFamily: 'JetBrains Mono, monospace', color: '#9ca3af' }}>{pc.ipAddress}</div>
-                  </div>
-                )
-              })}
+            {/* Layout controls */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              gap: 12, marginBottom: 16, flexWrap: 'wrap',
+            }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 13, color: '#1a1f36' }}>Floor Layout</div>
+                <div style={{ fontSize: 11, color: '#9ca3af' }}>
+                  Showing {filteredPcs.length} of {pcs.length} · {gridCols} columns · {density}
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <input
+                  className="dtc-inp"
+                  placeholder="Search name, IP, location…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  style={{ width: 220, padding: '7px 10px', fontSize: 12 }}
+                />
+                {/* Density toggle */}
+                <div style={{
+                  display: 'inline-flex', background: '#f1f3f9', borderRadius: 8, padding: 3,
+                  border: '1px solid #e5e7eb',
+                }}>
+                  {DENSITY_OPTIONS.map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => setDensity(d)}
+                      style={{
+                        fontSize: 11, padding: '5px 10px', borderRadius: 6,
+                        background: density === d ? '#fff' : 'transparent',
+                        color: density === d ? '#1a1f36' : '#6b7280',
+                        border: 'none', cursor: 'pointer', fontWeight: 600,
+                        boxShadow: density === d ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                        textTransform: 'capitalize',
+                      }}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+                {/* Grid column selector */}
+                <div style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4, background: '#f1f3f9',
+                  borderRadius: 8, padding: 3, border: '1px solid #e5e7eb',
+                }}>
+                  <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 600, padding: '0 6px' }}>Cols</span>
+                  {GRID_OPTIONS.map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => setGridCols(n)}
+                      style={{
+                        fontSize: 11, padding: '5px 9px', borderRadius: 6,
+                        background: gridCols === n ? '#4338ca' : 'transparent',
+                        color: gridCols === n ? '#fff' : '#374151',
+                        border: 'none', cursor: 'pointer', fontWeight: 700, minWidth: 24,
+                      }}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
+
+            {filteredPcs.length === 0 ? (
+              <div style={{ padding: '28px 0', textAlign: 'center', fontSize: 12, color: '#9ca3af' }}>
+                No workstations match the current filter.
+              </div>
+            ) : (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`,
+                gap: density === 'compact' ? 8 : 10,
+              }}>
+                {filteredPcs.map((pc) => {
+                  const c = STATUS_COLORS[pc.status] || STATUS_COLORS.OFFLINE
+                  const user = pc.logs?.[0]?.fullName
+                  return (
+                    <div key={pc._id} onClick={() => setEditing(pc)}
+                      style={{
+                        background: c.bg, border: `2px solid ${c.border}`,
+                        borderRadius: 12, padding: cardPadding, cursor: 'pointer',
+                        transition: 'transform 0.12s, box-shadow 0.12s',
+                      }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)';
+                        (e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 16px rgba(0,0,0,0.08)'
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLDivElement).style.transform = 'none';
+                        (e.currentTarget as HTMLDivElement).style.boxShadow = 'none'
+                      }}
+                      title={pc.name + (user ? ` — ${user}` : '')}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: showExtras ? 8 : 4 }}>
+                        <span style={{ fontSize: iconSize }}>{'\uD83D\uDDA5\uFE0F'}</span>
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.dot }} className={pc.status === 'ONLINE' ? 'dtc-pulse' : ''} />
+                      </div>
+                      <div style={{ fontWeight: 700, fontSize: nameSize, color: '#1a1f36', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pc.name}</div>
+                      {showExtras && (
+                        <>
+                          <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pc.location || 'No location'}</div>
+                          <div style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.7)', padding: '2px 7px', borderRadius: 20 }}>
+                            <div style={{ width: 5, height: 5, borderRadius: '50%', background: c.dot }} />
+                            <span style={{ fontSize: 10, fontWeight: 600, color: c.text }}>{c.label}</span>
+                          </div>
+                          {user && <div style={{ marginTop: 6, fontSize: 10, color: '#6b7280', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user}</div>}
+                          <div style={{ marginTop: 4, fontSize: 9, fontFamily: 'JetBrains Mono, monospace', color: '#9ca3af' }}>{pc.ipAddress}</div>
+                        </>
+                      )}
+                      {!showExtras && user && (
+                        <div style={{ marginTop: 4, fontSize: 9, color: '#6b7280', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user}</div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           <div className="dtc-card" style={{ overflow: 'hidden' }}>
-            <div style={{ padding: '16px 22px', borderBottom: '1px solid #f1f3f9', fontWeight: 700, fontSize: 13, color: '#1a1f36' }}>PC Registry</div>
+            <div style={{ padding: '16px 22px', borderBottom: '1px solid #f1f3f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#1a1f36' }}>PC Registry</div>
+              <div style={{ fontSize: 11, color: '#9ca3af' }}>{filteredPcs.length} of {pcs.length}</div>
+            </div>
             <table>
               <thead><tr><th>PC Name</th><th>Location</th><th>IP Address</th><th>Status</th><th>Current User</th><th>Actions</th></tr></thead>
               <tbody>
-                {pcs.map((pc) => {
+                {filteredPcs.map((pc) => {
                   const c = STATUS_COLORS[pc.status] || STATUS_COLORS.OFFLINE
                   const user = pc.logs?.[0]?.fullName
                   return (
@@ -1407,7 +1571,14 @@ function CVStation() {
   const [meta, setMeta] = useState<CVStationMeta | null>(null)
   const [loadingMeta, setLoadingMeta] = useState(true)
   const [downloading, setDownloading] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadPct, setUploadPct] = useState(0)
+  const [removing, setRemoving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [ok, setOk] = useState<string | null>(null)
+  const [dragActive, setDragActive] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const toast = useToast()
 
   async function loadMeta() {
     setLoadingMeta(true)
@@ -1453,125 +1624,295 @@ function CVStation() {
     setDownloading(false)
   }
 
+  async function handleUpload(file: File) {
+    setError(null); setOk(null)
+    if (!/\.exe$/i.test(file.name)) {
+      setError('Only .exe files are accepted.')
+      return
+    }
+    setUploading(true)
+    setUploadPct(0)
+    const form = new FormData()
+    form.append('file', file)
+    try {
+      // XHR (rather than fetch) so we can stream an upload progress bar.
+      const result = await new Promise<any>((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        xhr.open('POST', '/api/cv-station/upload')
+        xhr.withCredentials = true
+        xhr.upload.onprogress = (ev) => {
+          if (ev.lengthComputable) setUploadPct(Math.round((ev.loaded / ev.total) * 100))
+        }
+        xhr.onload = () => {
+          try {
+            const j = JSON.parse(xhr.responseText || '{}')
+            if (xhr.status >= 200 && xhr.status < 300) resolve(j)
+            else reject(new Error(j?.error || `HTTP ${xhr.status}`))
+          } catch { reject(new Error(`HTTP ${xhr.status}`)) }
+        }
+        xhr.onerror = () => reject(new Error('Network error'))
+        xhr.send(form)
+      })
+      setOk(`Uploaded ${result.filename} (${result.sizeMB} MB)`)
+      toast({ type: 'ok', msg: `Uploaded ${result.filename}` })
+      await loadMeta()
+    } catch (e: any) {
+      setError(e?.message ?? String(e))
+    } finally {
+      setUploading(false)
+      setUploadPct(0)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
+  async function handleRemoveBuild() {
+    if (!confirm('Remove the current build from the server?')) return
+    setRemoving(true); setError(null); setOk(null)
+    try {
+      const resp = await fetch('/api/cv-station/upload', { method: 'DELETE', credentials: 'include' })
+      const j = await resp.json().catch(() => ({}))
+      if (!resp.ok) throw new Error(j?.error || `HTTP ${resp.status}`)
+      toast({ type: 'ok', msg: 'Build removed' })
+      await loadMeta()
+    } catch (e: any) {
+      setError(e?.message ?? String(e))
+    } finally {
+      setRemoving(false)
+    }
+  }
+
+  const available = !!meta?.available
+
   return (
     <div className="dtc-page" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ fontWeight: 800, fontSize: 20, color: '#1a1f36' }}>CV Station — Desktop App</div>
+      {/* Page header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 20, color: '#1a1f36' }}>CV Station — Desktop App</div>
+          <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>
+            Face-recognition attendance client for Windows workstations
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            fontSize: 11, fontWeight: 700,
+            padding: '5px 10px', borderRadius: 20,
+            background: available ? '#d1fae5' : '#fef3c7',
+            color: available ? '#059669' : '#92400e',
+            border: `1px solid ${available ? '#6ee7b7' : '#fde68a'}`,
+          }}>
+            <span style={{
+              width: 6, height: 6, borderRadius: '50%',
+              background: available ? '#059669' : '#d97706',
+            }} className={available ? 'dtc-pulse' : ''} />
+            {loadingMeta ? 'Checking…' : available ? 'Build ready' : 'No build on server'}
+          </span>
+          <button
+            onClick={loadMeta}
+            style={{
+              fontSize: 11, padding: '6px 12px', borderRadius: 8,
+              background: '#f1f3f9', color: '#374151', border: '1px solid #e5e7eb',
+              cursor: 'pointer', fontWeight: 600,
+            }}
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
 
-      <div style={{ display: 'flex', gap: 14 }}>
-        {/* Download card */}
-        <div className="dtc-card" style={{ flex: 1.2, padding: 22 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+      {/* Primary row: download / upload side-by-side */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.15fr 1fr', gap: 14 }}>
+        {/* ── Download card — always visible, primary CTA ── */}
+        <div className="dtc-card" style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{
-              width: 40, height: 40, borderRadius: 10, background: '#eef2ff',
+              width: 44, height: 44, borderRadius: 12, background: '#eef2ff',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <Icon name="camera" size={22} color="#4338ca" />
+              <Icon name="download" size={22} color="#4338ca" />
             </div>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 15, color: '#1a1f36' }}>Face Recognition Attendance Client</div>
-              <div style={{ fontSize: 11, color: '#6b7280' }}>Packaged Windows desktop build — camera + check-in + offline queue</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: 15, color: '#1a1f36' }}>Download DICT-FaceCheckin.exe</div>
+              <div style={{ fontSize: 11, color: '#6b7280' }}>Admin-only · streams from <code>downloads/</code></div>
             </div>
           </div>
 
-          {loadingMeta ? (
-            <div style={{ fontSize: 12, color: '#6b7280' }}>Checking build status…</div>
-          ) : meta?.available ? (
-            <>
-              <div style={{
-                display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16,
-                background: '#f8faff', padding: 14, borderRadius: 10,
-              }}>
-                <Kv k="Filename" v={meta.filename ?? '—'} />
-                <Kv k="Version" v={meta.version ?? '—'} />
-                <Kv k="Size" v={meta.sizeMB != null ? `${meta.sizeMB} MB` : '—'} />
-                <Kv k="Built" v={meta.lastModified ? new Date(meta.lastModified).toLocaleString() : '—'} />
-              </div>
-              <button
-                className="dtc-btn-primary"
-                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 13 }}
-                onClick={handleDownload}
-                disabled={downloading}
-              >
-                <Icon name="download" size={14} color="#fff" />
-                {downloading ? 'Downloading…' : 'Download CV Station (.exe)'}
-              </button>
-            </>
+          {available ? (
+            <div style={{
+              display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10,
+              background: '#f8faff', padding: 14, borderRadius: 10,
+            }}>
+              <Kv k="Filename" v={meta?.filename ?? '—'} />
+              <Kv k="Version" v={meta?.version ?? '—'} />
+              <Kv k="Size" v={meta?.sizeMB != null ? `${meta.sizeMB} MB` : '—'} />
+              <Kv k="Built" v={meta?.lastModified ? new Date(meta.lastModified).toLocaleString() : '—'} />
+            </div>
           ) : (
             <div style={{
               background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10,
-              padding: 14, fontSize: 12, color: '#92400e',
+              padding: 14, fontSize: 12, color: '#92400e', lineHeight: 1.6,
             }}>
-              <div style={{ fontWeight: 700, marginBottom: 4 }}>Build not available yet</div>
-              <div>Run <code style={{ background: '#fef3c7', padding: '1px 5px', borderRadius: 3 }}>cv-station/build.bat</code> on a Windows machine with Python 3.10+ to produce the .exe. The script copies it into the server's <code>downloads/</code> folder.</div>
-              {meta?.hint && <div style={{ marginTop: 8, fontSize: 11, color: '#78350f' }}>{meta.hint}</div>}
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>No build uploaded yet</div>
+              <div>Build it on a Windows machine, then upload it using the panel on the right — it'll appear here immediately.</div>
             </div>
           )}
 
-          {error && (
-            <div style={{
-              marginTop: 12, padding: 10, borderRadius: 8,
-              background: '#fef2f2', border: '1px solid #fecaca',
-              color: '#991b1b', fontSize: 12,
-            }}>{error}</div>
-          )}
+          <button
+            className="dtc-btn-primary"
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              gap: 8, fontSize: 13, opacity: available ? 1 : 0.5, cursor: available ? 'pointer' : 'not-allowed',
+            }}
+            onClick={handleDownload}
+            disabled={!available || downloading}
+            title={!available ? 'Upload a build first' : ''}
+          >
+            <Icon name="download" size={14} color="#fff" />
+            {downloading ? 'Downloading…' : 'Download CV Station (.exe)'}
+          </button>
 
-          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          {available && (
             <button
-              onClick={loadMeta}
+              onClick={handleRemoveBuild}
+              disabled={removing}
               style={{
-                fontSize: 12, padding: '8px 14px', borderRadius: 8,
-                background: '#f1f3f9', color: '#374151', border: '1px solid #e5e7eb',
-                cursor: 'pointer', fontWeight: 600,
+                fontSize: 11, padding: '6px 10px', borderRadius: 8,
+                background: 'transparent', color: '#dc2626', border: '1px solid #fecaca',
+                cursor: 'pointer', fontWeight: 600, alignSelf: 'flex-start',
               }}
             >
-              Refresh status
+              {removing ? 'Removing…' : 'Remove current build'}
             </button>
-          </div>
+          )}
         </div>
 
-        {/* Setup instructions */}
-        <div className="dtc-card" style={{ flex: 1, padding: 22 }}>
+        {/* ── Upload card — drag/drop + pick button ── */}
+        <div
+          className="dtc-card"
+          style={{
+            padding: 22, display: 'flex', flexDirection: 'column', gap: 14,
+            border: dragActive ? '2px dashed #4338ca' : undefined,
+            background: dragActive ? '#eef2ff' : undefined,
+            transition: 'all 0.15s',
+          }}
+          onDragOver={(e) => { e.preventDefault(); setDragActive(true) }}
+          onDragLeave={() => setDragActive(false)}
+          onDrop={(e) => {
+            e.preventDefault()
+            setDragActive(false)
+            const f = e.dataTransfer.files?.[0]
+            if (f) handleUpload(f)
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 12, background: '#ede9fe',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Icon name="plus" size={22} color="#7c3aed" />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: 15, color: '#1a1f36' }}>Upload a new build</div>
+              <div style={{ fontSize: 11, color: '#6b7280' }}>Drag a <code>.exe</code> here, or pick one below</div>
+            </div>
+          </div>
+
+          <div style={{
+            border: '2px dashed #d1d5db', borderRadius: 12, padding: 20,
+            textAlign: 'center', background: dragActive ? 'transparent' : '#fafbff',
+          }}>
+            <div style={{ fontSize: 28, marginBottom: 6 }}>📦</div>
+            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 10 }}>
+              Drop <b>DICT-FaceCheckin.exe</b> here
+            </div>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".exe,application/vnd.microsoft.portable-executable"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) handleUpload(f)
+              }}
+            />
+            <button
+              className="dtc-btn-ghost"
+              style={{ fontSize: 12 }}
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+            >
+              {uploading ? `Uploading… ${uploadPct}%` : 'Choose .exe file'}
+            </button>
+            {uploading && (
+              <div style={{ marginTop: 10, background: '#e5e7eb', borderRadius: 999, height: 6, overflow: 'hidden' }}>
+                <div style={{ width: `${uploadPct}%`, background: '#4338ca', height: '100%', transition: 'width 0.15s' }} />
+              </div>
+            )}
+          </div>
+
+          <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.6 }}>
+            Build on Windows: <code style={{ background: '#f1f3f9', padding: '1px 5px', borderRadius: 3 }}>cv-station/build.bat</code>.
+            The resulting <code>dist/DICT-FaceCheckin.exe</code> can be uploaded here.
+          </div>
+        </div>
+      </div>
+
+      {/* Status messages */}
+      {(error || ok) && (
+        <div style={{
+          padding: 10, borderRadius: 8, fontSize: 12,
+          background: error ? '#fef2f2' : '#f0fdf4',
+          border: `1px solid ${error ? '#fecaca' : '#86efac'}`,
+          color: error ? '#991b1b' : '#166534',
+        }}>
+          {error || ok}
+        </div>
+      )}
+
+      {/* Secondary row: setup + verification */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        <div className="dtc-card" style={{ padding: 22 }}>
           <div style={{ fontWeight: 700, fontSize: 14, color: '#1a1f36', marginBottom: 12 }}>
             Setup on a new PC
           </div>
           <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: '#374151', lineHeight: 1.8 }}>
-            <li>Download <b>DICT-FaceCheckin.exe</b> using the button on the left.</li>
+            <li>Download <b>DICT-FaceCheckin.exe</b> using the button above.</li>
             <li>Copy the file to the target PC (USB stick, shared drive, etc.).</li>
             <li>Double-click. Windows may warn "unrecognized app" — choose <b>More info → Run anyway</b>.</li>
             <li>The <b>Setup Wizard</b> opens. Enter the <b>Server URL</b> and <b>API Key</b>, then click <b>Test Connection</b>.</li>
-            <li>Four checks run: web app, API key, Convex, Google Sheets. All four must pass before <b>Save & Launch</b> enables.</li>
+            <li>Four checks run: web app, API key, Convex, Google Sheets. All four must pass before <b>Save &amp; Launch</b> enables.</li>
             <li>In the app, go to <b>⚙️ Settings</b> and toggle <b>Run on Windows startup</b> if desired.</li>
           </ol>
           <div style={{
             marginTop: 14, padding: 12, borderRadius: 8,
             background: '#eff6ff', border: '1px solid #bfdbfe',
-            fontSize: 11, color: '#1e40af',
+            fontSize: 11, color: '#1e40af', lineHeight: 1.6,
           }}>
             <b>Security:</b> The API key is stored at <code>%APPDATA%\DICT-FaceCheckin\config.json</code> encrypted via Windows DPAPI — tied to the Windows user account. Copying the config file to another PC won't leak the key.
           </div>
         </div>
-      </div>
 
-      {/* Verification flow */}
-      <div className="dtc-card" style={{ padding: 22 }}>
-        <div style={{ fontWeight: 700, fontSize: 14, color: '#1a1f36', marginBottom: 10 }}>
-          How verification works
-        </div>
-        <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 14 }}>
-          Every setup call hits <code>POST /api/cv-station/verify</code>. The endpoint confirms all four sync dependencies before the .exe can be saved as configured.
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-          {[
-            { t: 'Web app', d: 'Reachable from the client' },
-            { t: 'API key',  d: 'Matches server FACE_CV_API_KEY' },
-            { t: 'Convex',   d: 'Interns table query returns' },
-            { t: 'Sheets',   d: 'Service account can read each target sheet' },
-          ].map((c) => (
-            <div key={c.t} style={{ background: '#f8faff', borderRadius: 10, padding: 14 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: '#1a1f36' }}>{c.t}</div>
-              <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>{c.d}</div>
-            </div>
-          ))}
+        <div className="dtc-card" style={{ padding: 22 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: '#1a1f36', marginBottom: 10 }}>
+            How verification works
+          </div>
+          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 14, lineHeight: 1.6 }}>
+            Every setup call hits <code>POST /api/cv-station/verify</code>. The endpoint confirms all four sync dependencies before the .exe can be saved as configured.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+            {[
+              { t: 'Web app', d: 'Reachable from the client' },
+              { t: 'API key',  d: 'Matches server FACE_CV_API_KEY' },
+              { t: 'Convex',   d: 'Interns table query returns' },
+              { t: 'Sheets',   d: 'Service account can read each sheet' },
+            ].map((c) => (
+              <div key={c.t} style={{ background: '#f8faff', borderRadius: 10, padding: 12 }}>
+                <div style={{ fontWeight: 700, fontSize: 12, color: '#1a1f36' }}>{c.t}</div>
+                <div style={{ fontSize: 10, color: '#6b7280', marginTop: 3, lineHeight: 1.4 }}>{c.d}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -1579,13 +1920,63 @@ function CVStation() {
 }
 
 // ─── Invites Page ────────────────────────────────────────────────────────────
+type InviteRow = {
+  id: string
+  email: string
+  role: 'intern' | 'supervisor' | 'manager' | 'admin'
+  token: string
+  createdAt: number
+  expiresAt: number
+  usedAt?: number
+  status: 'pending' | 'used' | 'expired'
+}
+
 function InvitesPage() {
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<'intern' | 'supervisor' | 'manager' | 'admin'>('intern')
   const [sending, setSending] = useState(false)
-  const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
-  const [invites, setInvites] = useState<any[]>([])
+  const [msg, setMsg] = useState<{ kind: 'ok' | 'err' | 'warn'; text: string; link?: string } | null>(null)
+  const [invites, setInvites] = useState<InviteRow[]>([])
   const [loadingList, setLoadingList] = useState(true)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [filter, setFilter] = useState<'all' | 'pending' | 'used' | 'expired'>('all')
+  const [search, setSearch] = useState('')
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+
+  function acceptUrl(token: string): string {
+    if (typeof window === 'undefined') return ''
+    return `${window.location.origin}/accept-invite?token=${encodeURIComponent(token)}`
+  }
+
+  async function copyToClipboard(text: string, tagId: string | null = null) {
+    try {
+      await navigator.clipboard.writeText(text)
+      if (tagId !== null) {
+        setCopiedId(tagId)
+        setTimeout(() => setCopiedId((c) => (c === tagId ? null : c)), 1800)
+      }
+      return true
+    } catch {
+      // Fallback: textarea + execCommand
+      try {
+        const ta = document.createElement('textarea')
+        ta.value = text
+        ta.style.position = 'fixed'
+        ta.style.opacity = '0'
+        document.body.appendChild(ta)
+        ta.select()
+        document.execCommand('copy')
+        document.body.removeChild(ta)
+        if (tagId !== null) {
+          setCopiedId(tagId)
+          setTimeout(() => setCopiedId((c) => (c === tagId ? null : c)), 1800)
+        }
+        return true
+      } catch {
+        return false
+      }
+    }
+  }
 
   async function loadInvites() {
     setLoadingList(true)
@@ -1608,23 +1999,35 @@ function InvitesPage() {
   async function handleSend(e: React.FormEvent) {
     e.preventDefault()
     setMsg(null)
-    if (!email.trim()) return
+    const clean = email.trim().toLowerCase()
+    if (!clean) return
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
+      setMsg({ kind: 'err', text: 'Please enter a valid email address' })
+      return
+    }
     setSending(true)
     try {
       const resp = await fetch('/api/auth/invite/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email: email.trim(), role }),
+        body: JSON.stringify({ email: clean, role }),
       })
-      const data = await resp.json()
-      if (!resp.ok) throw new Error(data.error || 'Failed to send invite')
-      setMsg({
-        kind: 'ok',
-        text: data.emailSent
-          ? `Invite sent to ${email}`
-          : `Invite created, but email failed: ${data.emailError ?? 'unknown'}`,
-      })
+      const data = await resp.json().catch(() => ({}))
+      if (!resp.ok) throw new Error(data.error || `Request failed (${resp.status})`)
+      if (data.emailSent) {
+        setMsg({
+          kind: 'ok',
+          text: `Invite emailed to ${clean}. Link also available below — share it manually if needed.`,
+          link: data.acceptUrl,
+        })
+      } else {
+        setMsg({
+          kind: 'warn',
+          text: `Invite created, but the email could not be sent${data.emailError ? `: ${data.emailError}` : '.'} Copy the link below and share it directly.`,
+          link: data.acceptUrl,
+        })
+      }
       setEmail('')
       loadInvites()
     } catch (e: any) {
@@ -1634,7 +2037,8 @@ function InvitesPage() {
   }
 
   async function revoke(id: string) {
-    if (!confirm('Revoke this invite?')) return
+    if (!confirm('Revoke this invite? The link will stop working immediately.')) return
+    setBusyId(id)
     try {
       const resp = await fetch('/api/auth/invite/revoke', {
         method: 'POST',
@@ -1650,12 +2054,111 @@ function InvitesPage() {
     } catch (e: any) {
       alert(e.message || 'Revoke failed')
     }
+    setBusyId(null)
+  }
+
+  async function resend(id: string, emailTo: string) {
+    setBusyId(id)
+    setMsg(null)
+    try {
+      const resp = await fetch('/api/auth/invite/resend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ inviteId: id }),
+      })
+      const data = await resp.json().catch(() => ({}))
+      if (!resp.ok) throw new Error(data.error || 'Resend failed')
+      if (data.emailSent) {
+        setMsg({ kind: 'ok', text: `Re-sent invite to ${emailTo}. Expiry extended by 7 days.`, link: data.acceptUrl })
+      } else {
+        setMsg({
+          kind: 'warn',
+          text: `Could not re-send email${data.emailError ? `: ${data.emailError}` : '.'} Link below is still valid.`,
+          link: data.acceptUrl,
+        })
+      }
+      loadInvites()
+    } catch (e: any) {
+      setMsg({ kind: 'err', text: e.message || 'Resend failed' })
+    }
+    setBusyId(null)
+  }
+
+  // Stats + filtered view
+  const stats = {
+    total: invites.length,
+    pending: invites.filter((i) => i.status === 'pending').length,
+    used: invites.filter((i) => i.status === 'used').length,
+    expired: invites.filter((i) => i.status === 'expired').length,
+  }
+  const visible = invites.filter((inv) => {
+    if (filter !== 'all' && inv.status !== filter) return false
+    if (search && !inv.email.toLowerCase().includes(search.toLowerCase())) return false
+    return true
+  })
+
+  function fmtDate(t: number | undefined): string {
+    if (!t) return '—'
+    return new Date(t).toLocaleString(undefined, {
+      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+    })
+  }
+  function daysUntil(t: number): number {
+    return Math.max(0, Math.ceil((t - Date.now()) / (24 * 60 * 60 * 1000)))
   }
 
   return (
     <div className="dtc-page" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ fontWeight: 800, fontSize: 20, color: '#1a1f36' }}>Invites</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 20, color: '#1a1f36' }}>Invites</div>
+          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+            Send one-time account invitations. Links are valid for 7 days.
+          </div>
+        </div>
+        <button
+          onClick={loadInvites}
+          disabled={loadingList}
+          style={{
+            fontSize: 12, fontWeight: 600, padding: '8px 12px', borderRadius: 8,
+            border: '1px solid #e5e7eb', background: '#fff', color: '#374151',
+            cursor: loadingList ? 'wait' : 'pointer',
+          }}
+        >
+          {loadingList ? 'Refreshing…' : '↻ Refresh'}
+        </button>
+      </div>
 
+      {/* Stat chips */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
+        {[
+          { k: 'all', lbl: 'Total', n: stats.total, bg: '#eef2ff', col: '#4338ca' },
+          { k: 'pending', lbl: 'Pending', n: stats.pending, bg: '#fef3c7', col: '#92400e' },
+          { k: 'used', lbl: 'Accepted', n: stats.used, bg: '#d1fae5', col: '#065f46' },
+          { k: 'expired', lbl: 'Expired', n: stats.expired, bg: '#fee2e2', col: '#991b1b' },
+        ].map((s) => (
+          <button
+            key={s.k}
+            onClick={() => setFilter(s.k as any)}
+            style={{
+              background: filter === s.k ? s.bg : '#fff',
+              border: `1px solid ${filter === s.k ? s.col : '#e5e7eb'}`,
+              borderRadius: 10, padding: '12px 14px', textAlign: 'left', cursor: 'pointer',
+              display: 'flex', flexDirection: 'column', gap: 4,
+              boxShadow: filter === s.k ? `0 0 0 3px ${s.bg}` : 'none',
+              transition: 'all 120ms ease',
+            }}
+          >
+            <span style={{ fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#6b7280', fontWeight: 700 }}>
+              {s.lbl}
+            </span>
+            <span style={{ fontSize: 22, fontWeight: 800, color: s.col }}>{s.n}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Send card */}
       <div className="dtc-card" style={{ padding: 22 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
           <div style={{
@@ -1667,7 +2170,7 @@ function InvitesPage() {
           <div>
             <div style={{ fontWeight: 700, fontSize: 15, color: '#1a1f36' }}>Send an invite</div>
             <div style={{ fontSize: 11, color: '#6b7280' }}>
-              The recipient gets an email with a link + one-time code. Invites expire in 7 days.
+              Recipient receives an email with the accept link. They'll verify with a one-time code on sign-up.
             </div>
           </div>
         </div>
@@ -1680,6 +2183,7 @@ function InvitesPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="person@example.com"
+              autoComplete="off"
               style={{
                 width: '100%', padding: '10px 12px', borderRadius: 8,
                 border: '1px solid #e5e7eb', fontSize: 13, marginTop: 4,
@@ -1716,60 +2220,177 @@ function InvitesPage() {
 
         {msg && (
           <div style={{
-            marginTop: 14, padding: 10, borderRadius: 8, fontSize: 12,
-            background: msg.kind === 'ok' ? '#ecfdf5' : '#fef2f2',
-            border: `1px solid ${msg.kind === 'ok' ? '#a7f3d0' : '#fecaca'}`,
-            color: msg.kind === 'ok' ? '#065f46' : '#991b1b',
-          }}>{msg.text}</div>
+            marginTop: 14, padding: 12, borderRadius: 8, fontSize: 12,
+            background:
+              msg.kind === 'ok' ? '#ecfdf5' :
+              msg.kind === 'warn' ? '#fffbeb' : '#fef2f2',
+            border: `1px solid ${
+              msg.kind === 'ok' ? '#a7f3d0' :
+              msg.kind === 'warn' ? '#fde68a' : '#fecaca'
+            }`,
+            color:
+              msg.kind === 'ok' ? '#065f46' :
+              msg.kind === 'warn' ? '#92400e' : '#991b1b',
+          }}>
+            <div style={{ fontWeight: 600 }}>{msg.text}</div>
+            {msg.link && (
+              <div style={{
+                marginTop: 8, display: 'flex', gap: 8, alignItems: 'center',
+                padding: '8px 10px', background: 'rgba(255,255,255,0.6)', borderRadius: 6,
+              }}>
+                <code style={{
+                  fontSize: 11, fontFamily: 'ui-monospace, Menlo, monospace',
+                  color: '#1a1f36', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}>{msg.link}</code>
+                <button
+                  onClick={() => copyToClipboard(msg.link!, '__msg__')}
+                  style={{
+                    fontSize: 11, padding: '4px 10px', borderRadius: 6,
+                    background: '#1a1f36', color: '#fff', border: 'none',
+                    cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap',
+                  }}
+                >
+                  {copiedId === '__msg__' ? '✓ Copied' : 'Copy link'}
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
+      {/* Invites list */}
       <div className="dtc-card" style={{ padding: 22 }}>
-        <div style={{ fontWeight: 700, fontSize: 14, color: '#1a1f36', marginBottom: 12 }}>
-          Recent invites
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          gap: 10, flexWrap: 'wrap', marginBottom: 12,
+        }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: '#1a1f36' }}>
+            {filter === 'all' ? 'All invites' : `${filter.charAt(0).toUpperCase() + filter.slice(1)} invites`}
+            {visible.length > 0 && (
+              <span style={{ marginLeft: 8, fontWeight: 500, color: '#6b7280' }}>
+                ({visible.length})
+              </span>
+            )}
+          </div>
+          <input
+            type="search"
+            placeholder="Search by email…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              padding: '8px 12px', borderRadius: 8, border: '1px solid #e5e7eb',
+              fontSize: 12, minWidth: 220,
+            }}
+          />
         </div>
+
         {loadingList ? (
-          <div style={{ fontSize: 12, color: '#6b7280' }}>Loading…</div>
-        ) : invites.length === 0 ? (
-          <div style={{ fontSize: 12, color: '#6b7280' }}>No invites yet.</div>
+          <div style={{ fontSize: 12, color: '#6b7280', padding: 16, textAlign: 'center' }}>Loading…</div>
+        ) : visible.length === 0 ? (
+          <div style={{
+            fontSize: 13, color: '#6b7280', padding: '24px 16px', textAlign: 'center',
+            background: '#f8faff', borderRadius: 8, border: '1px dashed #e5e7eb',
+          }}>
+            {invites.length === 0
+              ? 'No invites yet. Send one above to get started.'
+              : 'No invites match this filter.'}
+          </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {invites.map((inv) => (
-              <div key={inv.id} style={{
-                display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto',
-                gap: 12, alignItems: 'center', padding: '10px 12px',
-                background: '#f8faff', borderRadius: 8, fontSize: 12,
-              }}>
-                <div style={{ fontWeight: 600, color: '#1a1f36', wordBreak: 'break-all' }}>{inv.email}</div>
-                <div style={{ color: '#374151', textTransform: 'capitalize' }}>{inv.role}</div>
-                <div>
-                  <span style={{
-                    padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
-                    background:
-                      inv.status === 'used' ? '#d1fae5' :
-                      inv.status === 'expired' ? '#fee2e2' : '#fef3c7',
-                    color:
-                      inv.status === 'used' ? '#065f46' :
-                      inv.status === 'expired' ? '#991b1b' : '#92400e',
-                  }}>{inv.status}</span>
+            {visible.map((inv) => {
+              const link = acceptUrl(inv.token)
+              const daysLeft = daysUntil(inv.expiresAt)
+              return (
+                <div key={inv.id} style={{
+                  display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) 100px 110px 130px auto',
+                  gap: 12, alignItems: 'center', padding: '12px 14px',
+                  background: '#f8faff', borderRadius: 8, fontSize: 12,
+                  border: '1px solid #eef2ff',
+                }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, color: '#1a1f36', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {inv.email}
+                    </div>
+                    {inv.status === 'pending' && (
+                      <div style={{
+                        marginTop: 4, display: 'flex', alignItems: 'center', gap: 6,
+                        fontSize: 10, color: '#6b7280',
+                      }}>
+                        <code style={{
+                          fontFamily: 'ui-monospace, Menlo, monospace',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          flex: 1, minWidth: 0,
+                        }}>{link}</code>
+                        <button
+                          onClick={() => copyToClipboard(link, inv.id)}
+                          style={{
+                            fontSize: 10, padding: '2px 8px', borderRadius: 4,
+                            background: copiedId === inv.id ? '#d1fae5' : '#fff',
+                            color: copiedId === inv.id ? '#065f46' : '#374151',
+                            border: `1px solid ${copiedId === inv.id ? '#a7f3d0' : '#e5e7eb'}`,
+                            cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {copiedId === inv.id ? '✓' : 'Copy'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ color: '#374151', textTransform: 'capitalize', fontWeight: 600 }}>{inv.role}</div>
+                  <div>
+                    <span style={{
+                      padding: '3px 10px', borderRadius: 999, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em',
+                      background:
+                        inv.status === 'used' ? '#d1fae5' :
+                        inv.status === 'expired' ? '#fee2e2' : '#fef3c7',
+                      color:
+                        inv.status === 'used' ? '#065f46' :
+                        inv.status === 'expired' ? '#991b1b' : '#92400e',
+                    }}>{inv.status === 'used' ? 'Accepted' : inv.status}</span>
+                  </div>
+                  <div style={{ color: '#6b7280', fontSize: 11 }}>
+                    {inv.status === 'used' ? (
+                      <>Accepted {fmtDate(inv.usedAt)}</>
+                    ) : inv.status === 'pending' ? (
+                      <>Expires in {daysLeft}d</>
+                    ) : (
+                      <>Expired {fmtDate(inv.expiresAt)}</>
+                    )}
+                    <div style={{ fontSize: 10, opacity: 0.7 }}>Sent {fmtDate(inv.createdAt)}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {inv.status === 'pending' && (
+                      <>
+                        <button
+                          onClick={() => resend(inv.id, inv.email)}
+                          disabled={busyId === inv.id}
+                          style={{
+                            fontSize: 11, padding: '4px 10px', borderRadius: 6,
+                            background: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe',
+                            cursor: busyId === inv.id ? 'wait' : 'pointer', fontWeight: 600,
+                          }}
+                          title="Re-email and extend expiry"
+                        >
+                          {busyId === inv.id ? '…' : 'Resend'}
+                        </button>
+                        <button
+                          onClick={() => revoke(inv.id)}
+                          disabled={busyId === inv.id}
+                          style={{
+                            fontSize: 11, padding: '4px 10px', borderRadius: 6,
+                            background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca',
+                            cursor: busyId === inv.id ? 'wait' : 'pointer', fontWeight: 600,
+                          }}
+                        >
+                          Revoke
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
-                <div style={{ color: '#6b7280' }}>
-                  {new Date(inv.createdAt).toLocaleDateString()}
-                </div>
-                <div>
-                  {inv.status === 'pending' && (
-                    <button
-                      onClick={() => revoke(inv.id)}
-                      style={{
-                        fontSize: 11, padding: '4px 10px', borderRadius: 6,
-                        background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca',
-                        cursor: 'pointer', fontWeight: 600,
-                      }}
-                    >Revoke</button>
-                  )}
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

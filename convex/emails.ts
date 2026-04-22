@@ -1,4 +1,8 @@
-"use node";
+// NOTE: intentionally NOT marked `"use node"`. Resend only needs `fetch`,
+// which Convex's default V8 action runtime supports natively. Running on V8
+// also avoids a Windows-specific Node ESM bundler error on `npx convex dev`
+// ("Received protocol 'c:'"), which happened here when this file was bundled
+// for the Node runtime.
 
 import { v } from "convex/values";
 import { action } from "./_generated/server";
@@ -12,33 +16,42 @@ async function sendMail(opts: {
   html: string;
 }): Promise<{ ok: boolean; id?: string; error?: string }> {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.RESEND_FROM_EMAIL || "DICT <no-reply@dict-r5.local>";
+  const from = process.env.RESEND_FROM_EMAIL || "DICT <onboarding@resend.dev>";
   if (!apiKey) {
-    console.warn("[emails] RESEND_API_KEY not set — dropping email", opts);
-    return { ok: false, error: "RESEND_API_KEY missing" };
+    console.warn("[emails] RESEND_API_KEY not set — dropping email", opts.to);
+    return { ok: false, error: "RESEND_API_KEY is not configured on the Convex deployment. Run: npx convex env set RESEND_API_KEY re_xxx" };
   }
 
-  const res = await fetch(RESEND_ENDPOINT, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from,
-      to: [opts.to],
-      subject: opts.subject,
-      html: opts.html,
-    }),
-  });
+  try {
+    const res = await fetch(RESEND_ENDPOINT, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: [opts.to],
+        subject: opts.subject,
+        html: opts.html,
+      }),
+    });
 
-  if (!res.ok) {
-    const text = await res.text();
-    console.error("[emails] Resend error", res.status, text);
-    return { ok: false, error: `Resend ${res.status}: ${text.slice(0, 200)}` };
+    if (!res.ok) {
+      const text = await res.text();
+      console.error("[emails] Resend error", res.status, text);
+      // Surface the Resend error body directly — it usually explains the issue
+      // (e.g. "You can only send testing emails to your own email address").
+      return { ok: false, error: `Resend ${res.status}: ${text.slice(0, 300)}` };
+    }
+    const data = (await res.json()) as { id?: string };
+    console.log("[emails] sent to", opts.to, "id=", data.id);
+    return { ok: true, id: data.id };
+  } catch (err: any) {
+    const msg = String(err?.message ?? err);
+    console.error("[emails] fetch failed:", msg);
+    return { ok: false, error: `Network error calling Resend: ${msg}` };
   }
-  const data = (await res.json()) as { id?: string };
-  return { ok: true, id: data.id };
 }
 
 /** Issue an OTP for a purpose, then email it via Resend. */

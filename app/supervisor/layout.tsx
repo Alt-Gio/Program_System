@@ -1,3 +1,10 @@
+import OfflineBanner from "@/components/OfflineBanner";
+
 export default function SupervisorLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+  return (
+    <>
+      <OfflineBanner stores={[]} />
+      {children}
+    </>
+  );
 }

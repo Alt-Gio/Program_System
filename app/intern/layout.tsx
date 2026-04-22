@@ -7,6 +7,13 @@ import { api } from "@/convex/_generated/api";
 import Link from "next/link";
 import { LayoutDashboard, Flame, BookOpen, QrCode, LogOut, MessageSquare, ListTodo } from "lucide-react";
 import { cn } from "@/lib/utils";
+import OfflineBanner from "@/components/OfflineBanner";
+
+const INTERN_OFFLINE_STORES = [
+  { store: "internJournalQueue", endpoint: "/api/intern/journal/upsert" },
+  { store: "internHabitsQueue", endpoint: "/api/intern/habits/toggle" },
+  { store: "internCheckinQueue", endpoint: "/api/intern/qr/checkin" },
+] as const;
 
 const PUBLIC_PATHS = ["/intern/login", "/intern/register"];
 
@@ -144,6 +151,7 @@ export default function InternLayout({ children }: { children: React.ReactNode }
 
         {/* Page content */}
         <main className="flex-1 overflow-hidden flex flex-col pb-20 md:pb-0">
+          <OfflineBanner stores={[...INTERN_OFFLINE_STORES]} />
           <div className="flex-1 overflow-y-auto">
             {children}
           </div>

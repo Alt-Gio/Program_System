@@ -32,9 +32,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    if (!activityId || !activityTitle || !projectCode) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    if (!activityTitle || !projectCode) {
+      return NextResponse.json({ error: 'Missing required fields: activityTitle and projectCode' }, { status: 400 });
     }
+    // activityId is optional — the folder is derived from activityTitle.
+    void activityId;
 
     // Get service account credentials
     const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;

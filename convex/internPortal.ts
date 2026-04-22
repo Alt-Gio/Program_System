@@ -130,36 +130,48 @@ export const seedDefaultHabits = mutation({
 });
 
 export const toggleHabit = mutation({
-  args: { token: v.string(), habitId: v.id("internHabits") },
+  args: {
+    token: v.string(),
+    habitId: v.id("internHabits"),
+    // When provided, set the habit to this exact state (idempotent).
+    // Used by the offline queue so replays don't flip state back and forth.
+    desiredCompleted: v.optional(v.boolean()),
+    date: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const internId = await resolveInternFromToken(ctx, args.token);
     if (!internId) throw new Error("Session expired");
 
-    const today = new Date().toISOString().slice(0, 10);
+    const date = args.date ?? new Date().toISOString().slice(0, 10);
 
     const existing = await ctx.db
       .query("internHabitLogs")
       .withIndex("by_habit_date", (q: any) =>
-        q.eq("habitId", args.habitId).eq("date", today)
+        q.eq("habitId", args.habitId).eq("date", date)
       )
       .first();
 
     if (existing) {
-      const newVal = !existing.completed;
+      const newVal =
+        args.desiredCompleted !== undefined
+          ? args.desiredCompleted
+          : !existing.completed;
       await ctx.db.patch(existing._id, {
         completed: newVal,
         completedAt: newVal ? Date.now() : undefined,
       });
       return { completed: newVal };
     } else {
+      const newVal =
+        args.desiredCompleted !== undefined ? args.desiredCompleted : true;
       await ctx.db.insert("internHabitLogs", {
         internId,
         habitId: args.habitId,
-        date: today,
-        completed: true,
-        completedAt: Date.now(),
+        date,
+        completed: newVal,
+        completedAt: newVal ? Date.now() : undefined,
       });
-      return { completed: true };
+      return { completed: newVal };
     }
   },
 });
