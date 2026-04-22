@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { learnhubTables } from "./learnhub_schema";
 
 // ============================================================
 // DICT Region V – Program Management System
@@ -824,4 +825,9 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_submittedAt", ["submittedAt"])
     .index("by_email", ["email"]),
+
+  // ----------------------------------------------------------
+  // ILCDB LEARNHUB TABLES (imported from learnhub_schema.ts)
+  // ----------------------------------------------------------
+  ...learnhubTables,
 });

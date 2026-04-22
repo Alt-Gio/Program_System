@@ -17,7 +17,7 @@ import type { NextRequest } from "next/server";
  *   - account       : any authenticated user (e.g. /account, /settings-personal)
  */
 
-type Family = "intern-portal" | "supervisor" | "admin-area" | "account";
+type Family = "intern-portal" | "supervisor" | "admin-area" | "account" | "learnhub";
 
 // Exact paths that anyone can hit without signing in.
 const PUBLIC_EXACT = new Set<string>([
@@ -28,11 +28,18 @@ const PUBLIC_EXACT = new Set<string>([
   "/accept-invite",
   "/bootstrap",
   "/signup", // stays reachable so it can show an "invite-only" notice
+  "/learnhub/login",
+  "/learnhub/onboarding",
+  "/learnhub/login/mentor/invite",
 ]);
+
+// LearnHub path prefixes that are fully public (no auth of any kind needed)
+const LH_PUBLIC_PREFIXES = ["/learnhub/verify/"];
 
 // Prefix matchers for the family each route tree belongs to.
 // Order matters: the first match wins.
 const FAMILY_RULES: Array<{ prefix: string; family: Family }> = [
+  { prefix: "/learnhub", family: "learnhub" },
   { prefix: "/intern-portal", family: "intern-portal" },
   { prefix: "/intern-auth", family: "intern-portal" },
   { prefix: "/intern/", family: "intern-portal" },
@@ -56,6 +63,7 @@ const FAMILY_RULES: Array<{ prefix: string; family: Family }> = [
 
 function classify(pathname: string): Family | "public" | "account" {
   if (PUBLIC_EXACT.has(pathname)) return "public";
+  if (LH_PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return "public";
   for (const rule of FAMILY_RULES) {
     if (pathname === rule.prefix || pathname.startsWith(rule.prefix + "/")) {
       return rule.family;
@@ -73,6 +81,25 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // ── LearnHub paths use a separate session cookie ──
+  if (kind === "learnhub") {
+    const lhToken = request.cookies.get("learnhub_session")?.value;
+    if (!lhToken) {
+      const url = new URL("/learnhub/login", request.url);
+      url.searchParams.set("callbackUrl", pathname);
+      return NextResponse.redirect(url);
+    }
+    return NextResponse.next({
+      request: {
+        headers: new Headers({
+          ...Object.fromEntries(request.headers),
+          "x-dict-route-family": "learnhub",
+        }),
+      },
+    });
+  }
+
+  // ── Existing DICT system: uses dict-session cookie ──
   const token = request.cookies.get("dict-session")?.value;
   if (!token) {
     const url = new URL("/signin", request.url);
