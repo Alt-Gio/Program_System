@@ -7,12 +7,41 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 
 // ============================================================
-// /event — Dark-themed events calendar for DICT Region V
-// Perpetual horizontal day strip, 3D-tilt cards with directional
-// edge glow, custom cursor with lerp lag, warp "Jump to Today"
-// transition, modal event details. Connects to the Convex
-// `activities` table via api.activities.listActivities.
+// /event — DTC Events Calendar (public)
+// Horizontal day-strip calendar, month boundary auto-advance,
+// preview card, Philippines holiday detection, modal details.
 // ============================================================
+
+// Philippine fixed national holidays (MM-DD)
+const PH_HOLIDAYS_FIXED: Record<string, string> = {
+  "01-01": "New Year's Day",
+  "04-09": "Araw ng Kagitingan",
+  "05-01": "Labor Day",
+  "06-12": "Independence Day",
+  "08-21": "Ninoy Aquino Day",
+  "11-01": "All Saints' Day",
+  "11-02": "All Souls' Day",
+  "11-30": "Bonifacio Day",
+  "12-08": "Immaculate Conception",
+  "12-25": "Christmas Day",
+  "12-30": "Rizal Day",
+  "12-31": "Last Day of the Year",
+};
+
+// Philippine movable holidays (YYYY-MM-DD)
+const PH_HOLIDAYS_MOVABLE: Record<string, string> = {
+  "2025-01-29": "Chinese New Year",
+  "2025-04-17": "Maundy Thursday",
+  "2025-04-18": "Good Friday",
+  "2025-04-19": "Black Saturday",
+  "2026-02-17": "Chinese New Year",
+  "2026-04-02": "Maundy Thursday",
+  "2026-04-03": "Good Friday",
+  "2026-04-04": "Black Saturday",
+  "2027-01-27": "Chinese New Year",
+  "2027-03-25": "Maundy Thursday",
+  "2027-03-26": "Good Friday",
+};
 
 type Activity = {
   _id: Id<"activities">;
@@ -218,7 +247,7 @@ export default function EventCalendarPage() {
     const tick = () => {
       const d = new Date();
       setClock(
-        d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }),
+        d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true }),
       );
     };
     tick();
@@ -306,6 +335,25 @@ export default function EventCalendarPage() {
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
+  }, [transitionMonth]);
+
+  // ── Native horizontal scroll (trackpad/touch) → month transitions ──
+  useEffect(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    let lastLeft = el.scrollLeft;
+    const onScroll = () => {
+      if (transitioningRef.current) return;
+      const cur = el.scrollLeft;
+      const dir = cur > lastLeft ? 1 : cur < lastLeft ? -1 : 0;
+      lastLeft = cur;
+      if (dir === 0) return;
+      const max = el.scrollWidth - el.clientWidth;
+      if (cur <= 2 && dir === -1) { transitionMonth(-1); return; }
+      if (cur >= max - 2 && dir === 1) { transitionMonth(1); return; }
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
   }, [transitionMonth]);
 
   // Esc closes modal
@@ -398,16 +446,15 @@ export default function EventCalendarPage() {
 
   // Month stats
   const monthStats = useMemo(() => {
-    let events = 0;
-    let attendees = 0;
-    let busyDays = 0;
+    const uniqueIds = new Set<string>();
+    let holidays = 0;
     for (const d of days) {
-      if (d.events.length) busyDays++;
-      events += d.events.length;
-      attendees += d.events.reduce((s, e) => s + e.attendees, 0);
+      d.events.forEach((ev) => uniqueIds.add(ev.id));
+      const mmdd = d.key.slice(5);
+      if (PH_HOLIDAYS_FIXED[mmdd] || PH_HOLIDAYS_MOVABLE[d.key]) holidays++;
     }
-    return { events, attendees, busyDays };
-  }, [days]);
+    return { events: uniqueIds.size, holidays, days: daysInMonth(cursor.y, cursor.m) };
+  }, [days, cursor]);
 
   // Spotlighted events (falls back to today if within this month, else first busy day)
   const spotlightEvents = useMemo(() => {
@@ -431,21 +478,26 @@ export default function EventCalendarPage() {
       <div ref={ringRef} className="cur-ring" aria-hidden />
       <div ref={dotRef} className="cur-dot" aria-hidden />
 
+      {/* Ambient orbs */}
+      <div className="orb orb-1" aria-hidden />
+      <div className="orb orb-2" aria-hidden />
+      <div className="orb orb-3" aria-hidden />
+
       {/* Warp overlay */}
       <div className={`warp ${warp ? "active" : ""}`} aria-hidden />
 
-      {/* Topbar */}
+      {/* ── Topbar ── */}
       <header className="topbar">
-        <Link href="/" className="brand" onMouseEnter={() => {}}>
-          <span className="brand-mark">◆</span>
+        <Link href="/" className="brand">
+          <span className="brand-icon">🏛</span>
           <span className="brand-text">
-            <strong>DICT</strong> Region V
-            <em>Events Calendar</em>
+            <span className="brand-main">Digital Transformation Center</span>
+            <span className="brand-sub">DICT Regional Office V · Events &amp; Activities</span>
           </span>
         </Link>
         <nav className="topnav">
           <button
-            className="btn ghost"
+            className="btn btn-ghost"
             onClick={goBack}
             disabled={historyStack.length === 0}
             aria-label="Back"
@@ -456,41 +508,39 @@ export default function EventCalendarPage() {
             <span className="clock-dot" />
             {clock}
           </span>
-          <button className="btn warp-btn" onClick={goToToday}>
-            ⚡ Jump to Today
+          <button className="btn btn-today" onClick={goToToday}>
+            Jump to Today
           </button>
         </nav>
       </header>
 
-      {/* Info panel */}
+      {/* ── Info panel ── */}
       <section className={`info ${fade ?? ""}`}>
         <div className="month-block">
-          <div className="month-label">CURRENT VIEW</div>
+          <div className="month-label">CALENDAR</div>
           <h1 className="month-name">{MONTHS[cursor.m]}</h1>
           <div className="month-year">{cursor.y}</div>
           <div className="month-stats">
-            <div>
+            <div className="stat-item">
               <span className="stat-num">{monthStats.events}</span>
-              <span className="stat-lbl">Events</span>
+              <span className="stat-lbl">EVENTS</span>
             </div>
-            <div>
-              <span className="stat-num">{monthStats.busyDays}</span>
-              <span className="stat-lbl">Busy Days</span>
+            <div className="stat-item">
+              <span className="stat-num">{monthStats.holidays}</span>
+              <span className="stat-lbl">HOLIDAYS</span>
             </div>
-            <div>
-              <span className="stat-num">{monthStats.attendees.toLocaleString()}</span>
-              <span className="stat-lbl">Attendees</span>
+            <div className="stat-item">
+              <span className="stat-num">{monthStats.days}</span>
+              <span className="stat-lbl">DAYS</span>
             </div>
           </div>
         </div>
 
+        {/* Preview / spotlight */}
         <div className="spotlight">
-          <div className="spot-label">
-            {spotlightEvents ? "SPOTLIGHT" : "SELECT A DAY"}
-          </div>
           {spotlightEvents ? (
             <>
-              <div className="spot-date">
+              <div className="spot-label">
                 {parseYmd(spotlightEvents.date)?.toLocaleDateString(undefined, {
                   weekday: "long",
                   month: "long",
@@ -503,9 +553,7 @@ export default function EventCalendarPage() {
                     <span className={`swatch ${ev.grad}`} />
                     <div>
                       <div className="spot-title">{ev.title}</div>
-                      <div className="spot-meta">
-                        {ev.cat} · {ev.loc}
-                      </div>
+                      <div className="spot-meta">{ev.cat} · {ev.loc}</div>
                     </div>
                   </li>
                 ))}
@@ -515,68 +563,69 @@ export default function EventCalendarPage() {
               </ul>
             </>
           ) : (
-            <div className="spot-empty">
-              Hover a day column to preview its events. Click a card to open full details.
+            <div className="spot-hint">
+              <div className="hint-icon-wrap">
+                <span className="hint-icon">📅</span>
+              </div>
+              <div className="hint-body">
+                <div className="hint-title">Hover a date to preview</div>
+                <div className="hint-sub">Scroll to move through dates · Click an event for details</div>
+              </div>
             </div>
           )}
         </div>
       </section>
 
-      {/* Day strip */}
+      {/* ── Day strip ── */}
       <section className={`strip-wrap ${fade ?? ""}`}>
         {loading ? (
-          <div className="loading">
-            <span className="spin" /> Loading events from Convex…
-          </div>
+          <div className="loading"><span className="spin" /> Loading events…</div>
         ) : (
           <div className="strip" ref={stripRef} role="list">
-            {days.map((d) => (
-              <div
-                key={d.key}
-                data-day={d.key}
-                className={`day ${d.isToday ? "today" : ""} ${spotlight === d.key ? "active" : ""}`}
-                onMouseEnter={() => setSpotlight(d.key)}
-                onMouseMove={onCardMove}
-                onMouseLeave={(e) => {
-                  onCardLeave(e);
-                }}
-                role="listitem"
-              >
-                <div className="day-head">
-                  <div className="day-w">{d.w}</div>
-                  <div className="day-n">{d.d}</div>
-                  {d.isToday && <div className="day-today">TODAY</div>}
+            {days.map((d) => {
+              const holiday = PH_HOLIDAYS_FIXED[d.key.slice(5)] || PH_HOLIDAYS_MOVABLE[d.key];
+              return (
+                <div
+                  key={d.key}
+                  data-day={d.key}
+                  className={`day ${d.isToday ? "today" : ""} ${spotlight === d.key ? "active" : ""}`}
+                  onMouseEnter={() => setSpotlight(d.key)}
+                  onMouseMove={onCardMove}
+                  onMouseLeave={onCardLeave}
+                  role="listitem"
+                >
+                  <div className="day-head">
+                    <div className="day-w">{d.w}</div>
+                    <div className="day-n">{d.d}</div>
+                    {d.isToday && <div className="day-today-badge">Today</div>}
+                    {holiday && !d.isToday && <div className="day-holiday-badge">🎌</div>}
+                  </div>
+                  <div className="day-events">
+                    {d.events.map((ev) => (
+                      <button
+                        key={ev.id}
+                        className={`ev ${ev.grad}`}
+                        onClick={(e) => { e.stopPropagation(); setModal(ev); }}
+                        title={ev.title}
+                      >
+                        <span className="ev-cat">{ev.cat.split(" · ")[0]}</span>
+                        <span className="ev-title">{ev.title}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="day-foot">
+                    {d.events.length > 0 && (
+                      <span className="dot-count">{d.events.length}</span>
+                    )}
+                  </div>
                 </div>
-                <div className="day-events">
-                  {d.events.length === 0 && <div className="day-empty">—</div>}
-                  {d.events.map((ev) => (
-                    <button
-                      key={ev.id}
-                      className={`ev ${ev.grad}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setModal(ev);
-                      }}
-                      title={ev.title}
-                    >
-                      <span className="ev-cat">{ev.cat.split(" · ")[0]}</span>
-                      <span className="ev-title">{ev.title}</span>
-                    </button>
-                  ))}
-                </div>
-                <div className="day-foot">
-                  {d.events.length > 0 && (
-                    <span className="dot-count">{d.events.length}</span>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {days.length === 0 && <div className="loading">No days</div>}
           </div>
         )}
-
         <div className="strip-hint">
-          <span>◀ Scroll to travel across months ▶</span>
+          ← SCROLL TO NAVIGATE &nbsp;·&nbsp; MONTH BOUNDARY AUTO-ADVANCES →
         </div>
       </section>
 
@@ -637,29 +686,44 @@ export default function EventCalendarPage() {
 // ============================================================
 
 const CSS = `
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
 .event-root {
-  --bg: #050510;
-  --bg-soft: #0b0b1c;
-  --ink: #e6e6f4;
-  --ink-dim: #9a9ac2;
-  --line: rgba(255,255,255,0.08);
-  --accent: #8b5cf6;
-  --accent-2: #38bdf8;
-  min-height: 100vh;
+  --bg: #060914;
+  --bg-card: rgba(255,255,255,0.035);
+  --bg-card-hover: rgba(255,255,255,0.06);
+  --ink: #dde3f0;
+  --ink-dim: #6b7599;
+  --line: rgba(255,255,255,0.07);
+  --accent: #7c3aed;
+  --accent-2: #2563eb;
+  --today-glow: rgba(139,92,246,0.55);
+
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
   background:
-    radial-gradient(1200px 600px at 15% -10%, rgba(139,92,246,0.18), transparent 60%),
-    radial-gradient(900px 500px at 100% 110%, rgba(56,189,248,0.14), transparent 60%),
+    radial-gradient(ellipse 80% 50% at 20% -10%, rgba(99,102,241,0.15) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 90% 110%, rgba(37,99,235,0.12) 0%, transparent 60%),
     var(--bg);
   color: var(--ink);
-  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-family: Inter, system-ui, -apple-system, sans-serif;
   cursor: none;
+  overflow: hidden;
   position: relative;
-  overflow-x: hidden;
 }
-.event-root * { cursor: none; }
-.event-root button, .event-root a { cursor: none; }
+.event-root *, .event-root button, .event-root a { cursor: none; }
 
-/* Cursor */
+/* ── Ambient orbs ── */
+.orb { position: fixed; pointer-events: none; border-radius: 50%; filter: blur(80px); opacity: 0.25; }
+.orb-1 { width: 520px; height: 520px; top: -120px; left: 50%; transform: translateX(-50%);
+  background: radial-gradient(circle, rgba(139,92,246,0.6), transparent 70%); }
+.orb-2 { width: 300px; height: 300px; bottom: 80px; left: -60px;
+  background: radial-gradient(circle, rgba(37,99,235,0.5), transparent 70%); }
+.orb-3 { width: 220px; height: 220px; bottom: 0; right: 60px;
+  background: radial-gradient(circle, rgba(99,102,241,0.45), transparent 70%); }
+
+/* ── Custom cursor ── */
 .cur-ring, .cur-dot {
   position: fixed; top: 0; left: 0; pointer-events: none; z-index: 9999;
   will-change: transform;
@@ -667,7 +731,7 @@ const CSS = `
 .cur-ring {
   width: 36px; height: 36px; border-radius: 50%;
   border: 1.5px solid rgba(139,92,246,0.75);
-  box-shadow: 0 0 18px rgba(139,92,246,0.45), inset 0 0 10px rgba(139,92,246,0.25);
+  box-shadow: 0 0 18px rgba(139,92,246,0.35), inset 0 0 10px rgba(139,92,246,0.2);
   mix-blend-mode: screen;
 }
 .cur-dot {
@@ -675,218 +739,334 @@ const CSS = `
   background: #fff; box-shadow: 0 0 6px #fff;
 }
 
-/* Warp overlay */
+/* ── Warp overlay ── */
 .warp {
   position: fixed; inset: 0; z-index: 9990;
-  background: radial-gradient(circle at 50% 50%, rgba(139,92,246,0.7), rgba(5,5,16,0) 60%);
-  opacity: 0; transition: opacity 420ms ease;
-  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, rgba(139,92,246,0.65), rgba(6,9,20,0) 60%);
+  opacity: 0; transition: opacity 420ms ease; pointer-events: none;
 }
 .warp.active { opacity: 1; }
 
-/* Topbar */
+/* ── Topbar ── */
 .topbar {
+  flex-shrink: 0;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 18px 32px; border-bottom: 1px solid var(--line);
-  backdrop-filter: blur(8px);
-  position: sticky; top: 0; z-index: 20;
-  background: rgba(5,5,16,0.6);
+  padding: 14px 28px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(6,9,20,0.7);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  position: relative; z-index: 20;
 }
-.brand { display: flex; align-items: center; gap: 12px; color: var(--ink); text-decoration: none; }
-.brand-mark {
-  width: 28px; height: 28px; display: grid; place-items: center;
-  border-radius: 8px; background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  color: #0b0b1c; font-weight: 900; font-size: 14px;
+.brand {
+  display: flex; align-items: center; gap: 12px;
+  color: var(--ink); text-decoration: none;
 }
-.brand-text { display: flex; flex-direction: column; line-height: 1.05; font-size: 14px; }
-.brand-text em { font-style: normal; color: var(--ink-dim); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
-.topnav { display: flex; align-items: center; gap: 14px; }
+.brand-icon { font-size: 22px; line-height: 1; }
+.brand-text { display: flex; flex-direction: column; line-height: 1.1; }
+.brand-main { font-size: 14px; font-weight: 700; color: #e8ecf5; letter-spacing: 0.01em; }
+.brand-sub  { font-size: 11px; color: var(--ink-dim); margin-top: 1px; }
+.topnav { display: flex; align-items: center; gap: 12px; }
 .btn {
-  border: 1px solid var(--line); background: rgba(255,255,255,0.04);
-  color: var(--ink); padding: 8px 14px; border-radius: 10px;
-  font: 600 12px/1 Inter, system-ui; letter-spacing: 0.04em; text-transform: uppercase;
-  transition: all 180ms ease;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.05);
+  color: var(--ink);
+  padding: 7px 16px;
+  border-radius: 10px;
+  font: 600 12px/1 Inter, system-ui;
+  letter-spacing: 0.04em;
+  transition: all 170ms ease;
 }
-.btn:hover:not(:disabled) { background: rgba(139,92,246,0.15); border-color: rgba(139,92,246,0.4); }
-.btn:disabled { opacity: 0.35; }
-.btn.warp-btn {
-  background: linear-gradient(135deg, rgba(139,92,246,0.35), rgba(56,189,248,0.25));
-  border-color: rgba(139,92,246,0.55);
-  box-shadow: 0 0 20px rgba(139,92,246,0.35);
+.btn-ghost:hover:not(:disabled) {
+  background: rgba(139,92,246,0.12);
+  border-color: rgba(139,92,246,0.35);
 }
+.btn:disabled { opacity: 0.3; }
+.btn-today {
+  background: #fff;
+  color: #0f0f1a;
+  border-color: #fff;
+  font-weight: 700;
+  box-shadow: 0 0 18px rgba(255,255,255,0.12);
+}
+.btn-today:hover { background: #e8e8ff; }
 .clock {
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 13px; color: var(--ink-dim); display: flex; align-items: center; gap: 8px;
+  font-family: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  font-size: 13px; color: var(--ink-dim);
+  display: flex; align-items: center; gap: 8px;
 }
 .clock-dot {
-  width: 6px; height: 6px; border-radius: 50%; background: #10b981;
-  box-shadow: 0 0 8px #10b981;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #10b981; box-shadow: 0 0 8px #10b981;
   animation: pulse 1.6s ease-in-out infinite;
+  flex-shrink: 0;
 }
-@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
 
-/* Info panel */
+/* ── Info panel ── */
 .info {
-  display: grid; grid-template-columns: minmax(280px, 36%) 1fr;
-  gap: 24px; padding: 28px 32px; min-height: 36vh;
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: minmax(200px, 30%) 1fr;
+  gap: 20px;
+  padding: 22px 28px 14px;
   transition: opacity 260ms ease, transform 260ms ease;
 }
-.info.out { opacity: 0; transform: translateY(-6px); }
-.info.in { opacity: 0; animation: fadeIn 280ms ease forwards; }
+.info.out { opacity: 0; transform: translateY(-8px); }
+.info.in  { opacity: 0; animation: fadeIn 280ms ease forwards; }
 @keyframes fadeIn { to { opacity: 1; transform: translateY(0); } }
-.month-label, .spot-label {
-  font: 600 11px/1 "JetBrains Mono", monospace; letter-spacing: 0.2em;
-  color: var(--ink-dim); text-transform: uppercase;
+
+.month-block { display: flex; flex-direction: column; }
+.month-label {
+  font: 700 10px/1 "JetBrains Mono", monospace;
+  letter-spacing: 0.28em; color: var(--ink-dim); text-transform: uppercase;
 }
 .month-name {
-  font-size: clamp(56px, 8vw, 112px); line-height: 0.95; font-weight: 800;
-  background: linear-gradient(135deg, #fff 10%, var(--accent) 70%, var(--accent-2) 100%);
+  font-size: clamp(52px, 7.5vw, 96px);
+  line-height: 0.9;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #ffffff 0%, #a5b4fc 55%, #7c3aed 100%);
   -webkit-background-clip: text; background-clip: text; color: transparent;
-  margin: 8px 0 4px;
+  margin: 6px 0 4px;
 }
 .month-year {
-  font-family: "JetBrains Mono", monospace; font-size: 22px; color: var(--ink-dim);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 20px; color: var(--ink-dim); font-weight: 400;
 }
-.month-stats { display: flex; gap: 22px; margin-top: 24px; }
-.month-stats > div { display: flex; flex-direction: column; }
-.stat-num { font-size: 28px; font-weight: 800; color: var(--ink); }
-.stat-lbl { font-size: 11px; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.12em; }
+.month-stats {
+  display: flex; gap: 20px; margin-top: 18px; align-items: flex-end;
+}
+.stat-item { display: flex; flex-direction: column; }
+.stat-num { font-size: 26px; font-weight: 800; color: var(--ink); line-height: 1; }
+.stat-lbl {
+  font-size: 10px; color: var(--ink-dim);
+  text-transform: uppercase; letter-spacing: 0.14em; margin-top: 3px;
+}
 
+/* ── Spotlight / preview card ── */
 .spotlight {
-  border: 1px solid var(--line); border-radius: 16px; padding: 20px 24px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
-  display: flex; flex-direction: column; gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 18px 22px;
+  background: rgba(255,255,255,0.025);
+  display: flex; flex-direction: column; gap: 10px;
+  min-height: 0;
+  overflow: hidden;
 }
-.spot-date { font-size: 20px; font-weight: 700; }
-.spot-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.spot-label {
+  font: 600 11px/1 "JetBrains Mono", monospace;
+  letter-spacing: 0.2em; color: var(--ink-dim); text-transform: uppercase;
+}
+.spot-list {
+  list-style: none; display: flex; flex-direction: column; gap: 8px;
+}
 .spot-list li {
-  display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px;
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 11px; border-radius: 10px;
   background: rgba(255,255,255,0.03); border: 1px solid var(--line);
-  transition: all 160ms ease;
+  cursor: none; transition: all 140ms ease;
 }
-.spot-list li:hover { border-color: rgba(139,92,246,0.45); background: rgba(139,92,246,0.08); }
-.swatch { width: 10px; height: 36px; border-radius: 3px; flex-shrink: 0; }
-.spot-title { font-weight: 600; font-size: 14px; }
+.spot-list li:hover { border-color: rgba(139,92,246,0.4); background: rgba(139,92,246,0.07); }
+.swatch { width: 8px; height: 34px; border-radius: 3px; flex-shrink: 0; }
+.spot-title { font-weight: 600; font-size: 13px; color: var(--ink); }
 .spot-meta { font-size: 11px; color: var(--ink-dim); margin-top: 2px; }
-.spot-more { color: var(--ink-dim); font-size: 12px; text-align: center; padding: 6px; }
-.spot-empty { color: var(--ink-dim); font-size: 13px; padding: 16px 0; line-height: 1.5; }
+.spot-more {
+  color: var(--ink-dim); font-size: 11px; text-align: center; padding: 5px;
+  list-style: none;
+}
 
-/* Day strip */
+/* Hint card (when no date hovered) */
+.spot-hint {
+  display: flex; align-items: center; gap: 16px; padding: 6px 0;
+}
+.hint-icon-wrap {
+  width: 48px; height: 48px; border-radius: 14px; flex-shrink: 0;
+  background: linear-gradient(135deg, rgba(99,102,241,0.4), rgba(37,99,235,0.4));
+  border: 1px solid rgba(99,102,241,0.35);
+  display: grid; place-items: center; font-size: 22px;
+}
+.hint-title {
+  font-size: 15px; font-weight: 700; color: #cdd5f0;
+}
+.hint-sub {
+  font-size: 12px; color: var(--ink-dim); margin-top: 4px; line-height: 1.45;
+}
+
+/* ── Day strip ── */
 .strip-wrap {
-  position: relative; padding: 16px 32px 40px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 4px 28px 0;
+  min-height: 0;
   transition: opacity 260ms ease;
+  overflow: hidden;
 }
 .strip-wrap.out { opacity: 0; }
-.strip-wrap.in { animation: fadeIn 280ms ease forwards; opacity: 0; }
+.strip-wrap.in  { opacity: 0; animation: fadeIn 280ms ease forwards; }
+
 .strip {
-  display: flex; gap: 14px; overflow-x: auto; overflow-y: visible;
-  padding: 40px 8px 30px;
+  flex: 1;
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 12px 4px 16px;
   scroll-behavior: smooth;
-  scrollbar-width: thin; scrollbar-color: rgba(139,92,246,0.4) transparent;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(99,102,241,0.35) transparent;
 }
-.strip::-webkit-scrollbar { height: 6px; }
-.strip::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.4); border-radius: 3px; }
+.strip::-webkit-scrollbar { height: 4px; }
+.strip::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.4); border-radius: 2px; }
 
 .day {
-  flex: 0 0 auto; width: 108px; min-height: 280px;
-  border: 1px solid var(--line); border-radius: 14px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
-  display: flex; flex-direction: column; padding: 12px 10px;
-  transition: transform 220ms ease, box-shadow 220ms ease, border-color 180ms ease;
+  flex: 0 0 auto;
+  width: 106px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--bg-card);
+  display: flex;
+  flex-direction: column;
+  padding: 14px 10px 10px;
+  transition: transform 200ms ease, box-shadow 200ms ease, border-color 160ms ease;
   will-change: transform;
   transform-style: preserve-3d;
 }
-.day:hover { border-color: rgba(139,92,246,0.5); }
-.day.today { border-color: rgba(56,189,248,0.7); box-shadow: 0 0 0 1px rgba(56,189,248,0.4), 0 12px 36px -8px rgba(56,189,248,0.4); }
-.day.active { border-color: rgba(139,92,246,0.75); }
-.day-head { text-align: center; padding-bottom: 10px; border-bottom: 1px dashed var(--line); }
-.day-w { font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--ink-dim); letter-spacing: 0.2em; }
-.day-n { font-size: 30px; font-weight: 800; margin-top: 2px; }
-.day-today {
-  display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 999px;
-  background: rgba(56,189,248,0.18); color: #7dd3fc; font-size: 9px; font-weight: 700; letter-spacing: 0.1em;
+.day:hover { border-color: rgba(99,102,241,0.4); background: var(--bg-card-hover); }
+.day.today {
+  border-color: rgba(139,92,246,0.7);
+  background: rgba(99,102,241,0.08);
+  box-shadow: 0 0 0 1px rgba(139,92,246,0.35), 0 8px 32px -8px var(--today-glow);
 }
-.day-events { flex: 1; display: flex; flex-direction: column; gap: 6px; padding: 10px 0; }
-.day-empty { color: rgba(255,255,255,0.1); text-align: center; font-size: 22px; padding: 30px 0; }
+.day.active { border-color: rgba(139,92,246,0.6); }
+
+.day-head { text-align: center; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.day-w {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9px; font-weight: 700; color: var(--ink-dim); letter-spacing: 0.22em;
+}
+.day-n { font-size: 32px; font-weight: 900; line-height: 1.05; margin-top: 2px; color: var(--ink); }
+.day-today-badge {
+  display: inline-block; margin-top: 5px; padding: 2px 9px;
+  border-radius: 999px; background: rgba(139,92,246,0.22); color: #c4b5fd;
+  font-size: 8px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;
+}
+.day-holiday-badge {
+  display: inline-block; margin-top: 4px; font-size: 13px; line-height: 1;
+}
+
+.day-events {
+  flex: 1; display: flex; flex-direction: column; gap: 5px; padding: 8px 0;
+}
 .ev {
   text-align: left; border: none; border-radius: 8px;
-  padding: 7px 9px; color: #fff; font: 600 11px/1.25 Inter, sans-serif;
+  padding: 6px 8px; color: #fff;
+  font: 600 10px/1.3 Inter, sans-serif;
   display: flex; flex-direction: column; gap: 2px;
-  box-shadow: 0 6px 14px -6px rgba(0,0,0,0.5);
-  transition: transform 120ms ease, box-shadow 120ms ease;
+  box-shadow: 0 4px 12px -4px rgba(0,0,0,0.5);
+  transition: transform 100ms ease, box-shadow 100ms ease;
+  width: 100%;
 }
-.ev:hover { transform: translateY(-1px); box-shadow: 0 10px 18px -6px rgba(139,92,246,0.55); }
-.ev-cat { font-size: 9px; opacity: 0.85; letter-spacing: 0.1em; text-transform: uppercase; }
-.ev-title { font-size: 11px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.day-foot { text-align: center; padding-top: 6px; }
+.ev:hover { transform: translateY(-1px); box-shadow: 0 8px 16px -4px rgba(99,102,241,0.55); }
+.ev-cat {
+  font-size: 8px; opacity: 0.85; letter-spacing: 0.12em; text-transform: uppercase;
+}
+.ev-title {
+  font-size: 10px;
+  overflow: hidden; text-overflow: ellipsis;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+
+.day-foot { text-align: center; padding-top: 5px; min-height: 18px; }
 .dot-count {
-  display: inline-block; min-width: 20px; padding: 2px 6px; border-radius: 999px;
-  background: rgba(139,92,246,0.18); color: #c4b5fd; font-size: 10px; font-weight: 700;
-  font-family: "JetBrains Mono", monospace;
+  display: inline-block; min-width: 18px; padding: 1px 5px; border-radius: 999px;
+  background: rgba(99,102,241,0.2); color: #a5b4fc;
+  font: 700 9px/1.4 "JetBrains Mono", monospace;
 }
+
+/* Scroll hint */
 .strip-hint {
-  text-align: center; color: var(--ink-dim); font-size: 11px; letter-spacing: 0.2em;
-  font-family: "JetBrains Mono", monospace; margin-top: 4px;
+  flex-shrink: 0;
+  text-align: center; color: var(--ink-dim);
+  font: 600 9px/1 "JetBrains Mono", monospace;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  padding: 6px 0 10px;
+  border-top: 1px solid var(--line);
+  margin-top: 2px;
+  background: linear-gradient(to right, transparent, rgba(99,102,241,0.08) 50%, transparent);
 }
 
-/* Gradient swatches / backgrounds */
-.g-forum    { background: linear-gradient(135deg, #8b5cf6, #ec4899); }
-.g-training { background: linear-gradient(135deg, #06b6d4, #3b82f6); }
-.g-holiday  { background: linear-gradient(135deg, #f59e0b, #ef4444); }
-.g-workshop { background: linear-gradient(135deg, #10b981, #06b6d4); }
-.g-seminar  { background: linear-gradient(135deg, #ef4444, #f97316); }
-.g-deploy   { background: linear-gradient(135deg, #f97316, #eab308); }
-.g-conf     { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
-.g-talk     { background: linear-gradient(135deg, #ec4899, #f43f5e); }
+/* ── Gradient event pill colours ── */
+.g-forum    { background: linear-gradient(135deg, #7c3aed, #db2777); }
+.g-training { background: linear-gradient(135deg, #0891b2, #2563eb); }
+.g-holiday  { background: linear-gradient(135deg, #d97706, #dc2626); }
+.g-workshop { background: linear-gradient(135deg, #059669, #0891b2); }
+.g-seminar  { background: linear-gradient(135deg, #dc2626, #ea580c); }
+.g-deploy   { background: linear-gradient(135deg, #ea580c, #ca8a04); }
+.g-conf     { background: linear-gradient(135deg, #4f46e5, #7c3aed); }
+.g-talk     { background: linear-gradient(135deg, #db2777, #e11d48); }
 
-/* Loading */
-.loading { padding: 80px; text-align: center; color: var(--ink-dim); font-size: 14px; }
+/* ── Loading ── */
+.loading {
+  padding: 60px; text-align: center; color: var(--ink-dim); font-size: 14px;
+}
 .spin {
-  display: inline-block; width: 14px; height: 14px; border-radius: 50%;
-  border: 2px solid rgba(139,92,246,0.3); border-top-color: var(--accent);
+  display: inline-block; width: 13px; height: 13px; border-radius: 50%;
+  border: 2px solid rgba(99,102,241,0.3); border-top-color: #7c3aed;
   animation: spin 700ms linear infinite; margin-right: 8px; vertical-align: -2px;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* Modal */
+/* ── Modal ── */
 .modal-backdrop {
   position: fixed; inset: 0; z-index: 100;
-  background: rgba(5,5,16,0.78); backdrop-filter: blur(6px);
+  background: rgba(6,9,20,0.8); backdrop-filter: blur(8px);
   display: grid; place-items: center; padding: 20px;
   animation: fadeIn 200ms ease forwards;
 }
 .modal {
-  width: min(640px, 96vw); border-radius: 18px; overflow: hidden;
-  border: 1px solid rgba(139,92,246,0.3);
-  background: linear-gradient(180deg, #0c0c20, #07071a);
-  box-shadow: 0 30px 80px -20px rgba(139,92,246,0.5);
+  width: min(620px, 96vw); border-radius: 20px; overflow: hidden;
+  border: 1px solid rgba(99,102,241,0.3);
+  background: linear-gradient(180deg, #0d1128, #070914);
+  box-shadow: 0 32px 80px -20px rgba(99,102,241,0.55);
 }
-.modal-hero { padding: 28px 28px 36px; position: relative; color: #fff; }
+.modal-hero { padding: 26px 26px 32px; position: relative; color: #fff; }
 .modal-close {
   position: absolute; top: 14px; right: 14px;
   width: 32px; height: 32px; border-radius: 50%; border: none;
-  background: rgba(0,0,0,0.35); color: #fff; font-size: 20px; line-height: 1;
+  background: rgba(0,0,0,0.4); color: #fff; font-size: 18px; line-height: 1;
+  cursor: none;
 }
 .modal-badge {
   display: inline-block; padding: 4px 10px; border-radius: 999px;
-  background: rgba(0,0,0,0.35); font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
-  text-transform: uppercase;
+  background: rgba(0,0,0,0.35); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase;
 }
-.modal-title { margin: 10px 0 6px; font-size: 28px; font-weight: 800; line-height: 1.15; }
-.modal-sub { font-size: 13px; opacity: 0.85; font-family: "JetBrains Mono", monospace; }
-.modal-body { padding: 20px 28px 28px; }
-.modal-meta { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px 24px; margin-bottom: 18px; }
-.modal-meta > div { display: flex; flex-direction: column; gap: 4px; }
-.meta-k { font-size: 10px; color: var(--ink-dim); letter-spacing: 0.15em; text-transform: uppercase; font-family: "JetBrains Mono", monospace; }
-.meta-v { font-size: 14px; color: var(--ink); font-weight: 600; }
-.meta-v.status { display: inline-block; padding: 3px 10px; background: rgba(139,92,246,0.18); border-radius: 999px; width: fit-content; font-size: 11px; }
-.modal-desc { color: var(--ink-dim); font-size: 14px; line-height: 1.6; margin: 0; }
+.modal-title { margin: 10px 0 6px; font-size: 26px; font-weight: 800; line-height: 1.15; }
+.modal-sub { font-size: 12px; opacity: 0.8; font-family: "JetBrains Mono", monospace; }
+.modal-body { padding: 18px 26px 26px; }
+.modal-meta { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px 24px; margin-bottom: 16px; }
+.modal-meta > div { display: flex; flex-direction: column; gap: 3px; }
+.meta-k {
+  font-size: 9px; color: var(--ink-dim); letter-spacing: 0.15em;
+  text-transform: uppercase; font-family: "JetBrains Mono", monospace;
+}
+.meta-v { font-size: 13px; color: var(--ink); font-weight: 600; }
+.meta-v.status {
+  display: inline-block; padding: 3px 10px;
+  background: rgba(99,102,241,0.18); border-radius: 999px;
+  width: fit-content; font-size: 11px;
+}
+.modal-desc { color: var(--ink-dim); font-size: 13px; line-height: 1.65; margin: 0; }
 
-@media (max-width: 640px) {
-  .info { grid-template-columns: 1fr; }
-  .topbar { padding: 14px 18px; }
-  .strip-wrap { padding: 12px 18px 32px; }
-  .info { padding: 20px 18px; }
+/* ── Responsive ── */
+@media (max-width: 700px) {
+  .info { grid-template-columns: 1fr; padding: 16px 16px 10px; }
+  .topbar { padding: 12px 16px; }
+  .strip-wrap { padding: 4px 16px 0; }
   .clock { display: none; }
+  .event-root { height: auto; overflow: auto; }
+  .strip { overflow-x: auto; }
 }
 `;

@@ -21,7 +21,7 @@ const ROLE_COLORS: Record<Role, string> = {
   admin: "bg-violet-100 text-violet-800 border-violet-200",
 };
 
-const HIDDEN_PATHS = new Set(["/signin", "/signup", "/accept-invite", "/meeting-hall"]);
+const HIDDEN_PATHS = new Set(["/signin", "/signup", "/accept-invite", "/meeting-hall", "/event"]);
 
 export default function UserBadge() {
   const router = useRouter();

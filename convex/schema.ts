@@ -27,12 +27,14 @@ export default defineSchema({
     fullName: v.string(),
     role: v.string(),
     googleEmail: v.optional(v.string()),
+    googleId: v.optional(v.string()),
     isActive: v.boolean(),
     createdAt: v.number(),
     lastLoginAt: v.optional(v.number()),
   })
     .index("by_email", ["email"])
-    .index("by_role", ["role"]),
+    .index("by_role", ["role"])
+    .index("by_googleId", ["googleId"]),
 
   /** Admin-issued invites for new user registration (single-use, OTP-gated) */
   invites: defineTable({

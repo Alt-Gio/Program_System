@@ -399,6 +399,121 @@ export const cleanupSessions = mutation({
   },
 });
 
+/**
+ * Sign in an existing DICT user who authenticated via Google OAuth.
+ * Looks up by googleId first; falls back to email for auto-linking.
+ * Returns session token + user info.
+ */
+export const signInWithGoogle = mutation({
+  args: {
+    googleId: v.string(),
+    email: v.string(),
+    name: v.string(),
+    avatarUrl: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const email = args.email.toLowerCase().trim();
+
+    // 1. Look up by googleId (fastest path)
+    let user = await ctx.db
+      .query("users")
+      .withIndex("by_googleId", (q) => q.eq("googleId", args.googleId))
+      .first();
+
+    // 2. Auto-link: same email already exists without googleId
+    if (!user) {
+      const byEmail = await ctx.db
+        .query("users")
+        .withIndex("by_email", (q) => q.eq("email", email))
+        .first();
+      if (byEmail && !byEmail.googleId) {
+        await ctx.db.patch(byEmail._id, {
+          googleId: args.googleId,
+          googleEmail: email,
+          lastLoginAt: Date.now(),
+        });
+        user = { ...byEmail, googleId: args.googleId, googleEmail: email };
+      }
+    }
+
+    if (!user) return null; // No account — caller redirects to /login/register/[role]
+    if (!user.isActive) throw new Error("Account is disabled");
+
+    await ctx.db.patch(user._id, { lastLoginAt: Date.now() });
+
+    const token = generateToken();
+    await ctx.db.insert("sessions", {
+      userId: user._id,
+      token,
+      expiresAt: Date.now() + SESSION_TTL_MS,
+      createdAt: Date.now(),
+    });
+
+    return {
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role,
+      },
+    };
+  },
+});
+
+/**
+ * Create a new DICT user from Google OAuth (self-registration).
+ * Only allowed for intern and supervisor roles.
+ */
+export const registerWithGoogle = mutation({
+  args: {
+    googleId: v.string(),
+    email: v.string(),
+    fullName: v.string(),
+    avatarUrl: v.optional(v.string()),
+    role: v.union(v.literal("intern"), v.literal("supervisor")),
+  },
+  handler: async (ctx, args) => {
+    const email = args.email.toLowerCase().trim();
+
+    const existing = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", email))
+      .first();
+    if (existing) throw new Error("An account with this email already exists.");
+
+    const userId = await ctx.db.insert("users", {
+      email,
+      passwordHash: "",
+      fullName: args.fullName,
+      role: args.role,
+      googleId: args.googleId,
+      googleEmail: email,
+      isActive: true,
+      createdAt: Date.now(),
+      lastLoginAt: Date.now(),
+    });
+
+    const token = generateToken();
+    await ctx.db.insert("sessions", {
+      userId,
+      token,
+      expiresAt: Date.now() + SESSION_TTL_MS,
+      createdAt: Date.now(),
+    });
+
+    return {
+      token,
+      user: {
+        id: userId,
+        email,
+        fullName: args.fullName,
+        role: args.role,
+      },
+    };
+  },
+});
+
 /** DEV ONLY — wipe all users and sessions so bootstrapFirstAdmin can run again. */
 export const dangerClearUsers = mutation({
   args: {},

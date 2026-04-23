@@ -24,17 +24,33 @@ const PUBLIC_EXACT = new Set<string>([
   "/",
   "/dtc-logbook",
   "/meeting-hall",
+  "/event",
   "/signin",
   "/accept-invite",
   "/bootstrap",
   "/signup", // stays reachable so it can show an "invite-only" notice
+  // LearnHub login (backward compat — now at /login/student or /login/mentor)
   "/learnhub/login",
   "/learnhub/onboarding",
   "/learnhub/login/mentor/invite",
+  // New unified role-based login pages
+  "/login",
+  "/login/intern",
+  "/login/supervisor",
+  "/login/mentor",
+  "/login/student",
+  "/login/admin",
+  "/login/manager",
+  "/login/pick-role",
+  "/login/register/intern",
+  "/login/register/supervisor",
 ]);
 
-// LearnHub path prefixes that are fully public (no auth of any kind needed)
-const LH_PUBLIC_PREFIXES = ["/learnhub/verify/"];
+// Prefix matchers for paths that are always public (no session needed)
+const PUBLIC_PREFIXES = [
+  "/learnhub/verify/",
+  "/login/register/",    // new-user registration forms after Google OAuth
+];
 
 // Prefix matchers for the family each route tree belongs to.
 // Order matters: the first match wins.
@@ -63,7 +79,7 @@ const FAMILY_RULES: Array<{ prefix: string; family: Family }> = [
 
 function classify(pathname: string): Family | "public" | "account" {
   if (PUBLIC_EXACT.has(pathname)) return "public";
-  if (LH_PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return "public";
+  if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return "public";
   for (const rule of FAMILY_RULES) {
     if (pathname === rule.prefix || pathname.startsWith(rule.prefix + "/")) {
       return rule.family;
@@ -85,7 +101,7 @@ export function middleware(request: NextRequest) {
   if (kind === "learnhub") {
     const lhToken = request.cookies.get("learnhub_session")?.value;
     if (!lhToken) {
-      const url = new URL("/learnhub/login", request.url);
+      const url = new URL("/login/student", request.url);
       url.searchParams.set("callbackUrl", pathname);
       return NextResponse.redirect(url);
     }
@@ -102,7 +118,13 @@ export function middleware(request: NextRequest) {
   // ── Existing DICT system: uses dict-session cookie ──
   const token = request.cookies.get("dict-session")?.value;
   if (!token) {
-    const url = new URL("/signin", request.url);
+    // Route to the appropriate role login page based on family
+    const loginPath =
+      kind === "admin-area" ? "/login/admin"
+      : kind === "supervisor" ? "/login/supervisor"
+      : kind === "intern-portal" ? "/login/intern"
+      : "/signin"; // fallback keeps old bookmarks working
+    const url = new URL(loginPath, request.url);
     url.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(url);
   }

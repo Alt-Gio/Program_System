@@ -24,6 +24,7 @@ import type * as gamification from "../gamification.js";
 import type * as googleSheetsWrite from "../googleSheetsWrite.js";
 import type * as highlightFields from "../highlightFields.js";
 import type * as http from "../http.js";
+import type * as identities from "../identities.js";
 import type * as images from "../images.js";
 import type * as internAuth from "../internAuth.js";
 import type * as internPortal from "../internPortal.js";
@@ -83,6 +84,7 @@ declare const fullApi: ApiFromModules<{
   googleSheetsWrite: typeof googleSheetsWrite;
   highlightFields: typeof highlightFields;
   http: typeof http;
+  identities: typeof identities;
   images: typeof images;
   internAuth: typeof internAuth;
   internPortal: typeof internPortal;
