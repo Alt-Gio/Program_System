@@ -1,7 +1,8 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, Search, Filter, LogOut, User, Menu } from "lucide-react";
+import { Search, Filter, LogOut, User, Menu } from "lucide-react";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation } from "convex/react";
@@ -112,10 +113,7 @@ export function Header() {
             </div>
           )}
 
-          <button className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors">
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-          </button>
+          <NotificationBell />
 
           {/* User menu */}
           {user && (

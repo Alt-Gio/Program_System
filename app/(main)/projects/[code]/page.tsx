@@ -11,7 +11,10 @@ import {
   TrendingUp, Key, AlertTriangle, Globe,
   Plus, MapPin, Calendar, Users, ArrowLeft, Download,
   CheckCircle2, ChevronRight, ExternalLink, Filter, FileSpreadsheet, Loader2,
+  Settings as SettingsIcon,
 } from "lucide-react";
+import { ProjectSettingsDialog } from "@/components/project-settings/ProjectSettingsDialog";
+import { ExportDialog } from "@/components/export/ExportDialog";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
@@ -54,6 +57,8 @@ export default function ProjectPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [showDescriptionModal, setShowDescriptionModal] = useState(false);
   const [showAddActivity, setShowAddActivity] = useState(false);
+  const [showProjectSettings, setShowProjectSettings] = useState(false);
+  const [showExport, setShowExport] = useState(false);
   const [selectedYear, setSelectedYear] = useState<number>(CURRENT_YEAR);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [selectedQuarter, setSelectedQuarter] = useState<number | null>(null);
@@ -150,7 +155,7 @@ export default function ProjectPage() {
   };
 
   return (
-    <div className="space-y-4 md:space-y-5">
+    <div className="page-content space-y-4 md:space-y-5">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
         <Link href="/dashboard">
@@ -170,32 +175,50 @@ export default function ProjectPage() {
           </div>
         </div>
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
-          <a href={`/api/looker-export?year=${CURRENT_YEAR}&project=${projectCode}`} target="_blank" rel="noopener noreferrer" className="flex-1 sm:flex-none">
-            <Button variant="outline" size="sm" className="gap-1 sm:gap-1.5 text-xs w-full sm:w-auto">
-              <Download className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> 
-              <span className="hidden sm:inline">Export CSV</span>
-              <span className="sm:hidden">CSV</span>
-            </Button>
-          </a>
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             className="gap-1 sm:gap-1.5 text-xs flex-1 sm:flex-none"
-            onClick={handleExportToSheets}
-            disabled={isExporting}
+            onClick={() => setShowExport(true)}
           >
-            <FileSpreadsheet className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> 
-            <span className="hidden sm:inline">{isExporting ? "Exporting..." : "Export to Sheets"}</span>
-            <span className="sm:hidden">Sheets</span>
+            <Download className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+            <span className="hidden sm:inline">Export…</span>
+            <span className="sm:hidden">Export</span>
           </Button>
           <Button size="sm" className="gap-1 sm:gap-1.5 text-xs flex-1 sm:flex-none" style={{ backgroundColor: projectDef.color }}
             onClick={() => setShowAddActivity(true)}>
-            <Plus className="w-3 h-3 sm:w-4 sm:h-4" /> 
+            <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
             <span className="hidden sm:inline">Add Activity</span>
             <span className="sm:hidden">Add</span>
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 shrink-0 p-0"
+            onClick={() => setShowProjectSettings(true)}
+            aria-label={`${projectDef.shortName} settings`}
+            title="Project settings"
+          >
+            <SettingsIcon className="w-3.5 h-3.5 text-gray-500" />
+          </Button>
         </div>
       </div>
+
+      <ProjectSettingsDialog
+        open={showProjectSettings}
+        onOpenChange={setShowProjectSettings}
+        projectCode={projectCode}
+        projectRoute={code}
+        shortName={projectDef.shortName}
+        color={projectDef.color}
+      />
+
+      <ExportDialog
+        open={showExport}
+        onOpenChange={setShowExport}
+        scope={{ label: `${projectDef.shortName} activities`, projectCode }}
+        defaultYear={selectedYear}
+      />
 
       {/* Program Description - Modal Trigger - Compact */}
       {PROJECT_DESCRIPTIONS[projectCode] && (

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   ListChecks,
@@ -15,6 +15,8 @@ import {
   GraduationCap,
   PanelLeftClose,
   PanelLeftOpen,
+  Download,
+  Keyboard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -38,6 +40,7 @@ const navItems = [
   { href: "/activities", label: "Activities", icon: ListChecks },
   { href: "/map", label: "Map View", icon: Map },
   { href: "/reports", label: "Reports", icon: FileText },
+  { href: "/import-log", label: "Import & Log", icon: Download },
 ];
 
 const projects = [
@@ -55,8 +58,14 @@ const projects = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [projectsExpanded, setProjectsExpanded] = useState(true);
   const { collapsed, setCollapsed, mobileOpen, setMobileOpen } = useSidebar();
+
+  // Prefetch project routes on hover — 10 programs is too many to
+  // prefetch upfront, but warming the cache when the user hovers is free.
+  const prefetchProject = (route: string) =>
+    router.prefetch(`/projects/${route}`);
 
   function closeMobile() { setMobileOpen(false); }
 
@@ -161,6 +170,8 @@ export function Sidebar() {
                   <Link
                     key={project.code}
                     href={href}
+                    onMouseEnter={() => prefetchProject(project.route)}
+                    onFocus={() => prefetchProject(project.route)}
                     onClick={closeMobile}
                     className={cn(
                       "flex items-center justify-center p-2 rounded-lg transition-all border",
@@ -206,6 +217,8 @@ export function Sidebar() {
                   <Link
                     key={project.code}
                     href={href}
+                    onMouseEnter={() => prefetchProject(project.route)}
+                    onFocus={() => prefetchProject(project.route)}
                     onClick={closeMobile}
                     className={cn(
                       "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all border",
@@ -281,6 +294,21 @@ export function Sidebar() {
           >
             <Settings className="w-4 h-4 shrink-0" />
             {!collapsed && "Settings"}
+          </Link>
+          <Link
+            href="/shortcuts"
+            onClick={closeMobile}
+            className={cn(
+              "flex items-center rounded-xl text-sm font-medium transition-all",
+              collapsed ? "justify-center px-3 py-3" : "gap-3 px-4 py-3",
+              pathname.startsWith("/shortcuts")
+                ? "bg-gray-800 text-white shadow-md"
+                : "text-gray-500 hover:bg-white hover:shadow-sm hover:text-gray-900"
+            )}
+            title={collapsed ? "Keyboard Shortcuts" : undefined}
+          >
+            <Keyboard className="w-4 h-4 shrink-0" />
+            {!collapsed && "Shortcuts"}
           </Link>
         </div>
       </nav>

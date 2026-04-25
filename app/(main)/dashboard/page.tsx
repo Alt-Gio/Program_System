@@ -3,10 +3,20 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { useDashboardFilters } from "@/components/layout/DashboardFilterContext";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-} from "recharts";
+
+// Split `recharts` out of the initial dashboard bundle. Shows a skeleton
+// while the chart chunk loads — the page's KPIs stay interactive meanwhile.
+const DashboardQuarterChart = dynamic(
+  () => import("@/components/dashboard/DashboardQuarterChart"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[150px] w-full animate-pulse rounded-md bg-gray-100" />
+    ),
+  },
+);
 import {
   Monitor, Building2, Wifi, Network, Shield,
   GraduationCap, TrendingUp, Key, AlertTriangle, Globe,
@@ -23,6 +33,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn, formatDate, getStatusColor, numberWithCommas, getCompletionRate, calcTotal } from "@/lib/utils";
 import { CURRENT_YEAR, DICT_PROJECTS } from "@/lib/types";
 import { Id } from "@/convex/_generated/dataModel";
+import { DashboardActivityStrip } from "@/components/dashboard/DashboardActivityStrip";
+import { ProgramHealthBadge } from "@/components/program-health/ProgramHealthBadge";
 
 const ICON_MAP: Record<string, React.ElementType> = {
   Monitor, Building2, Wifi, Network, Shield,
@@ -121,7 +133,10 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-5">
+    <div className="page-content space-y-5">
+      {/* Live strip: pending imports + recent sync activity */}
+      <DashboardActivityStrip />
+
       {/* Main Layout: Carousel (Left) + Stats + Progress (Right) */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         {/* LEFT: Activity Carousel */}
@@ -247,7 +262,10 @@ export default function DashboardPage() {
                         <p className="text-sm font-semibold text-gray-900 group-hover:text-blue-700 truncate">
                           {proj.shortName}
                         </p>
-                        <span className="text-xs text-gray-400 shrink-0">{proj.totalActivities} acts</span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <ProgramHealthBadge projectCode={proj.code} showLabel={false} />
+                          <span className="text-xs text-gray-400">{proj.totalActivities} acts</span>
+                        </div>
                       </div>
                       <div className="mt-1.5">
                         <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
@@ -284,16 +302,7 @@ export default function DashboardPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
-              <ResponsiveContainer width="100%" height={150}>
-                <BarChart data={quarterData} barSize={28}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                  <XAxis dataKey="quarter" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e7eb" }}
-                    cursor={{ fill: "#f9fafb" }} />
-                  <Bar dataKey="count" name="Activities" fill="#2563eb" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <DashboardQuarterChart data={quarterData} />
             </CardContent>
           </Card>
 

@@ -1,6 +1,8 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { learnhubTables } from "./learnhub_schema";
+import { importLogTables } from "./import_log";
+import { userAccountTables } from "./user_accounts";
 
 // ============================================================
 // DICT Region V – Program Management System
@@ -832,4 +834,14 @@ export default defineSchema({
   // ILCDB LEARNHUB TABLES (imported from learnhub_schema.ts)
   // ----------------------------------------------------------
   ...learnhubTables,
+
+  // ----------------------------------------------------------
+  // IMPORT LOG (imported from import_log.ts)
+  // ----------------------------------------------------------
+  ...importLogTables,
+
+  // ----------------------------------------------------------
+  // USER ACCOUNTS (imported from user_accounts.ts)
+  // ----------------------------------------------------------
+  ...userAccountTables,
 });

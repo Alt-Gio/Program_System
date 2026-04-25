@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { onVoiceEvent } from "@/lib/voice/voiceEvents";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Link from "next/link";
@@ -29,6 +30,20 @@ export default function ActivitiesPage() {
   const [filterMonth, setFilterMonth]     = useState<string>("all");
   const [filterYear, setFilterYear]       = useState<string>(String(CURRENT_YEAR));
   const [view, setView]                   = useState<"list" | "grid">("list");
+
+  // Voice command bridge — search/filter/openItem events from VoiceOrb
+  useEffect(() => {
+    const offs = [
+      onVoiceEvent("voice:search", ({ query }) => setSearch(query)),
+      onVoiceEvent("voice:filter", ({ field, value }) => {
+        if (field === "program" || field === "project") setFilterProject(value);
+        else if (field === "status") setFilterStatus(value);
+        else if (field === "month") setFilterMonth(value);
+        else if (field === "year") setFilterYear(value);
+      }),
+    ];
+    return () => offs.forEach((off) => off());
+  }, []);
 
   const projects            = useQuery(api.projects.list, { isActive: true });
   const provinces           = useQuery(api.provinces.list, {});

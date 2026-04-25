@@ -1,15 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "convex/react";
+import Link from "next/link";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn, formatDate, numberWithCommas } from "@/lib/utils";
-import { Database, TrendingUp, TrendingDown, Minus, Users, Download, Tag, MapPin, Server, Code, Wifi, Network, HardDrive } from "lucide-react";
+import {
+  Database, TrendingUp, TrendingDown, Minus, Users, Download, Tag,
+  MapPin, Server, Code, Wifi, Network, HardDrive,
+  Trash2, Upload, Plus, Settings as SettingsIcon,
+} from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
 import { DICT_PROJECTS } from "@/lib/types";
 
@@ -35,11 +42,15 @@ export function ProjectDataTable({ projectId, projectCode, projectColor, year }:
   ];
   
   const [highlightField, setHighlightField] = useState<string>(highlightFields[0]?.key || "participants");
-  
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
+
   const activities = useQuery(api.activities.listActivities, {
     projectId,
     year,
   });
+  const deleteActivity = useMutation(api.activities.deleteActivity);
+  const logAction = useMutation(api.import_log.logManualAction);
 
   if (!activities) {
     return (
@@ -110,12 +121,111 @@ export function ProjectDataTable({ projectId, projectCode, projectColor, year }:
   const sortedActivities = [...activities].sort((a, b) => {
     const valA = getFieldValue(a, highlightField);
     const valB = getFieldValue(b, highlightField);
-    
+
     if (typeof valA === "number" && typeof valB === "number") {
       return valB - valA; // Descending for numbers
     }
     return 0;
   });
+
+  const allVisibleIds = sortedActivities.map((a) => String(a._id));
+  const allSelected =
+    selected.size > 0 && allVisibleIds.every((id) => selected.has(id));
+  const someSelected = selected.size > 0 && !allSelected;
+
+  const toggleRow = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    setSelected((prev) =>
+      allSelected ? new Set() : new Set(allVisibleIds),
+    );
+  };
+
+  const clearSelection = () => setSelected(new Set());
+
+  const handleBulkDelete = async () => {
+    if (selected.size === 0) return;
+    const count = selected.size;
+    const ok = confirm(
+      `Delete ${count} activit${count === 1 ? "y" : "ies"}? This cannot be undone after this session.`,
+    );
+    if (!ok) return;
+
+    setDeleting(true);
+    try {
+      const ids = Array.from(selected) as Id<"activities">[];
+      for (const id of ids) {
+        await deleteActivity({ id });
+      }
+      try {
+        await logAction({
+          program: projectDef?.shortName ?? projectCode,
+          action: "bulk_delete",
+          entityType: "activity",
+          summary: `Bulk-deleted ${count} activit${count === 1 ? "y" : "ies"} from ${projectDef?.shortName ?? projectCode}`,
+          detail: { count, ids },
+          affectedRows: count,
+          isVoiceInitiated: false,
+        });
+      } catch {
+        // audit log is best-effort
+      }
+      toast.success(`Deleted ${count} activit${count === 1 ? "y" : "ies"}`);
+      clearSelection();
+    } catch (e: any) {
+      toast.error(`Bulk delete failed: ${e?.message ?? e}`);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleBulkExport = () => {
+    const ids = Array.from(selected);
+    const rows = sortedActivities.filter((a) => ids.includes(String(a._id)));
+    if (rows.length === 0) return;
+    const header =
+      "Title,Start Date,End Date,Venue,Status,Participants,Remarks";
+    const csv = [
+      header,
+      ...rows.map((a) => {
+        const p = a.participants;
+        const total =
+          p.nga.male +
+          p.nga.female +
+          p.lgu.male +
+          p.lgu.female +
+          p.suc.male +
+          p.suc.female +
+          p.others.male +
+          p.others.female;
+        return [
+          csvCell(a.activityTitle),
+          csvCell(a.startDate),
+          csvCell(a.endDate),
+          csvCell(a.venue),
+          csvCell(a.status),
+          total,
+          csvCell(a.remarks ?? ""),
+        ].join(",");
+      }),
+    ].join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${projectCode}-selected-${ids.length}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${ids.length} rows as CSV`);
+  };
 
   return (
     <Card>
@@ -185,11 +295,55 @@ export function ProjectDataTable({ projectId, projectCode, projectColor, year }:
       </CardHeader>
 
       <CardContent>
+        {selected.size > 0 && (
+          <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+            <span className="text-sm font-semibold text-blue-900">
+              {selected.size} selected
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1 border-blue-300 bg-white text-xs"
+              onClick={handleBulkExport}
+            >
+              <Download className="h-3 w-3" /> Export selected
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1 border-red-200 bg-white text-xs text-red-600 hover:bg-red-50"
+              onClick={handleBulkDelete}
+              disabled={deleting}
+            >
+              <Trash2 className="h-3 w-3" /> {deleting ? "Deleting…" : "Delete selected"}
+            </Button>
+            <button
+              type="button"
+              onClick={clearSelection}
+              className="ml-auto text-xs text-blue-700 hover:underline"
+            >
+              Clear
+            </button>
+          </div>
+        )}
+
         <div className="border rounded-lg overflow-hidden">
           <div className="max-h-[500px] overflow-y-auto">
             <Table>
               <TableHeader className="sticky top-0 bg-gray-50 z-10">
                 <TableRow>
+                  <TableHead className="w-10 px-2">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all"
+                      checked={allSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = someSelected;
+                      }}
+                      onChange={toggleAll}
+                      className="h-4 w-4 accent-blue-600"
+                    />
+                  </TableHead>
                   <TableHead className="w-12 text-center">#</TableHead>
                   <TableHead className="min-w-[250px]">Activity Title</TableHead>
                   <TableHead className="text-center">Province</TableHead>
@@ -211,15 +365,26 @@ export function ProjectDataTable({ projectId, projectCode, projectColor, year }:
                   const isMax = selectedField?.type === "number" && fieldValue === maxValue;
                   const isMin = selectedField?.type === "number" && fieldValue === minValue;
                   
+                  const isSelected = selected.has(String(activity._id));
                   return (
-                    <TableRow 
+                    <TableRow
                       key={activity._id}
                       className={cn(
                         "hover:bg-gray-50 transition-colors",
                         isMax && "bg-green-50 hover:bg-green-100",
-                        isMin && values.length > 1 && "bg-amber-50 hover:bg-amber-100"
+                        isMin && values.length > 1 && "bg-amber-50 hover:bg-amber-100",
+                        isSelected && "bg-blue-50 hover:bg-blue-100"
                       )}
                     >
+                      <TableCell className="w-10 px-2">
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${activity.activityTitle}`}
+                          checked={isSelected}
+                          onChange={() => toggleRow(String(activity._id))}
+                          className="h-4 w-4 accent-blue-600"
+                        />
+                      </TableCell>
                       <TableCell className="text-center text-xs text-gray-500 font-medium">
                         {index + 1}
                       </TableCell>
@@ -307,13 +472,42 @@ export function ProjectDataTable({ projectId, projectCode, projectColor, year }:
         </div>
 
         {activities.length === 0 && (
-          <div className="text-center py-12">
-            <Database className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-            <p className="text-sm text-gray-500">No data available for this project</p>
-            <p className="text-xs text-gray-400 mt-1">Activities will appear here when added to Google Sheets</p>
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <Database className="mb-3 h-12 w-12 text-gray-300" />
+            <p className="text-sm font-medium text-gray-600">
+              No activities yet for {projectDef?.shortName ?? projectCode}
+            </p>
+            <p className="mt-1 text-xs text-gray-400">
+              Connect a Google Sheet, import a CSV, or add manually.
+            </p>
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              <Link
+                href={`/import-log?program=${encodeURIComponent(projectDef?.shortName ?? "")}`}
+              >
+                <Button size="sm" variant="outline" className="gap-1.5 text-xs">
+                  <Upload className="h-3.5 w-3.5" /> Import CSV or paste
+                </Button>
+              </Link>
+              <Link href={`/projects/${projectCode.toLowerCase()}`}>
+                <Button size="sm" variant="outline" className="gap-1.5 text-xs">
+                  <Plus className="h-3.5 w-3.5" /> Add manually
+                </Button>
+              </Link>
+              <Link href={`/projects/${projectCode.toLowerCase()}`}>
+                <Button size="sm" variant="outline" className="gap-1.5 text-xs">
+                  <SettingsIcon className="h-3.5 w-3.5" /> Connect sheet
+                </Button>
+              </Link>
+            </div>
           </div>
         )}
       </CardContent>
     </Card>
   );
+}
+
+function csvCell(s: string): string {
+  const str = String(s ?? "");
+  if (/[",\n]/.test(str)) return `"${str.replace(/"/g, '""')}"`;
+  return str;
 }

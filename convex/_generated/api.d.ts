@@ -26,6 +26,7 @@ import type * as highlightFields from "../highlightFields.js";
 import type * as http from "../http.js";
 import type * as identities from "../identities.js";
 import type * as images from "../images.js";
+import type * as import_log from "../import_log.js";
 import type * as internAuth from "../internAuth.js";
 import type * as internPortal from "../internPortal.js";
 import type * as internPublic from "../internPublic.js";
@@ -60,6 +61,7 @@ import type * as supervisorTools from "../supervisorTools.js";
 import type * as supervisors from "../supervisors.js";
 import type * as syncMonitor from "../syncMonitor.js";
 import type * as testEnv from "../testEnv.js";
+import type * as user_accounts from "../user_accounts.js";
 
 import type {
   ApiFromModules,
@@ -86,6 +88,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   identities: typeof identities;
   images: typeof images;
+  import_log: typeof import_log;
   internAuth: typeof internAuth;
   internPortal: typeof internPortal;
   internPublic: typeof internPublic;
@@ -120,6 +123,7 @@ declare const fullApi: ApiFromModules<{
   supervisors: typeof supervisors;
   syncMonitor: typeof syncMonitor;
   testEnv: typeof testEnv;
+  user_accounts: typeof user_accounts;
 }>;
 
 /**
