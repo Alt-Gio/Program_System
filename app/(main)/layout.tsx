@@ -24,6 +24,7 @@ function MainLayoutContent({ children }: { children: React.ReactNode }) {
       "/import-log",
       "/reports",
       "/personnel",
+      "/attendance",
     ];
     routes.forEach((r) => router.prefetch(r));
   }, [router]);

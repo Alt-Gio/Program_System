@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -155,32 +155,12 @@ export function NotificationBell() {
               </div>
             ) : (
               notifications.map((n) => (
-                <Link
+                <NotificationItem
                   key={n.id}
-                  href={n.href}
-                  onClick={() => setOpen(false)}
-                  className={`flex gap-2.5 border-b border-gray-50 px-4 py-3 transition hover:bg-gray-50 ${
-                    n.timestamp > lastReadAt ? "bg-blue-50/40" : ""
-                  }`}
-                >
-                  <NotificationIcon kind={n.kind} />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm text-gray-900">
-                      {n.title}
-                    </div>
-                    {n.subtitle && (
-                      <div className="truncate text-[11px] text-gray-500">
-                        {n.subtitle}
-                      </div>
-                    )}
-                    <div
-                      className="mt-0.5 text-[10px] text-gray-400"
-                      title={absoluteTime(n.timestamp)}
-                    >
-                      {relativeTime(n.timestamp)}
-                    </div>
-                  </div>
-                </Link>
+                  n={n}
+                  unread={n.timestamp > lastReadAt}
+                  onClose={() => setOpen(false)}
+                />
               ))
             )}
           </div>
@@ -197,6 +177,50 @@ export function NotificationBell() {
     </div>
   );
 }
+
+// Each row is memoized so a fresh sync log entry doesn't re-render
+// the entire list — only the new row mounts.
+const NotificationItem = memo(
+  function NotificationItem({
+    n,
+    unread,
+    onClose,
+  }: {
+    n: Notification;
+    unread: boolean;
+    onClose: () => void;
+  }) {
+    return (
+      <Link
+        href={n.href}
+        onClick={onClose}
+        className={`flex gap-2.5 border-b border-gray-50 px-4 py-3 transition hover:bg-gray-50 ${
+          unread ? "bg-blue-50/40" : ""
+        }`}
+      >
+        <NotificationIcon kind={n.kind} />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm text-gray-900">{n.title}</div>
+          {n.subtitle && (
+            <div className="truncate text-[11px] text-gray-500">
+              {n.subtitle}
+            </div>
+          )}
+          <div
+            className="mt-0.5 text-[10px] text-gray-400"
+            title={absoluteTime(n.timestamp)}
+          >
+            {relativeTime(n.timestamp)}
+          </div>
+        </div>
+      </Link>
+    );
+  },
+  (prev, next) =>
+    prev.n.id === next.n.id &&
+    prev.n.timestamp === next.n.timestamp &&
+    prev.unread === next.unread,
+);
 
 function NotificationIcon({ kind }: { kind: Notification["kind"] }) {
   if (kind === "sync_success")

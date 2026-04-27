@@ -1,0 +1,151 @@
+# ─────────────────────────────────────────────────────────────
+# DICT R5 PMS — full-stack production compose
+#
+# Brings up everything on one box:
+#   • convex-backend       : self-hosted Convex (HTTP + WS on :3210, HTTP actions on :3211)
+#   • convex-dashboard     : optional admin UI (:6791)
+#   • face-server          : Python face recognition (GPU, :8001)
+#   • app                  : Next.js production server (:3000)
+#   • nginx (optional)     : single-port :80 reverse proxy in front of all of them
+#
+# Run from repo root:
+#   docker compose -f docker-compose.prod.yml --profile core up -d --build
+#   docker compose -f docker-compose.prod.yml --profile core --profile proxy up -d --build  # with nginx
+#
+# Stop:
+#   docker compose -f docker-compose.prod.yml down
+#
+# All env values come from .env.production (gitignored — copy from
+# .env.production.example and fill in). See SERVER_DEPLOYMENT.md.
+# ─────────────────────────────────────────────────────────────
+
+services:
+  # ── Self-hosted Convex backend ─────────────────────────────
+  convex-backend:
+    image: ghcr.io/get-convex/convex-backend:latest
+    container_name: pms-convex
+    profiles: ["core"]
+    restart: unless-stopped
+    ports:
+      - "3210:3210"   # client API (HTTP + WebSocket) — browsers connect here
+      - "3211:3211"   # HTTP actions (httpAction routes — face server posts here)
+    environment:
+      INSTANCE_NAME:                "pms-prod"
+      INSTANCE_SECRET:              "${CONVEX_INSTANCE_SECRET}"
+      CONVEX_CLOUD_ORIGIN:          "${CONVEX_CLOUD_ORIGIN:-http://localhost:3210}"
+      CONVEX_SITE_ORIGIN:           "${CONVEX_SITE_ORIGIN:-http://localhost:3211}"
+      DISABLE_BEACON:               "true"
+      REDACT_LOGS_TO_CLIENT:        "true"
+    volumes:
+      - convex_data:/convex/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3210/version"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ── Convex dashboard (admin UI) ────────────────────────────
+  convex-dashboard:
+    image: ghcr.io/get-convex/convex-dashboard:latest
+    container_name: pms-convex-dashboard
+    profiles: ["core"]
+    restart: unless-stopped
+    ports:
+      - "6791:6791"
+    environment:
+      NEXT_PUBLIC_DEPLOYMENT_URL: "${CONVEX_CLOUD_ORIGIN:-http://localhost:3210}"
+    depends_on:
+      - convex-backend
+
+  # ── Python face recognition server (GPU) ───────────────────
+  face-recognition:
+    build: ./cv-station/server
+    container_name: face-server
+    profiles: ["core"]
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      # Inside the compose network the face server talks to Convex via
+      # the service name, NOT localhost.
+      FACE_CONVEX_HTTP_URL: "http://convex-backend:3211"
+      FACE_CONVEX_ENDPOINT: "/face/attendance"
+      FACE_SHARED_TOKEN:    "${FACE_SHARED_TOKEN}"
+      FACE_API_TOKEN:       "${FACE_API_TOKEN:-}"
+      MATCH_THRESHOLD:      "${MATCH_THRESHOLD:-0.45}"
+      COOLDOWN_SECONDS:     "${COOLDOWN_SECONDS:-30}"
+      GPU_CONCURRENCY:      "${GPU_CONCURRENCY:-1}"
+      MAX_FRAME_BYTES:      "${MAX_FRAME_BYTES:-4194304}"
+      TIMEZONE:             "${TIMEZONE:-Asia/Manila}"
+      HOST:                 "0.0.0.0"
+      PORT:                 "8001"
+      CORS_ORIGINS:         "${CORS_ORIGINS:-*}"
+      FACE_DB_PATH:         "/data/faces.db"
+      LOG_LEVEL:            "${LOG_LEVEL:-INFO}"
+      UVICORN_LOG_LEVEL:    "${UVICORN_LOG_LEVEL:-info}"
+    volumes:
+      - face_data:/data
+      - face_models:/root/.insightface
+    depends_on:
+      convex-backend:
+        condition: service_healthy
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8001/healthz', timeout=3).status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+
+  # ── Next.js production server ──────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # NEXT_PUBLIC_* gets baked into the client bundle at build time.
+        # If you change CONVEX_CLOUD_ORIGIN, you MUST rebuild the app.
+        NEXT_PUBLIC_CONVEX_URL: "${NEXT_PUBLIC_CONVEX_URL}"
+    container_name: pms-app
+    profiles: ["core"]
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.production
+    depends_on:
+      convex-backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health", "||", "exit", "1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # ── Optional: Nginx reverse proxy (single-port :80) ────────
+  nginx:
+    image: nginx:alpine
+    container_name: pms-nginx
+    profiles: ["proxy"]
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app
+      - convex-backend
+      - face-recognition
+
+volumes:
+  convex_data:
+  face_data:
+  face_models:

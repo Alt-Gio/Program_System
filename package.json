@@ -4,10 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "dev:all": "concurrently -n \"convex,next\" -c \"cyan,green\" \"convex dev\" \"next dev\"",
+    "dev:turbo": "next dev --turbo",
+    "dev:all": "concurrently -n \"convex,next\" -c \"cyan,green\" \"convex dev\" \"next dev --turbo\"",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "analyze": "cross-env ANALYZE=true next build",
     "convex:dev": "convex dev",
     "convex:deploy": "convex deploy"
   },

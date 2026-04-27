@@ -255,7 +255,7 @@ export default function MapPage() {
   if (!MAPBOX_TOKEN) return <NoTokenFallback pins={provPins} />;
 
   return (
-    <div className="flex gap-4 h-[calc(100vh-5rem)] -mt-1">
+    <div className="page-content flex gap-4 h-[calc(100vh-5rem)] -mt-1">
 
       {/* ── Sidebar ─────────────────────────────────────────── */}
       <div className={cn(

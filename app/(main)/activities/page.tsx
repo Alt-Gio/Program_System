@@ -96,7 +96,7 @@ export default function ActivitiesPage() {
   const totalPax = useMemo(() => filtered.reduce((s, a) => s + calcTotal(a.participants), 0), [filtered]);
 
   return (
-    <div className="space-y-4">
+    <div className="page-content space-y-4">
 
       {/* ── Top bar ── */}
       <div className="flex items-center justify-between">

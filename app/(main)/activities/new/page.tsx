@@ -191,7 +191,7 @@ function NewActivityForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-4xl mx-auto space-y-6">
+    <form onSubmit={handleSubmit} className="page-content max-w-4xl mx-auto space-y-6">
       {/* Program & Location */}
       <Card>
         <CardHeader>

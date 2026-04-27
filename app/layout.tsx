@@ -5,7 +5,12 @@ import { Providers } from "./providers";
 import UserBadge from "@/components/auth/UserBadge";
 import ServiceWorkerRegistrar from "@/components/ServiceWorkerRegistrar";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+  preload: true,
+});
 
 export const metadata: Metadata = {
   title: "DICT Region V – Program Management System",
@@ -39,6 +44,28 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Resource hints — reduce TLS/handshake latency for hot external origins.
+            Mapbox is preconnected with credentials so tile fetches reuse the socket. */}
+        <link rel="preconnect" href="https://api.mapbox.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://events.mapbox.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://api.mapbox.com" />
+        <link rel="preconnect" href="https://lh3.googleusercontent.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://lh3.googleusercontent.com" />
+        <link rel="dns-prefetch" href="https://drive.google.com" />
+        {/* Convex: only emit a hint when the URL is set and is a real https origin
+            (skip for local dev http://127.0.0.1:3210 — no benefit there). */}
+        {(() => {
+          const url = process.env.NEXT_PUBLIC_CONVEX_URL ?? "";
+          if (!url.startsWith("https://")) return null;
+          let origin = "";
+          try { origin = new URL(url).origin; } catch { return null; }
+          return (
+            <>
+              <link rel="preconnect" href={origin} crossOrigin="anonymous" />
+              <link rel="dns-prefetch" href={origin} />
+            </>
+          );
+        })()}
         <link
           href="https://api.mapbox.com/mapbox-gl-js/v3.5.1/mapbox-gl.css"
           rel="stylesheet"

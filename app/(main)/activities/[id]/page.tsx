@@ -187,7 +187,7 @@ export default function ActivityDetailPage() {
   const projectLogo = def?.code ? `/logo/${def.code.toLowerCase() === 'egov' ? 'egov_ph' : def.code.toLowerCase() === 'wifi' ? 'freewifi' : def.code.toLowerCase() === 'cyber' ? 'cybersecurity' : def.code.toLowerCase() === 'ilcdb' || def.code.toLowerCase() === 'iidb' ? 'iidb' : def.code.toLowerCase()}_logo.png` : null;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="page-content max-w-4xl mx-auto space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <Link href="/activities">

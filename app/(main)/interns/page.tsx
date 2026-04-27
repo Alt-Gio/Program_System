@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useDeferredValue } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
@@ -433,18 +433,25 @@ export default function InternsPage() {
 
   const list = interns ?? [];
 
+  // Defer the search query so the input stays responsive even on large lists.
+  // React will run the filter at lower priority — the textbox won't stutter
+  // while we lowercase + match every intern across 5 fields per keystroke.
+  const deferredSearch = useDeferredValue(search);
+  const isFilterStale  = deferredSearch !== search;
+
   const filtered = useMemo(() => {
+    const q = deferredSearch.toLowerCase();
     return list.filter(i => {
-      const matchSearch = !search ||
-        i.fullName.toLowerCase().includes(search.toLowerCase()) ||
-        i.school.toLowerCase().includes(search.toLowerCase()) ||
-        i.course.toLowerCase().includes(search.toLowerCase()) ||
-        (i.email ?? "").toLowerCase().includes(search.toLowerCase()) ||
-        (i.department ?? "").toLowerCase().includes(search.toLowerCase());
+      const matchSearch = !q ||
+        i.fullName.toLowerCase().includes(q) ||
+        i.school.toLowerCase().includes(q) ||
+        i.course.toLowerCase().includes(q) ||
+        (i.email ?? "").toLowerCase().includes(q) ||
+        (i.department ?? "").toLowerCase().includes(q);
       const matchStatus = filterStatus === "ALL" || i.status === filterStatus;
       return matchSearch && matchStatus;
     });
-  }, [list, search, filterStatus]);
+  }, [list, deferredSearch, filterStatus]);
 
   const kpis = useMemo(() => ({
     total:     list.length,
@@ -470,7 +477,7 @@ export default function InternsPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 space-y-5">
+    <div className="page-content max-w-7xl mx-auto px-4 py-6 space-y-5">
 
       {/* ── Header ── */}
       <div className="flex items-start justify-between gap-4">
@@ -540,7 +547,10 @@ export default function InternsPage() {
             );
           })}
         </div>
-        <span className="text-xs text-gray-400 ml-auto">
+        <span
+          className="text-xs text-gray-400 ml-auto transition-opacity"
+          style={{ opacity: isFilterStale ? 0.4 : 1 }}
+        >
           {filtered.length} of {list.length} intern{list.length !== 1 ? "s" : ""}
         </span>
       </div>

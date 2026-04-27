@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import DTCShowcase from "@/components/dtc-showcase";
 import { FacebookPageEmbed } from "@/components/facebook-embed";
 import { DTCOffices } from "@/components/dtc-offices";
@@ -16,7 +17,13 @@ import {
 import { cn, numberWithCommas, getCompletionRate } from "@/lib/utils";
 import { DICT_PROJECTS, CURRENT_YEAR } from "@/lib/types";
 import { R5_PROVINCE_COORDS, R5_GEO } from "@/lib/r5-data";
-import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from "recharts";
+
+// Recharts is split out of the landing's initial chunk — only loaded when
+// a project card actually renders a status bar chart.
+const StatusMiniChart = dynamic(
+  () => import("@/components/landing/StatusMiniChart"),
+  { ssr: false, loading: () => <div style={{ height: 60 }} /> },
+);
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -284,13 +291,7 @@ function StatsPanel({
           <p className={cn("text-[9px] uppercase tracking-widest mb-1.5", dark ? "text-white/30" : "text-gray-400")}>
             By Status
           </p>
-          <ResponsiveContainer width="100%" height={60}>
-            <BarChart data={statusData} barSize={10}>
-              <Bar dataKey="count" fill={project.color} radius={[2, 2, 0, 0]} />
-              <XAxis dataKey="name" tick={{ fontSize: 7, fill: dark ? "#ffffff60" : "#6b7280" }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ fontSize: 10, background: dark ? "#1a1a2e" : "#fff", border: "none", borderRadius: 6 }} />
-            </BarChart>
-          </ResponsiveContainer>
+          <StatusMiniChart data={statusData} fill={project.color} dark={dark} />
         </div>
       )}
 

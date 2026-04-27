@@ -15,9 +15,19 @@ import {
 } from "lucide-react";
 import { ProjectSettingsDialog } from "@/components/project-settings/ProjectSettingsDialog";
 import { ExportDialog } from "@/components/export/ExportDialog";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
-} from "recharts";
+import dynamic from "next/dynamic";
+
+// Code-split the recharts bundle out of the project page's initial JS.
+// The header, KPIs, table all paint before the chart loads.
+const ProjectMonthlyChart = dynamic(
+  () => import("@/components/projects/ProjectMonthlyChart"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[190px] w-full animate-pulse rounded-md bg-muted" />
+    ),
+  },
+);
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -481,34 +491,17 @@ export default function ProjectPage() {
             </div>
           </CardHeader>
           <CardContent className="px-1 sm:px-2 pb-3 sm:pb-4">
-            <ResponsiveContainer width="100%" height={190}>
-              <BarChart data={yearMonthData} barSize={13} margin={{ left: -14, right: 4 }}
-                onClick={(data) => {
-                  if (!data?.activePayload?.[0]) return;
-                  const mn = (data.activePayload[0].payload as any).monthNum as number;
-                  setSelectedMonth(selectedMonth === mn ? null : mn);
-                  setSelectedQuarter(null);
-                }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 9 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 9 }} axisLine={false} tickLine={false} width={26} />
-                <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} cursor={{ fill: "#f3f4f6" }} />
-                <Bar dataKey="count" name="Activities" radius={[3, 3, 0, 0]} cursor="pointer">
-                  {yearMonthData.map((entry) => {
-                    const isHighlighted =
-                      (selectedMonth === null && selectedQuarter === null) ||
-                      selectedMonth === entry.monthNum ||
-                      (selectedQuarter !== null && QUARTER_MONTHS[selectedQuarter].includes(entry.monthNum));
-                    return (
-                      <Cell
-                        key={`cell-${entry.monthNum}`}
-                        fill={isHighlighted ? projectDef.color : `${projectDef.color}28`}
-                      />
-                    );
-                  })}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <ProjectMonthlyChart
+              data={yearMonthData}
+              highlightColor={projectDef.color}
+              selectedMonth={selectedMonth}
+              selectedQuarter={selectedQuarter}
+              quarterMonthsMap={QUARTER_MONTHS}
+              onBarClick={(mn) => {
+                setSelectedMonth(selectedMonth === mn ? null : mn);
+                setSelectedQuarter(null);
+              }}
+            />
           </CardContent>
         </Card>
 

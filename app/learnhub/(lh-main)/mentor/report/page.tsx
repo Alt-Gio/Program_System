@@ -3,11 +3,32 @@
 import { useState, useCallback } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import {
-  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, Legend,
-} from "recharts";
+import dynamic from "next/dynamic";
 import { useLearnhubSession } from "@/lib/learnhub/hooks";
+
+// Recharts is split out of this page's initial chunk — the page shell
+// (KPI tiles, headings) paints immediately, charts hydrate after.
+const chartLoader = () => (
+  <div style={{ height: 180, display: "flex", alignItems: "center", justifyContent: "center", color: "#9ba3cc", fontSize: 12 }}>
+    Loading chart…
+  </div>
+);
+const ModalityPieChart = dynamic(
+  () => import("@/components/learnhub/mentor/MentorReportCharts").then((m) => m.ModalityPieChart),
+  { ssr: false, loading: chartLoader },
+);
+const ProvinceBarChart = dynamic(
+  () => import("@/components/learnhub/mentor/MentorReportCharts").then((m) => m.ProvinceBarChart),
+  { ssr: false, loading: chartLoader },
+);
+const SectorPieChart = dynamic(
+  () => import("@/components/learnhub/mentor/MentorReportCharts").then((m) => m.SectorPieChart),
+  { ssr: false, loading: chartLoader },
+);
+const CategoryBarChart = dynamic(
+  () => import("@/components/learnhub/mentor/MentorReportCharts").then((m) => m.CategoryBarChart),
+  { ssr: false, loading: chartLoader },
+);
 
 type Quarter = "Q1" | "Q2" | "Q3" | "Q4";
 const QUARTERS: Quarter[] = ["Q1", "Q2", "Q3", "Q4"];
@@ -21,9 +42,6 @@ const PROVINCE_ABBR: Record<string, string> = {
   "Catanduanes": "CT",
   "Camarines Norte": "CN",
 };
-
-const PROVINCE_COLORS = ["#5b6cff", "#22d3a0", "#ff8c42", "#fbbf24", "#a78bfa", "#f472b6"];
-const PIE_COLORS = ["#5b6cff", "#22d3a0", "#ff8c42", "#fbbf24", "#a78bfa"];
 
 const SECTOR_LABELS: Record<string, string> = {
   gov_workforce: "Gov Workforce",
@@ -72,17 +90,6 @@ function ProvinceAvatar({ name, count }: { name: string; count: number }) {
     </div>
   );
 }
-
-// ── Chart tooltip ─────────────────────────────────────────────────────────────
-const ChartTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: string }) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div style={{ background: "#1a1f3a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "8px 14px" }}>
-      {label && <p style={{ color: "#9ba3cc", fontSize: 12, marginBottom: 4 }}>{label}</p>}
-      <p style={{ color: "#e8eaff", fontWeight: 700, fontSize: 14 }}>{payload[0].value.toLocaleString()}</p>
-    </div>
-  );
-};
 
 // ── Gender Bar ────────────────────────────────────────────────────────────────
 function GenderBar({ label, count, total, color }: { label: string; count: number; total: number; color: string }) {
@@ -237,15 +244,7 @@ export default function MentorReportPage() {
           <div className="report-card" style={{ background: "#131626", borderRadius: 16, padding: "20px", border: "1px solid rgba(255,255,255,0.07)" }}>
             <p style={{ color: "#9ba3cc", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>Training Modality</p>
             {modalityData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={180}>
-                <PieChart>
-                  <Pie data={modalityData} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={3} dataKey="value">
-                    {modalityData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip content={<ChartTooltip />} />
-                  <Legend formatter={(v) => <span style={{ color: "#9ba3cc", fontSize: 12 }}>{v}</span>} />
-                </PieChart>
-              </ResponsiveContainer>
+              <ModalityPieChart data={modalityData} />
             ) : (
               <div style={{ height: 180, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <p style={{ color: "#9ba3cc", fontSize: 13 }}>No data for {quarter} {year}</p>
@@ -256,18 +255,7 @@ export default function MentorReportPage() {
           <div className="report-card" style={{ background: "#131626", borderRadius: 16, padding: "20px", border: "1px solid rgba(255,255,255,0.07)" }}>
             <p style={{ color: "#9ba3cc", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>Beneficiaries by Province</p>
             {(reportData?.provinceDistribution ?? []).some((p) => p.count > 0) ? (
-              <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={reportData?.provinceDistribution ?? []} barSize={22}>
-                  <XAxis dataKey="province" tick={{ fill: "#9ba3cc", fontSize: 10 }} tickFormatter={(v) => PROVINCE_ABBR[v] ?? v} />
-                  <YAxis tick={{ fill: "#9ba3cc", fontSize: 10 }} />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                    {(reportData?.provinceDistribution ?? []).map((_, i) => (
-                      <Cell key={i} fill={PROVINCE_COLORS[i % PROVINCE_COLORS.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <ProvinceBarChart data={reportData?.provinceDistribution ?? []} abbrMap={PROVINCE_ABBR} />
             ) : (
               <div style={{ height: 180, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <p style={{ color: "#9ba3cc", fontSize: 13 }}>No data for {quarter} {year}</p>
@@ -338,15 +326,7 @@ export default function MentorReportPage() {
           <div className="report-card" style={{ background: "#131626", borderRadius: 16, padding: "20px", border: "1px solid rgba(255,255,255,0.07)" }}>
             <p style={{ color: "#9ba3cc", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>Beneficiary Sector</p>
             {sectorData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={180}>
-                <PieChart>
-                  <Pie data={sectorData} cx="50%" cy="50%" outerRadius={70} paddingAngle={3} dataKey="value">
-                    {sectorData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip content={<ChartTooltip />} />
-                  <Legend formatter={(v) => <span style={{ color: "#9ba3cc", fontSize: 11 }}>{v}</span>} />
-                </PieChart>
-              </ResponsiveContainer>
+              <SectorPieChart data={sectorData} />
             ) : (
               <div style={{ height: 180, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <p style={{ color: "#9ba3cc", fontSize: 13 }}>No sector data yet</p>
@@ -357,16 +337,7 @@ export default function MentorReportPage() {
           <div className="report-card" style={{ background: "#131626", borderRadius: 16, padding: "20px", border: "1px solid rgba(255,255,255,0.07)" }}>
             <p style={{ color: "#9ba3cc", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>Key Category Performance</p>
             {categoryData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={categoryData} layout="vertical" barSize={16}>
-                  <XAxis type="number" tick={{ fill: "#9ba3cc", fontSize: 10 }} />
-                  <YAxis type="category" dataKey="category" tick={{ fill: "#9ba3cc", fontSize: 10 }} width={100} />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                    {categoryData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <CategoryBarChart data={categoryData} />
             ) : (
               <div style={{ height: 180, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <p style={{ color: "#9ba3cc", fontSize: 13 }}>No category data yet</p>

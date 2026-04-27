@@ -94,7 +94,13 @@
   /* Applied by individual page components; fires on every route change,
      unlike `animate-fade-in` on the persistent <main>. */
   .page-content {
-    animation: page-enter 0.15s ease-out;
+    animation: page-enter 0.12s ease-out;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .page-content,
+    .animate-fade-in {
+      animation: none;
+    }
   }
   .perspective-1000 {
     perspective: 1000px;

@@ -1,6 +1,47 @@
 import { v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import { query, mutation } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
+
+// Paginated variant of listActivities — additive, leaves the existing
+// `listActivities` (which uses `.collect()`) untouched so existing
+// callers behave the same.
+export const listActivitiesPaginated = query({
+  args: {
+    projectId: v.optional(v.id("projects")),
+    provinceId: v.optional(v.id("provinces")),
+    year: v.optional(v.number()),
+    month: v.optional(v.number()),
+    status: v.optional(v.string()),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    let qb = args.projectId
+      ? ctx.db
+          .query("activities")
+          .withIndex("by_project", (i) =>
+            i.eq("projectId", args.projectId!),
+          )
+      : args.provinceId
+        ? ctx.db
+            .query("activities")
+            .withIndex("by_province", (i) =>
+              i.eq("provinceId", args.provinceId!),
+            )
+        : ctx.db.query("activities");
+
+    const result = await qb.order("desc").paginate(args.paginationOpts);
+
+    // Filters that aren't covered by the chosen index are applied
+    // post-paginate. With small page sizes this is negligible.
+    let page = result.page;
+    if (args.year) page = page.filter((a) => a.year === args.year);
+    if (args.month) page = page.filter((a) => a.month === args.month);
+    if (args.status) page = page.filter((a) => a.status === args.status);
+
+    return { ...result, page };
+  },
+});
 
 export const listActivities = query({
   args: {

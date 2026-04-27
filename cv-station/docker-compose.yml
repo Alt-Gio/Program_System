@@ -1,0 +1,43 @@
+# ─────────────────────────────────────────────────────────────
+# Face Recognition Server — standalone compose file.
+#
+# Run from the repo root:
+#   docker compose -f cv-station/docker-compose.yml up --build -d
+#
+# This file is deliberately independent from the Next.js / Convex
+# dev workflow — it only brings up the Python face server. Deploy
+# it on the GPU box; point the browser at ws(s)://<gpu-box>:8001/ws/camera.
+# ─────────────────────────────────────────────────────────────
+
+services:
+  face-server:
+    build: ./server
+    container_name: face-server
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    env_file:
+      - ./server/.env
+    volumes:
+      # SQLite + model cache persist across rebuilds.
+      - face_data:/data
+      - face_models:/root/.insightface
+    # GPU access via the NVIDIA Container Toolkit (preferred over
+    # the legacy `runtime: nvidia`).
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8001/healthz', timeout=3).status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s   # model load can take a while on first boot
+
+volumes:
+  face_data:
+  face_models:

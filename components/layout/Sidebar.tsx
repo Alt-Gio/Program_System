@@ -17,6 +17,7 @@ import {
   PanelLeftOpen,
   Download,
   Keyboard,
+  ScanFace,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -41,6 +42,7 @@ const navItems = [
   { href: "/map", label: "Map View", icon: Map },
   { href: "/reports", label: "Reports", icon: FileText },
   { href: "/import-log", label: "Import & Log", icon: Download },
+  { href: "/attendance", label: "Attendance", icon: ScanFace },
 ];
 
 const projects = [

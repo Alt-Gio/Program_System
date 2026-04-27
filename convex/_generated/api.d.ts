@@ -19,6 +19,7 @@ import type * as dtcLogs from "../dtcLogs.js";
 import type * as dtcPcs from "../dtcPcs.js";
 import type * as dtcSettings from "../dtcSettings.js";
 import type * as emails from "../emails.js";
+import type * as face_recognition from "../face_recognition.js";
 import type * as files from "../files.js";
 import type * as gamification from "../gamification.js";
 import type * as googleSheetsWrite from "../googleSheetsWrite.js";
@@ -81,6 +82,7 @@ declare const fullApi: ApiFromModules<{
   dtcPcs: typeof dtcPcs;
   dtcSettings: typeof dtcSettings;
   emails: typeof emails;
+  face_recognition: typeof face_recognition;
   files: typeof files;
   gamification: typeof gamification;
   googleSheetsWrite: typeof googleSheetsWrite;

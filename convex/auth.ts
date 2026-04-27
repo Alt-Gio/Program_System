@@ -114,6 +114,29 @@ export const listUsers = query({
   },
 });
 
+/**
+ * List all active auth users for UI pickers (e.g. the Register Face page).
+ *
+ * Returns only public-safe fields (id, name, email, role) — no password
+ * hashes, no session tokens, no Google IDs. Unlike `listUsers`, this is
+ * NOT admin-gated because the /attendance/register page needs any
+ * authenticated staff member to be able to enroll someone's face.
+ */
+export const listEnrollableAuthUsers = query({
+  args: {},
+  handler: async (ctx) => {
+    const users = await ctx.db.query("users").collect();
+    return users
+      .filter((u) => u.isActive)
+      .map((u) => ({
+        id:       u._id,
+        name:     u.fullName,
+        email:    u.email,
+        role:     u.role,
+      }));
+  },
+});
+
 // ============================================================
 // MUTATIONS
 // ============================================================

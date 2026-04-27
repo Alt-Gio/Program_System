@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { learnhubTables } from "./learnhub_schema";
 import { importLogTables } from "./import_log";
 import { userAccountTables } from "./user_accounts";
+import { faceRecognitionTables } from "./face_recognition";
 
 // ============================================================
 // DICT Region V – Program Management System
@@ -844,4 +845,9 @@ export default defineSchema({
   // USER ACCOUNTS (imported from user_accounts.ts)
   // ----------------------------------------------------------
   ...userAccountTables,
+
+  // ----------------------------------------------------------
+  // FACE RECOGNITION ATTENDANCE (imported from face_recognition.ts)
+  // ----------------------------------------------------------
+  ...faceRecognitionTables,
 });

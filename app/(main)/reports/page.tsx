@@ -76,7 +76,7 @@ function SheetsTab() {
   const webhookBase = convexSiteUrl ? `${convexSiteUrl}/api/sheets-sync` : "Configure NEXT_PUBLIC_CONVEX_SITE_URL";
 
   return (
-    <div className="space-y-6">
+    <div className="page-content space-y-6">
       {/* Architecture explanation */}
       <Card className="border-blue-200 bg-blue-50">
         <CardContent className="p-4">

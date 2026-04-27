@@ -42,8 +42,8 @@ export default function AttendanceOverviewPage() {
   const isLoading = !todayStats || !recentActivity;
 
   return (
-    <div className="space-y-6">
-      {/* ── Header ──────────────────────────────────────────── */}
+    <div className="page-content space-y-6">
+      {/* ── Header ──────────────────────────────────── */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Attendance Overview</h1>
