@@ -1,4 +1,5 @@
 "use client";
+import { Suspense } from "react";
 
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "convex/react";
@@ -10,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export default function SupervisorRegisterPage() {
+function SupervisorRegisterPageInner() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const token        = searchParams.get("token") ?? "";
@@ -147,4 +148,12 @@ export default function SupervisorRegisterPage() {
       </p>
     </div>
   );
+}
+
+export default function SupervisorRegisterPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>}>
+      <SupervisorRegisterPageInner />
+    </Suspense>
+  )
 }

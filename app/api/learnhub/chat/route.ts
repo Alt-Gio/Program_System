@@ -1,3 +1,5 @@
+export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server";
 import { verifySession, SESSION_COOKIE } from "@/lib/learnhub/auth";
 import {

@@ -1,15 +1,11 @@
-import admin from "firebase-admin";
+import admin from "firebase-admin"
 
-// Server-only — never import from client components
+function getAdminApp(): admin.app.App {
+  const existing = admin.apps.find((a) => a?.name === "learnhub-admin")
+  if (existing) return existing
 
-function initAdmin(): admin.app.App {
-  if (admin.apps.find((a) => a?.name === "learnhub-admin")) {
-    return admin.app("learnhub-admin");
-  }
-  const privateKey = process.env.LH_FIREBASE_ADMIN_PRIVATE_KEY?.replace(
-    /\\n/g,
-    "\n"
-  );
+  const privateKey = process.env.LH_FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, "\n")
+
   return admin.initializeApp(
     {
       credential: admin.credential.cert({
@@ -19,10 +15,21 @@ function initAdmin(): admin.app.App {
       }),
     },
     "learnhub-admin"
-  );
+  )
 }
 
-export const adminApp = initAdmin();
-export const adminAuth = adminApp.auth();
-export const adminFirestore = adminApp.firestore();
-export const adminMessaging = adminApp.messaging();
+export const adminApp = new Proxy({} as admin.app.App, {
+  get(_t, prop) { return (getAdminApp() as any)[prop] }
+})
+
+export const adminAuth = new Proxy({} as admin.auth.Auth, {
+  get(_t, prop) { return (getAdminApp().auth() as any)[prop] }
+})
+
+export const adminFirestore = new Proxy({} as admin.firestore.Firestore, {
+  get(_t, prop) { return (getAdminApp().firestore() as any)[prop] }
+})
+
+export const adminMessaging = new Proxy({} as admin.messaging.Messaging, {
+  get(_t, prop) { return (getAdminApp().messaging() as any)[prop] }
+})

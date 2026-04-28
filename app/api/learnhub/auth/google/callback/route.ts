@@ -1,3 +1,5 @@
+export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
 import { NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";

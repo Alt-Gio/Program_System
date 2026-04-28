@@ -1,4 +1,5 @@
 "use client";
+import { Suspense } from "react";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -19,7 +20,7 @@ function landingForRole(role: string): string {
   return "/";
 }
 
-export default function AcceptInvitePage() {
+function AcceptInvitePageInner() {
   const router = useRouter();
   const params = useSearchParams();
   const token = params.get("token") ?? "";
@@ -337,4 +338,12 @@ export default function AcceptInvitePage() {
       </div>
     </div>
   );
+}
+
+export default function AcceptInvitePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>}>
+      <AcceptInvitePageInner />
+    </Suspense>
+  )
 }
