@@ -211,3 +211,45 @@ export const markVideoCompressed = mutation({
     })
   }
 })
+
+export const getVideoUrl = query({
+  args: { storageId: v.id("_storage") },
+  handler: async (ctx, args) => {
+    return await ctx.storage.getUrl(args.storageId)
+  }
+})
+
+export const getVideoStorageStats = query({
+  args: {},
+  handler: async (ctx) => {
+    const posts = await ctx.db
+      .query("learnhub_posts")
+      .filter(q => q.eq(q.field("type"), "video"))
+      .collect()
+
+    const total = posts.length
+    const compressed = posts.filter(p => p.compressed === true).length
+    const uncompressed = total - compressed
+
+    const totalOriginalBytes = posts.reduce((sum, p) => {
+      const meta = p.metadata as Record<string, unknown>
+      return sum + ((meta?.sizeBytes as number) ?? 0)
+    }, 0)
+
+    const videos = posts.map(p => {
+      const meta = p.metadata as Record<string, unknown>
+      return {
+        id: p._id,
+        title: (meta?.title as string) ?? (meta?.courseTitle as string) ?? "Untitled",
+        storageId: meta?.storageId as string,
+        sizeBytes: (meta?.sizeBytes as number) ?? 0,
+        compressed: p.compressed ?? false,
+        contentType: (meta?.contentType as string) ?? "video/mp4",
+        createdAt: p.createdAt,
+        content: p.content,
+      }
+    })
+
+    return { total, compressed, uncompressed, totalOriginalBytes, videos }
+  }
+})

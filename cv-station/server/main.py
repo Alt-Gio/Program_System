@@ -797,7 +797,7 @@ if __name__ == "__main__":
 import subprocess
 import tempfile
 import httpx as _httpx
-from fastapi import UploadFile, File, Form
+from fastapi import UploadFile, File, Form, Request
 from fastapi.responses import FileResponse
 
 @app.post("/compress")
@@ -833,9 +833,11 @@ async def compress_video(
     # Choose codec and settings based on duration
     if duration <= 10:
         # Very short — WebM VP9 for tiny file size + looping
-        output_path = input_path + ".webm"
-        video_args = ["-c:v", "libvpx-vp9", "-b:v", "800k", "-crf", "33", "-speed", "4"]
-        content_type = "video/webm"
+        output_path = input_path + ".mp4"
+        video_args = ["-c:v", "h264_nvenc", "-preset", "fast", "-b:v", "800k",
+                      "-vf", "scale=trunc(iw*min(1\,1280/iw)/2)*2:trunc(ih*min(1\,720/ih)/2)*2",
+                      "-profile:v", "baseline", "-movflags", "+faststart"]
+        content_type = "video/mp4"
     elif duration <= 30:
         # Short — H.264 NVENC 720p 1.5Mbps
         video_args = ["-c:v", "h264_nvenc", "-preset", "fast", "-b:v", "1500k",
@@ -941,9 +943,11 @@ async def compress_from_convex(request: Request):
 
     # Choose format
     if duration <= 10:
-        output_path = input_path + ".webm"
-        video_args = ["-c:v", "libvpx-vp9", "-b:v", "800k", "-crf", "33", "-speed", "4"]
-        content_type = "video/webm"
+        output_path = input_path + ".mp4"
+        video_args = ["-c:v", "h264_nvenc", "-preset", "fast", "-b:v", "800k",
+                      "-vf", "scale=trunc(iw*min(1\,1280/iw)/2)*2:trunc(ih*min(1\,720/ih)/2)*2",
+                      "-profile:v", "baseline", "-movflags", "+faststart"]
+        content_type = "video/mp4"
     elif duration <= 30:
         output_path = input_path + ".mp4"
         video_args = ["-c:v", "h264_nvenc", "-preset", "fast", "-b:v", "1500k",

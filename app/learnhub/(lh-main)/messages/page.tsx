@@ -1,4 +1,5 @@
 "use client";
+import { Suspense } from "react";
 
 /**
  * LearnHub Messages — Meta Messenger / WhatsApp hybrid.
@@ -32,7 +33,7 @@ import { ArrowLeft, Edit3, MessageCircle, Search, Send, X } from "lucide-react";
 // Page
 // ────────────────────────────────────────────────────────────────────
 
-export default function MessagesPage() {
+function MessagesPageInner() {
   const { userId } = useLearnhubSession();
   const sp = useSearchParams();
   const router = useRouter();
@@ -570,4 +571,12 @@ function shortTime(ts: number): string {
     return date.toLocaleDateString([], { weekday: "short" });
   }
   return date.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+export default function MessagesPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>}>
+      <MessagesPageInner />
+    </Suspense>
+  )
 }
