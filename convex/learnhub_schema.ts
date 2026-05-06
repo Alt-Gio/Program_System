@@ -353,6 +353,83 @@ export const learnhubTables = {
     .index("by_user", ["userId"])
     .index("by_user_post", ["userId", "postId"]),
 
+  learnhub_video_sessions: defineTable({
+    userId: v.id("learnhub_users"),
+    postId: v.optional(v.id("learnhub_posts")),
+    videoId: v.string(),
+    sourceUrl: v.optional(v.string()),
+    title: v.optional(v.string()),
+    thumbnail: v.optional(v.string()),
+    channelName: v.optional(v.string()),
+    status: v.union(
+      v.literal("not_started"),
+      v.literal("in_progress"),
+      v.literal("completed")
+    ),
+    lastPositionSec: v.number(),
+    durationSec: v.optional(v.number()),
+    progressPct: v.number(),
+    summary: v.optional(v.string()),
+    aiSummary: v.optional(v.any()),
+    takeaways: v.optional(v.array(v.string())),
+    visibility: v.union(
+      v.literal("private"),
+      v.literal("mentors"),
+      v.literal("learnhub"),
+      v.literal("public")
+    ),
+    sharedAt: v.optional(v.number()),
+    driveFileId: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_video", ["userId", "videoId"])
+    .index("by_user_status", ["userId", "status"])
+    .index("by_visibility", ["visibility"]),
+
+  learnhub_video_notes: defineTable({
+    sessionId: v.id("learnhub_video_sessions"),
+    userId: v.id("learnhub_users"),
+    timestampSec: v.number(),
+    content: v.string(),
+    kind: v.union(
+      v.literal("note"),
+      v.literal("question"),
+      v.literal("bookmark"),
+      v.literal("takeaway")
+    ),
+    label: v.optional(v.string()),
+    isShared: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_user", ["userId"])
+    .index("by_session_timestamp", ["sessionId", "timestampSec"]),
+
+  learnhub_video_timeline_events: defineTable({
+    sessionId: v.id("learnhub_video_sessions"),
+    userId: v.id("learnhub_users"),
+    type: v.union(
+      v.literal("started"),
+      v.literal("progress"),
+      v.literal("note"),
+      v.literal("question"),
+      v.literal("summary"),
+      v.literal("quiz"),
+      v.literal("completed"),
+      v.literal("shared"),
+      v.literal("exported")
+    ),
+    timestampSec: v.optional(v.number()),
+    message: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_user", ["userId"]),
+
   learnhub_goals: defineTable({
     userId: v.id("learnhub_users"),
     title: v.string(),

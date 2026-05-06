@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -218,6 +219,16 @@ export function FeedPost({ post, userId, onLike }: FeedPostProps) {
   };
 
   const commentInputRef = useRef<HTMLInputElement>(null);
+  const videoFlowHref =
+    post.type === "youtube" && post.metadata.videoId
+      ? [
+          `/learnhub/video-flow?videoId=${encodeURIComponent(String(post.metadata.videoId))}`,
+          post.convexPostId ? `postId=${encodeURIComponent(post.convexPostId)}` : null,
+          post.metadata.title ? `title=${encodeURIComponent(String(post.metadata.title))}` : null,
+          post.metadata.thumbnail ? `thumbnail=${encodeURIComponent(String(post.metadata.thumbnail))}` : null,
+          post.metadata.channelName ? `channel=${encodeURIComponent(String(post.metadata.channelName))}` : null,
+        ].filter(Boolean).join("&")
+      : null;
 
   return (
     <article
@@ -346,6 +357,13 @@ export function FeedPost({ post, userId, onLike }: FeedPostProps) {
           <span className="lh-action-icon">{isBookmarked ? "🔖" : "📑"}</span>
           {isBookmarked && <span style={{ fontSize: 12 }}>Saved</span>}
         </button>
+
+        {videoFlowHref && (
+          <Link href={videoFlowHref} className="lh-action-btn lh-video-flow-action">
+            <span className="lh-action-icon">🎥</span>
+            <span>Learn</span>
+          </Link>
+        )}
       </div>
 
       {/* Inline comment input (always visible) */}
