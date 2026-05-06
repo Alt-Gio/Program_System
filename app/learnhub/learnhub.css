@@ -2418,14 +2418,35 @@ button:active { transform: scale(0.97); }
 .lh-topnav { position: fixed; z-index: 60; }
 
 /* ════════════════════════════════════════════════════════════════════
-   Feed masonry layout (2-column Pinterest-style)
+   Feed masonry layout (Pinterest-style, true variable-height columns)
+   Implemented with CSS multi-column so card heights pack naturally.
+   Each .lh-post becomes a column-fragment; break-inside:avoid keeps a
+   card whole. Cards must be display:inline-block + width:100% inside a
+   columned container.
    ════════════════════════════════════════════════════════════════════ */
 .lh-feed-masonry {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  align-items: start;
+  column-count: 2;
+  column-gap: 12px;
+  width: 100%;
 }
+.lh-feed-masonry > .lh-post {
+  display: inline-block;
+  width: 100%;
+  margin: 0 0 12px;
+  break-inside: avoid;
+  -webkit-column-break-inside: avoid;
+  page-break-inside: avoid;
+}
+/* Columns scale with viewport. Container queries on the parent layout
+   would be ideal, but the lh-main grid already keeps the feed column
+   inside a stable ~640–960px range, so width-based breakpoints work. */
+@media (min-width: 900px)  { .lh-feed-masonry { column-count: 2; } }
+@media (min-width: 1200px) { .lh-feed-masonry { column-count: 3; } }
+@media (min-width: 1600px) { .lh-feed-masonry { column-count: 4; } }
+@media (max-width: 540px)  { .lh-feed-masonry { column-count: 1; } }
+
+/* Outer page wrapper still uses lh-feed-col as a flex column for the
+   greeting / composer / feed stack. Kept for backwards compatibility. */
 .lh-feed-col {
   display: flex;
   flex-direction: column;
@@ -2434,8 +2455,45 @@ button:active { transform: scale(0.97); }
   min-width: 0;
   box-sizing: border-box;
 }
-@media (max-width: 768px) {
-  .lh-feed-masonry { grid-template-columns: 1fr; }
+
+/* Tab strip on the feed page (For you / Saved) */
+.lh-feed-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--lh-surface-2);
+  border: 1px solid var(--lh-surface-3);
+  margin-bottom: 4px;
+  align-self: flex-start;
+}
+.lh-feed-tab {
+  padding: 6px 14px;
+  border-radius: 8px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lh-text-2);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  transition: background 0.15s, color 0.15s;
+}
+.lh-feed-tab:hover { color: var(--lh-text); }
+.lh-feed-tab.is-active {
+  background: var(--lh-bg);
+  color: var(--lh-text);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+/* Saved-section status group headers */
+.lh-saved-group-title {
+  margin: 14px 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lh-text-3);
 }
 
 /* ── Hide old tab strip if any references remain ─────────────────── */

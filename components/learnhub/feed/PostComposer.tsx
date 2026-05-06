@@ -7,7 +7,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import type { MockPost } from "./FeedPost";
 import { DTC_OFFICES } from "@/lib/learnhub/dtc-offices";
 
-type PostTypeValue = "text" | "youtube" | "meet" | "drive" | "form";
+type PostTypeValue = "text" | "youtube" | "video" | "meet" | "drive" | "form";
 interface PostTypeDef {
   value: PostTypeValue;
   label: string;
@@ -17,10 +17,15 @@ interface PostTypeDef {
 const ALL_POST_TYPES: readonly PostTypeDef[] = [
   { value: "text", label: "Text", emoji: "✍️" },
   { value: "youtube", label: "YouTube", emoji: "▶️" },
+  { value: "video", label: "Video", emoji: "🎬" },
   { value: "meet", label: "Meet", emoji: "📹", mentorOnly: true },
   { value: "drive", label: "Drive", emoji: "📄" },
   { value: "form", label: "Form", emoji: "📋" },
 ];
+
+// Cap on uploaded course videos. ~200 MB keeps Convex bandwidth bounded
+// while still allowing a 5–10 minute lesson at reasonable quality.
+const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
 
 interface PostComposerProps {
   onPost: (post: MockPost) => void;
@@ -114,9 +119,19 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
   const [thumbnail, setThumbnail] = useState<string | null>(null);
   const [compressing, setCompressing] = useState(false);
   const [posting, setPosting] = useState(false);
+  const [videoStorageId, setVideoStorageId] = useState<string | null>(null);
+  const [videoFileName, setVideoFileName] = useState<string | null>(null);
+  const [videoDurationSec, setVideoDurationSec] = useState<number | null>(null);
+  const [videoSizeBytes, setVideoSizeBytes] = useState<number | null>(null);
+  const [videoUploading, setVideoUploading] = useState(false);
+  const [videoProgress, setVideoProgress] = useState(0);
+  const [videoError, setVideoError] = useState<string | null>(null);
+  const [videoCourseTitle, setVideoCourseTitle] = useState("");
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const videoFileRef = useRef<HTMLInputElement | null>(null);
 
   const createPost = useMutation(api.learnhub_posts.createPost);
+  const generateVideoUploadUrl = useMutation(api.learnhub_posts.generateVideoUploadUrl);
 
   // Collapse the composer whenever a panel toggle fires so the expanded
   // form doesn't squeeze during the CSS grid column transition.
@@ -171,6 +186,14 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
       };
     } else if (type === "form" && formUrl) {
       metadata = { formUrl, formTitle: "Google Form" };
+    } else if (type === "video" && videoStorageId) {
+      metadata = {
+        storageId: videoStorageId,
+        title: videoFileName ?? undefined,
+        durationSec: videoDurationSec ?? undefined,
+        sizeBytes: videoSizeBytes ?? undefined,
+        courseTitle: videoCourseTitle.trim() || undefined,
+      };
     }
     if (thumbnail) {
       metadata.thumbnailUrl = thumbnail;
@@ -220,8 +243,90 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
     setDriveUrl("");
     setFormUrl("");
     setThumbnail(null);
+    setVideoStorageId(null);
+    setVideoFileName(null);
+    setVideoDurationSec(null);
+    setVideoSizeBytes(null);
+    setVideoCourseTitle("");
+    setVideoError(null);
+    setVideoProgress(0);
     setExpanded(false);
     setType("text");
+  };
+
+  // Probe a local video file for duration + a poster frame.
+  const probeVideo = (file: File): Promise<{ durationSec: number }> =>
+    new Promise((resolve) => {
+      const url = URL.createObjectURL(file);
+      const v = document.createElement("video");
+      v.preload = "metadata";
+      v.muted = true;
+      v.src = url;
+      v.onloadedmetadata = () => {
+        const durationSec = isFinite(v.duration) ? v.duration : 0;
+        URL.revokeObjectURL(url);
+        resolve({ durationSec });
+      };
+      v.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve({ durationSec: 0 });
+      };
+    });
+
+  const handleVideoUpload = async (file: File) => {
+    setVideoError(null);
+    if (!file.type.startsWith("video/")) {
+      setVideoError("Please choose a video file.");
+      return;
+    }
+    if (file.size > MAX_VIDEO_BYTES) {
+      setVideoError(
+        `Video is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Max is ${MAX_VIDEO_BYTES / 1024 / 1024} MB.`
+      );
+      return;
+    }
+
+    setVideoUploading(true);
+    setVideoProgress(0);
+    try {
+      const { durationSec } = await probeVideo(file);
+
+      const uploadUrl = await generateVideoUploadUrl({});
+
+      const storageId: string = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", uploadUrl);
+        xhr.setRequestHeader("Content-Type", file.type);
+        xhr.upload.onprogress = (evt) => {
+          if (evt.lengthComputable) {
+            setVideoProgress(Math.round((evt.loaded / evt.total) * 100));
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const json = JSON.parse(xhr.responseText) as { storageId: string };
+              resolve(json.storageId);
+            } catch (err) {
+              reject(err);
+            }
+          } else {
+            reject(new Error(`Upload failed: ${xhr.status}`));
+          }
+        };
+        xhr.onerror = () => reject(new Error("Network error during upload"));
+        xhr.send(file);
+      });
+
+      setVideoStorageId(storageId);
+      setVideoFileName(file.name);
+      setVideoDurationSec(durationSec || null);
+      setVideoSizeBytes(file.size);
+    } catch (err) {
+      setVideoError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setVideoUploading(false);
+    }
   };
 
   const avatarSrc = userAvatar
@@ -249,6 +354,9 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
             </button>
             <button className="lh-composer-action video" onClick={() => { setExpanded(true); setType("youtube"); }}>
               <span>▶️</span> YouTube
+            </button>
+            <button className="lh-composer-action video" onClick={() => { setExpanded(true); setType("video"); }}>
+              <span>🎬</span> Upload video
             </button>
             {canCreateMeet(userRole) && (
               <button className="lh-composer-action meet" onClick={() => { setExpanded(true); setType("meet"); }}>
@@ -355,6 +463,97 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
           {type === "youtube" && (
             <input type="url" value={youtubeUrl} onChange={(e) => setYoutubeUrl(e.target.value)}
               placeholder="https://youtube.com/watch?v=..." className="lh-composer-url-input" />
+          )}
+          {type === "video" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <input
+                ref={videoFileRef}
+                type="file"
+                accept="video/*"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f) void handleVideoUpload(f);
+                }}
+              />
+              {!videoStorageId && !videoUploading && (
+                <button
+                  type="button"
+                  onClick={() => videoFileRef.current?.click()}
+                  className="lh-composer-pill"
+                  style={{ fontSize: 13, alignSelf: "flex-start" }}
+                >
+                  🎬 Choose video file (max {MAX_VIDEO_BYTES / 1024 / 1024} MB)
+                </button>
+              )}
+              {videoUploading && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div style={{ fontSize: 12, color: "var(--lh-text-3)" }}>
+                    Uploading… {videoProgress}%
+                  </div>
+                  <div style={{ height: 6, borderRadius: 3, background: "var(--lh-surface-3)", overflow: "hidden" }}>
+                    <div
+                      style={{
+                        height: "100%",
+                        width: `${videoProgress}%`,
+                        background: "var(--lh-accent-2)",
+                        transition: "width 0.2s",
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+              {videoStorageId && !videoUploading && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "8px 10px",
+                    borderRadius: 10,
+                    background: "var(--lh-surface-2)",
+                    border: "1px solid var(--lh-surface-3)",
+                  }}
+                >
+                  <span style={{ fontSize: 18 }}>🎬</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--lh-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {videoFileName}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--lh-text-3)" }}>
+                      {videoSizeBytes ? `${(videoSizeBytes / 1024 / 1024).toFixed(1)} MB` : ""}
+                      {videoDurationSec ? ` · ${Math.floor(videoDurationSec / 60)}:${Math.floor(videoDurationSec % 60).toString().padStart(2, "0")}` : ""}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVideoStorageId(null);
+                      setVideoFileName(null);
+                      setVideoDurationSec(null);
+                      setVideoSizeBytes(null);
+                    }}
+                    style={{
+                      width: 24, height: 24, borderRadius: "50%",
+                      background: "var(--lh-surface-3)", color: "var(--lh-text-2)",
+                      border: 0, fontSize: 12, cursor: "pointer",
+                    }}
+                    aria-label="Remove video"
+                  >×</button>
+                </div>
+              )}
+              {videoError && (
+                <div style={{ fontSize: 12, color: "#ef4444" }}>{videoError}</div>
+              )}
+              <input
+                type="text"
+                value={videoCourseTitle}
+                onChange={(e) => setVideoCourseTitle(e.target.value)}
+                placeholder="Course / topic (optional, e.g. Python — Loops)"
+                className="lh-composer-url-input"
+              />
+            </div>
           )}
           {type === "meet" && (
             <>

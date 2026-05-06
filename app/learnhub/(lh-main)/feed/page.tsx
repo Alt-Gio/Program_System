@@ -3,18 +3,17 @@
 /**
  * LearnHub Feed (DTC-HUB redesign).
  *
- * The center column of the (lh-main) layout. Replaces the old static
- * masonry grid with a real, Convex-backed social feed:
+ * The center column of the (lh-main) layout. Center column hosts:
  *
  *   1. Greeting + streak pill (DTC-HUB header)
  *   2. PostComposer    — wired to api.learnhub_posts.createPost
- *   3. Live feed list  — useQuery(api.learnhub_posts.listFeedWithAuthors)
+ *   3. For you / Saved tab strip
+ *   4. Live feed list  — useQuery(api.learnhub_posts.listFeedWithAuthors)
+ *      Rendered as a Pinterest-style multi-column masonry (CSS columns).
  *      Each item is mapped into the MockPost shape that FeedPost expects
- *      so likes, comments, and media renderers (YouTube / Meet / Drive /
- *      Form / Opportunity / Certificate) all work out of the box.
- *
- * No layout changes here — TopNav / LeftPanel / RightPanel come from
- * the parent layout. CSS lives in app/learnhub/learnhub.css.
+ *      so likes, comments, bookmarks, and media renderers (YouTube /
+ *      Video / Meet / Drive / Form / Opportunity / Certificate) all work.
+ *   5. Saved tab — bookmarked posts grouped by learning status.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -34,7 +33,7 @@ type AuthorDoc = Doc<"learnhub_users"> | null;
 type PostWithAuthor = Doc<"learnhub_posts"> & { author: AuthorDoc };
 
 function isMockPostType(t: string): t is MockPost["type"] {
-  return ["text", "youtube", "meet", "drive", "form", "opportunity", "certificate"].includes(t);
+  return ["text", "youtube", "video", "meet", "drive", "form", "opportunity", "certificate"].includes(t);
 }
 
 function isMockRole(r: string | undefined): r is MockPost["author"]["role"] {
@@ -66,12 +65,25 @@ function mapConvexPost(p: PostWithAuthor): MockPost {
   };
 }
 
+function mapStandalonePost(p: Doc<"learnhub_posts">): MockPost {
+  return mapConvexPost({ ...p, author: null });
+}
+
+type FeedTab = "for_you" | "saved";
+
+const SAVED_GROUPS: { key: "in_progress" | "want_to_learn" | "done"; label: string; emoji: string }[] = [
+  { key: "in_progress", label: "Continue learning", emoji: "▶️" },
+  { key: "want_to_learn", label: "Want to learn", emoji: "📌" },
+  { key: "done", label: "Done", emoji: "✅" },
+];
+
 // ────────────────────────────────────────────────────────────────────
 // Page
 // ────────────────────────────────────────────────────────────────────
 
 export default function FeedPage() {
   const { session, userId, role } = useLearnhubSession();
+  const [tab, setTab] = useState<FeedTab>("for_you");
 
   const me = useQuery(
     api.learnhub_users.getUser,
@@ -81,6 +93,14 @@ export default function FeedPage() {
   // Live, real-time feed query. Returns posts with their author docs joined.
   const feed = useQuery(api.learnhub_posts.listFeedWithAuthors, { limit: 30 });
 
+  // Bookmarks for the signed-in user (only loaded when the Saved tab is open
+  // — but we also use it to decorate "For you" with bookmark state via the
+  // per-post getBookmark query inside FeedPost itself).
+  const bookmarks = useQuery(
+    api.learnhub_bookmarks.listBookmarks,
+    userId && tab === "saved" ? { userId: userId as Id<"learnhub_users"> } : "skip"
+  );
+
   // Optimistic local posts — used by PostComposer when the user isn't signed
   // in yet (anonymous draft) and for instant feedback before the live query
   // re-snapshots. Once the live feed length grows past what we have locally
@@ -89,7 +109,6 @@ export default function FeedPage() {
   useEffect(() => {
     if (!feed) return;
     if (localPosts.length === 0) return;
-    // Drop any local optimistic post that now exists on the server.
     const liveIds = new Set(feed.map((p) => p._id as string));
     setLocalPosts((prev) => prev.filter((p) => !liveIds.has(p.id) && !liveIds.has(p.convexPostId ?? "")));
   }, [feed, localPosts.length]);
@@ -116,6 +135,22 @@ export default function FeedPage() {
   const composerRole: "student" | "mentor" | "org_partner" =
     role === "mentor" ? "mentor" : role === "org_partner" ? "org_partner" : "student";
 
+  // Group bookmarks by status for the Saved tab.
+  const savedGroups = useMemo(() => {
+    if (!bookmarks) return null;
+    const groups: Record<"in_progress" | "want_to_learn" | "done", MockPost[]> = {
+      in_progress: [],
+      want_to_learn: [],
+      done: [],
+    };
+    for (const b of bookmarks) {
+      if (!b.post) continue;
+      const mp = mapStandalonePost(b.post as Doc<"learnhub_posts">);
+      groups[b.status].push(mp);
+    }
+    return groups;
+  }, [bookmarks]);
+
   return (
     <div className="lh-feed-col" style={{ display: "flex", flexDirection: "column" }}>
       {/* Greeting header */}
@@ -135,78 +170,126 @@ export default function FeedPage() {
         )}
       </header>
 
-      {/* Composer */}
-      <PostComposer
-        onPost={handleOptimisticPost}
-        userId={userId}
-        userName={session?.name}
-        userAvatar={session?.avatarUrl}
-        userRole={composerRole}
-      />
-
-      {/* Loading skeletons */}
-      {feed === undefined && (
-        <div className="lh-feed-masonry">
-          <div className="lh-feed-col">
-            {[0, 2].map((i) => (
-              <div key={i} className="lh-card" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                  <div className="lh-skeleton" style={{ width: 42, height: 42, borderRadius: "50%" }} />
-                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
-                    <div className="lh-skeleton" style={{ height: 12, width: "40%" }} />
-                    <div className="lh-skeleton" style={{ height: 10, width: "25%" }} />
-                  </div>
-                </div>
-                <div className="lh-skeleton" style={{ height: 14, width: "92%" }} />
-                <div className="lh-skeleton" style={{ height: 14, width: "78%" }} />
-                <div className="lh-skeleton" style={{ height: 160, width: "100%", borderRadius: 12 }} />
-              </div>
-            ))}
-          </div>
-          <div className="lh-feed-col">
-            {[1].map((i) => (
-              <div key={i} className="lh-card" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                  <div className="lh-skeleton" style={{ width: 42, height: 42, borderRadius: "50%" }} />
-                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
-                    <div className="lh-skeleton" style={{ height: 12, width: "40%" }} />
-                    <div className="lh-skeleton" style={{ height: 10, width: "25%" }} />
-                  </div>
-                </div>
-                <div className="lh-skeleton" style={{ height: 14, width: "92%" }} />
-                <div className="lh-skeleton" style={{ height: 14, width: "78%" }} />
-                <div className="lh-skeleton" style={{ height: 200, width: "100%", borderRadius: 12 }} />
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* Composer — only visible on the For you tab */}
+      {tab === "for_you" && (
+        <PostComposer
+          onPost={handleOptimisticPost}
+          userId={userId}
+          userName={session?.name}
+          userAvatar={session?.avatarUrl}
+          userRole={composerRole}
+        />
       )}
 
-      {/* Empty state */}
-      {feed !== undefined && posts.length === 0 && (
-        <div className="lh-feed-empty">
-          <div className="lh-feed-empty-emoji">📭</div>
-          <p className="lh-feed-empty-title">No posts yet</p>
-          <p style={{ margin: 0, fontSize: 12 }}>
-            Be the first to share something with the cohort.
-          </p>
-        </div>
+      {/* Tabs */}
+      <div className="lh-feed-tabs" role="tablist" aria-label="Feed sections">
+        <button
+          role="tab"
+          aria-selected={tab === "for_you"}
+          className={`lh-feed-tab${tab === "for_you" ? " is-active" : ""}`}
+          onClick={() => setTab("for_you")}
+        >
+          For you
+        </button>
+        <button
+          role="tab"
+          aria-selected={tab === "saved"}
+          className={`lh-feed-tab${tab === "saved" ? " is-active" : ""}`}
+          onClick={() => setTab("saved")}
+          disabled={!userId}
+          title={userId ? undefined : "Sign in to see saved posts"}
+        >
+          🔖 Saved
+        </button>
+      </div>
+
+      {/* ── For you tab ────────────────────────────────────────── */}
+      {tab === "for_you" && (
+        <>
+          {feed === undefined && (
+            <div className="lh-feed-masonry">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="lh-post" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <div className="lh-skeleton" style={{ width: 42, height: 42, borderRadius: "50%" }} />
+                    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                      <div className="lh-skeleton" style={{ height: 12, width: "40%" }} />
+                      <div className="lh-skeleton" style={{ height: 10, width: "25%" }} />
+                    </div>
+                  </div>
+                  <div className="lh-skeleton" style={{ height: 14, width: "92%" }} />
+                  <div className="lh-skeleton" style={{ height: 14, width: "78%" }} />
+                  <div className="lh-skeleton" style={{ height: 160 + i * 40, width: "100%", borderRadius: 12 }} />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {feed !== undefined && posts.length === 0 && (
+            <div className="lh-feed-empty">
+              <div className="lh-feed-empty-emoji">📭</div>
+              <p className="lh-feed-empty-title">No posts yet</p>
+              <p style={{ margin: 0, fontSize: 12 }}>
+                Be the first to share something with the cohort.
+              </p>
+            </div>
+          )}
+
+          {feed !== undefined && posts.length > 0 && (
+            <div className="lh-feed-masonry">
+              {posts.map((post) => (
+                <FeedPost key={post.id} post={post} userId={userId} />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
-      {/* Live feed — 2-column masonry */}
-      {feed !== undefined && posts.length > 0 && (
-        <div className="lh-feed-masonry">
-          <div className="lh-feed-col">
-            {posts.filter((_, i) => i % 2 === 0).map((post) => (
-              <FeedPost key={post.id} post={post} userId={userId} />
-            ))}
-          </div>
-          <div className="lh-feed-col">
-            {posts.filter((_, i) => i % 2 === 1).map((post) => (
-              <FeedPost key={post.id} post={post} userId={userId} />
-            ))}
-          </div>
-        </div>
+      {/* ── Saved tab ──────────────────────────────────────────── */}
+      {tab === "saved" && (
+        <>
+          {!userId && (
+            <div className="lh-feed-empty">
+              <p className="lh-feed-empty-title">Sign in to save posts</p>
+            </div>
+          )}
+          {userId && savedGroups === null && (
+            <div className="lh-feed-masonry">
+              <div className="lh-skeleton" style={{ height: 160, borderRadius: 12 }} />
+              <div className="lh-skeleton" style={{ height: 220, borderRadius: 12 }} />
+              <div className="lh-skeleton" style={{ height: 180, borderRadius: 12 }} />
+            </div>
+          )}
+          {userId && savedGroups !== null && (
+            <>
+              {SAVED_GROUPS.every((g) => savedGroups[g.key].length === 0) && (
+                <div className="lh-feed-empty">
+                  <div className="lh-feed-empty-emoji">🔖</div>
+                  <p className="lh-feed-empty-title">Nothing saved yet</p>
+                  <p style={{ margin: 0, fontSize: 12 }}>
+                    Tap the bookmark on any post to add it here.
+                  </p>
+                </div>
+              )}
+              {SAVED_GROUPS.map((g) => {
+                const items = savedGroups[g.key];
+                if (items.length === 0) return null;
+                return (
+                  <section key={g.key}>
+                    <h2 className="lh-saved-group-title">
+                      {g.emoji} {g.label} · {items.length}
+                    </h2>
+                    <div className="lh-feed-masonry">
+                      {items.map((post) => (
+                        <FeedPost key={post.id} post={post} userId={userId} />
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
+            </>
+          )}
+        </>
       )}
     </div>
   );

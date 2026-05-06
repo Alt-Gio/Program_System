@@ -53,6 +53,7 @@ export const createPost = mutation({
     type: v.union(
       v.literal("text"),
       v.literal("youtube"),
+      v.literal("video"),
       v.literal("meet"),
       v.literal("drive"),
       v.literal("form"),
@@ -156,5 +157,21 @@ export const deletePost = mutation({
   args: { postId: v.id("learnhub_posts") },
   handler: async (ctx, args) => {
     await ctx.db.delete(args.postId);
+  },
+});
+
+// ── Native video uploads via Convex storage ──────────────────────────
+
+export const generateVideoUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+export const getStorageUrl = query({
+  args: { storageId: v.id("_storage") },
+  handler: async (ctx, args) => {
+    return await ctx.storage.getUrl(args.storageId);
   },
 });

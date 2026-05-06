@@ -206,6 +206,7 @@ export const learnhubTables = {
     type: v.union(
       v.literal("text"),
       v.literal("youtube"),
+      v.literal("video"),
       v.literal("meet"),
       v.literal("drive"),
       v.literal("form"),

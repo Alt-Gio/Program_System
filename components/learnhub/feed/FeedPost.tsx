@@ -6,6 +6,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { formatDistanceToNow } from "date-fns";
 import { YouTubePost } from "./post-types/YouTubePost";
+import { VideoPost } from "./post-types/VideoPost";
 import { MeetPost } from "./post-types/MeetPost";
 import { DrivePost } from "./post-types/DrivePost";
 import { FormPost } from "./post-types/FormPost";
@@ -25,6 +26,7 @@ export interface MockPost {
   type:
     | "text"
     | "youtube"
+    | "video"
     | "meet"
     | "drive"
     | "form"
@@ -178,6 +180,30 @@ export function FeedPost({ post, userId, onLike }: FeedPostProps) {
   const badge = ROLE_BADGE[post.author.role];
   const likePost = useMutation(api.learnhub_posts.likePost);
   const unlikePost = useMutation(api.learnhub_posts.unlikePost);
+  const upsertBookmark = useMutation(api.learnhub_bookmarks.upsertBookmark);
+  const removeBookmark = useMutation(api.learnhub_bookmarks.removeBookmark);
+
+  const bookmarkRecord = useQuery(
+    api.learnhub_bookmarks.getBookmark,
+    userId && post.convexPostId
+      ? {
+          userId: userId as Id<"learnhub_users">,
+          postId: post.convexPostId as Id<"learnhub_posts">,
+        }
+      : "skip"
+  );
+  const isBookmarked = Boolean(bookmarkRecord);
+
+  const handleBookmark = async () => {
+    if (!userId || !post.convexPostId) return;
+    const uid = userId as Id<"learnhub_users">;
+    const pid = post.convexPostId as Id<"learnhub_posts">;
+    if (bookmarkRecord) {
+      await removeBookmark({ bookmarkId: bookmarkRecord._id });
+    } else {
+      await upsertBookmark({ userId: uid, postId: pid, status: "want_to_learn" });
+    }
+  };
 
   const handleLike = () => {
     const nowLiked = !liked;
@@ -265,6 +291,7 @@ export function FeedPost({ post, userId, onLike }: FeedPostProps) {
 
       {/* Media */}
       {post.type === "youtube" && <div style={{ marginTop: 10 }}><YouTubePost metadata={post.metadata} /></div>}
+      {post.type === "video"   && <div style={{ marginTop: 10 }}><VideoPost   metadata={post.metadata} /></div>}
       {post.type === "meet"    && <div style={{ marginTop: 10 }}><MeetPost    metadata={post.metadata} /></div>}
       {post.type === "drive"   && <div style={{ marginTop: 10 }}><DrivePost   metadata={post.metadata} /></div>}
       {post.type === "form"    && <div style={{ marginTop: 10 }}><FormPost    metadata={post.metadata} /></div>}
@@ -309,8 +336,15 @@ export function FeedPost({ post, userId, onLike }: FeedPostProps) {
           <span className="lh-action-icon">↗️</span>
         </button>
 
-        <button className="lh-action-btn lh-action-save" title="Save to Learning Path">
-          🔖
+        <button
+          onClick={handleBookmark}
+          disabled={!userId || !post.convexPostId}
+          className={`lh-action-btn lh-action-save${isBookmarked ? " liked" : ""}`}
+          title={isBookmarked ? "Saved — click to remove" : "Save to Learning Path"}
+          aria-pressed={isBookmarked}
+        >
+          <span className="lh-action-icon">{isBookmarked ? "🔖" : "📑"}</span>
+          {isBookmarked && <span style={{ fontSize: 12 }}>Saved</span>}
         </button>
       </div>
 
