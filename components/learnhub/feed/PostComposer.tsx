@@ -292,11 +292,11 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
       const { durationSec } = await probeVideo(file);
 
       const rawUploadUrl = await generateVideoUploadUrl({});
-      // Replace internal Convex URL with public URL for browser uploads
-      const uploadUrl = rawUploadUrl.replace(
-        /https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?/,
-        process.env.NEXT_PUBLIC_CONVEX_SITE_URL ?? "https://convex.dict.it.com"
-      );
+      // Convex returns a relative path — prepend the public Convex URL
+      const convexBase = process.env.NEXT_PUBLIC_CONVEX_SITE_URL ?? "https://convex.dict.it.com";
+      const uploadUrl = rawUploadUrl.startsWith("http")
+        ? rawUploadUrl.replace(/https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?/, convexBase)
+        : `${convexBase}${rawUploadUrl}`;
 
       const storageId: string = await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
