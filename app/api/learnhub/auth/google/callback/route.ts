@@ -1,3 +1,10 @@
+
+const getBaseUrl = (req: Request) =>
+  process.env.NEXTAUTH_URL ??
+  process.env.NEXT_PUBLIC_APP_URL ??
+  new URL(req.url).origin;
+
+
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 import { NextResponse } from "next/server";
@@ -24,7 +31,7 @@ export async function GET(request: Request) {
 
   if (error || !code) {
     return NextResponse.redirect(
-      new URL("/learnhub/login?error=oauth_failed", request.url)
+      new URL("/learnhub/login?error=oauth_failed", getBaseUrl(request))
     );
   }
 
@@ -80,7 +87,7 @@ export async function GET(request: Request) {
 
       const callbackUrl =
         state ? decodeURIComponent(state) : "/learnhub/feed";
-      const res = NextResponse.redirect(new URL(callbackUrl, request.url));
+      const res = NextResponse.redirect(new URL(callbackUrl, getBaseUrl(request)));
       res.cookies.set(SESSION_COOKIE, sessionToken, {
         httpOnly: true,
         sameSite: "lax",
@@ -100,7 +107,7 @@ export async function GET(request: Request) {
     });
 
     const res = NextResponse.redirect(
-      new URL("/learnhub/onboarding", request.url)
+      new URL("/learnhub/onboarding", getBaseUrl(request))
     );
     res.cookies.set(PENDING_COOKIE, pendingToken, {
       httpOnly: true,
@@ -113,7 +120,7 @@ export async function GET(request: Request) {
   } catch (err) {
     console.error("[LearnHub] OAuth callback error:", err);
     return NextResponse.redirect(
-      new URL("/learnhub/login?error=server_error", request.url)
+      new URL("/learnhub/login?error=server_error", getBaseUrl(request))
     );
   }
 }

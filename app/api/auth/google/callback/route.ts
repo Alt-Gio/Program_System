@@ -47,7 +47,7 @@ export async function GET(request: Request) {
 
   if (error || !code) {
     return NextResponse.redirect(
-      new URL(`/login/${role}?error=oauth_failed`, request.url)
+      new URL(`/login/${role}?error=oauth_failed`, process.env.NEXTAUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin)
     );
   }
 
@@ -62,7 +62,7 @@ export async function GET(request: Request) {
       process.env.GOOGLE_CLIENT_SECRET!;
     const redirectUri =
       process.env.DICT_GOOGLE_REDIRECT_URI ??
-      new URL("/api/auth/google/callback", request.url).toString();
+      new URL("/api/auth/google/callback", process.env.NEXTAUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin).toString();
 
     // Exchange code for tokens
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
@@ -105,7 +105,7 @@ export async function GET(request: Request) {
 
       // Cross-system: has both DICT + LearnHub accounts → offer role picker
       if (hasLearnHub) {
-        const pickUrl = new URL("/login/pick-role", request.url);
+        const pickUrl = new URL("/login/pick-role", process.env.NEXTAUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin);
         pickUrl.searchParams.set("dictRole", result.user.role);
         pickUrl.searchParams.set("lhRole", identities.lhUser!.role);
         const res = NextResponse.redirect(pickUrl);
@@ -125,7 +125,7 @@ export async function GET(request: Request) {
 
     if (identities.lhUser) {
       // Has LearnHub but no DICT — ask if they want to also register as intern/supervisor
-      const pickUrl = new URL("/login/pick-role", request.url);
+      const pickUrl = new URL("/login/pick-role", process.env.NEXTAUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin);
       pickUrl.searchParams.set("lhRole", identities.lhUser.role);
       pickUrl.searchParams.set("wantsDictRole", role);
       pickUrl.searchParams.set("googleId", googleId);
@@ -144,7 +144,7 @@ export async function GET(request: Request) {
     });
 
     const res = NextResponse.redirect(
-      new URL(`/login/register/${role}`, request.url)
+      new URL(`/login/register/${role}`, process.env.NEXTAUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin)
     );
     res.cookies.set(DICT_PENDING_COOKIE, pendingToken, {
       httpOnly: true,
@@ -157,7 +157,7 @@ export async function GET(request: Request) {
   } catch (err) {
     console.error("[DICT OAuth] Callback error:", err);
     return NextResponse.redirect(
-      new URL(`/login/${role}?error=server_error`, request.url)
+      new URL(`/login/${role}?error=server_error`, process.env.NEXTAUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin)
     );
   }
 }
