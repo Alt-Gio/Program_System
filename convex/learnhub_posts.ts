@@ -175,3 +175,39 @@ export const getStorageUrl = query({
     return await ctx.storage.getUrl(args.storageId);
   },
 });
+
+export const getUncompressedVideos = query({
+  args: {},
+  handler: async (ctx) => {
+    return ctx.db
+      .query("learnhub_posts")
+      .filter(q =>
+        q.and(
+          q.eq(q.field("type"), "video"),
+          q.neq(q.field("compressed"), true)
+        )
+      )
+      .take(5)
+  }
+})
+
+export const markVideoCompressed = mutation({
+  args: {
+    postId: v.id("learnhub_posts"),
+    newStorageId: v.string(),
+    contentType: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const post = await ctx.db.get(args.postId)
+    if (!post) return
+    await ctx.db.patch(args.postId, {
+      metadata: {
+        ...(post.metadata as Record<string, unknown>),
+        storageId: args.newStorageId,
+        contentType: args.contentType,
+        compressed: true,
+      },
+      compressed: true,
+    })
+  }
+})
