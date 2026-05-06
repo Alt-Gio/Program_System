@@ -114,7 +114,8 @@ export async function GET(request: Request) {
         return res;
       }
 
-      const res = NextResponse.redirect(new URL(landing, request.url));
+      const baseUrl = process.env.NEXTAUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin;
+      const res = NextResponse.redirect(new URL(landing, baseUrl));
       res.cookies.set(SESSION_COOKIE, result.token, sessionCookieOptions());
       return res;
     }
