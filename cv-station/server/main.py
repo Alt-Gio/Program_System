@@ -789,3 +789,224 @@ if __name__ == "__main__":
         workers=1,       # Single worker — InsightFace holds GPU state.
         log_level=os.getenv("UVICORN_LOG_LEVEL", "info"),
     )
+
+
+# ─────────────────────────────────────────────────────────────
+# Video Compression Endpoint
+# ─────────────────────────────────────────────────────────────
+import subprocess
+import tempfile
+import httpx as _httpx
+from fastapi import UploadFile, File, Form, Request
+from fastapi.responses import FileResponse
+
+@app.post("/compress")
+async def compress_video(
+    file: UploadFile = File(...),
+    convex_url: str = Form(...),   # where to PUT the compressed file
+    token: str = Form(...),         # Convex upload token
+):
+    """
+    Accepts a raw video upload, compresses it with NVENC (falls back to
+    libx264 on CPU if GPU unavailable), then uploads the result directly
+    to Convex storage.
+    """
+    suffix = ".mp4"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".input") as tmp_in:
+        tmp_in.write(await file.read())
+        input_path = tmp_in.name
+
+    output_path = input_path + suffix
+
+    # Probe duration
+    probe = subprocess.run([
+        "ffprobe", "-v", "error",
+        "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1",
+        input_path
+    ], capture_output=True, text=True)
+    try:
+        duration = float(probe.stdout.strip())
+    except Exception:
+        duration = 999
+
+    # Choose codec and settings based on duration
+    if duration <= 10:
+        # Very short — WebM VP9 for tiny file size + looping
+        output_path = input_path + ".mp4"
+        video_args = ["-c:v", "h264_nvenc", "-preset", "fast", "-b:v", "800k",
+                      "-vf", "scale=trunc(iw*min(1\,1280/iw)/2)*2:trunc(ih*min(1\,720/ih)/2)*2",
+                      "-profile:v", "baseline", "-movflags", "+faststart"]
+        content_type = "video/mp4"
+    elif duration <= 30:
+        # Short — H.264 NVENC 720p 1.5Mbps
+        video_args = ["-c:v", "h264_nvenc", "-preset", "fast", "-b:v", "1500k",
+                      "-vf", "scale=trunc(iw*min(1\\,1280/iw)/2)*2:trunc(ih*min(1\\,720/ih)/2)*2"]
+        content_type = "video/mp4"
+    else:
+        # Long — H.264 NVENC 720p 2Mbps
+        video_args = ["-c:v", "h264_nvenc", "-preset", "fast", "-b:v", "2000k",
+                      "-vf", "scale=trunc(iw*min(1\\,1280/iw)/2)*2:trunc(ih*min(1\\,720/ih)/2)*2"]
+        content_type = "video/mp4"
+
+    # Run FFmpeg
+    cmd = ["ffmpeg", "-y", "-i", input_path] + video_args + \
+          ["-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", output_path]
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+
+    # Fallback to CPU if NVENC failed
+    if result.returncode != 0 and "h264_nvenc" in " ".join(cmd):
+        cmd = ["ffmpeg", "-y", "-i", input_path,
+               "-c:v", "libx264", "-preset", "fast", "-b:v", "2000k",
+               "-vf", "scale=trunc(iw*min(1\\,1280/iw)/2)*2:trunc(ih*min(1\\,720/ih)/2)*2",
+               "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", output_path]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+    if result.returncode != 0:
+        import os; os.unlink(input_path)
+        return {"error": "Compression failed", "details": result.stderr[-500:]}
+
+    # Upload compressed file to Convex
+    with open(output_path, "rb") as f:
+        compressed_data = f.read()
+
+    async with _httpx.AsyncClient() as client:
+        upload_resp = await client.post(
+            convex_url,
+            content=compressed_data,
+            headers={"Content-Type": content_type},
+            timeout=120,
+        )
+
+    # Cleanup
+    import os
+    os.unlink(input_path)
+    os.unlink(output_path)
+
+    if upload_resp.status_code not in (200, 201):
+        return {"error": f"Convex upload failed: {upload_resp.status_code}"}
+
+    result_json = upload_resp.json()
+    return {
+        "storageId": result_json.get("storageId"),
+        "duration": duration,
+        "contentType": content_type,
+        "compressed": True,
+    }
+
+
+@app.post("/compress-from-convex")
+async def compress_from_convex(request: Request):
+    """
+    Downloads a video from Convex storage, compresses it with NVENC,
+    re-uploads the compressed version, and returns the new storageId.
+
+    Body JSON:
+    {
+        "download_url": "https://convex.dict.it.com/api/storage/...",
+        "upload_url":   "https://convex.dict.it.com/api/storage/upload?token=...",
+        "content_type": "video/mp4"
+    }
+    """
+    import os, tempfile, subprocess
+    body = await request.json()
+    download_url = body.get("download_url")
+    upload_url   = body.get("upload_url")
+
+    if not download_url or not upload_url:
+        return {"error": "download_url and upload_url required"}
+
+    # Download from Convex
+    async with _httpx.AsyncClient() as client:
+        dl = await client.get(download_url, timeout=120, follow_redirects=True)
+        if dl.status_code != 200:
+            return {"error": f"Download failed: {dl.status_code}"}
+        video_data = dl.content
+
+    # Write to temp file
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".input") as tmp_in:
+        tmp_in.write(video_data)
+        input_path = tmp_in.name
+
+    # Probe duration
+    probe = subprocess.run([
+        "ffprobe", "-v", "error",
+        "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1",
+        input_path
+    ], capture_output=True, text=True)
+    try:
+        duration = float(probe.stdout.strip())
+    except Exception:
+        duration = 999
+
+    # Choose format
+    if duration <= 10:
+        output_path = input_path + ".mp4"
+        video_args = ["-c:v", "h264_nvenc", "-preset", "fast", "-b:v", "800k",
+                      "-vf", "scale=trunc(iw*min(1\,1280/iw)/2)*2:trunc(ih*min(1\,720/ih)/2)*2",
+                      "-profile:v", "baseline", "-movflags", "+faststart"]
+        content_type = "video/mp4"
+    elif duration <= 30:
+        output_path = input_path + ".mp4"
+        video_args = ["-c:v", "h264_nvenc", "-preset", "fast", "-b:v", "1500k",
+                      "-vf", "scale=trunc(iw*min(1\\,1280/iw)/2)*2:trunc(ih*min(1\\,720/ih)/2)*2"]
+        content_type = "video/mp4"
+    else:
+        output_path = input_path + ".mp4"
+        video_args = ["-c:v", "h264_nvenc", "-preset", "fast", "-b:v", "2000k",
+                      "-vf", "scale=trunc(iw*min(1\\,1280/iw)/2)*2:trunc(ih*min(1\\,720/ih)/2)*2"]
+        content_type = "video/mp4"
+
+    # Compress
+    cmd = ["ffmpeg", "-y", "-i", input_path] + video_args + \
+          ["-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", output_path]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+
+    # CPU fallback
+    if result.returncode != 0 and "h264_nvenc" in " ".join(cmd):
+        output_path2 = input_path + "_cpu.mp4"
+        cmd = ["ffmpeg", "-y", "-i", input_path,
+               "-c:v", "libx264", "-preset", "fast", "-b:v", "2000k",
+               "-vf", "scale=trunc(iw*min(1\\,1280/iw)/2)*2:trunc(ih*min(1\\,720/ih)/2)*2",
+               "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", output_path2]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        output_path = output_path2
+        content_type = "video/mp4"
+
+    if result.returncode != 0:
+        os.unlink(input_path)
+        return {"error": "Compression failed", "details": result.stderr[-300:]}
+
+    # Upload compressed to Convex
+    with open(output_path, "rb") as f:
+        compressed = f.read()
+
+    original_size = len(video_data)
+    compressed_size = len(compressed)
+
+    async with _httpx.AsyncClient() as client:
+        up = await client.post(
+            upload_url,
+            content=compressed,
+            headers={"Content-Type": content_type},
+            timeout=180,
+        )
+
+    os.unlink(input_path)
+    os.unlink(output_path)
+
+    if up.status_code not in (200, 201):
+        return {"error": f"Upload failed: {up.status_code}"}
+
+    result_json = up.json()
+    return {
+        "storageId": result_json.get("storageId"),
+        "duration": duration,
+        "contentType": content_type,
+        "originalSize": original_size,
+        "compressedSize": compressed_size,
+        "ratio": round(original_size / max(compressed_size, 1), 2),
+        "compressed": True,
+    }

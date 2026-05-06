@@ -217,6 +217,7 @@ export const learnhubTables = {
     ),
     content: v.string(),
     metadata: v.any(),
+    compressed: v.optional(v.boolean()),
     likeCount: v.number(),
     commentCount: v.number(),
     isPinned: v.boolean(),

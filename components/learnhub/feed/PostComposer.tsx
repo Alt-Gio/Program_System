@@ -23,9 +23,9 @@ const ALL_POST_TYPES: readonly PostTypeDef[] = [
   { value: "form", label: "Form", emoji: "📋" },
 ];
 
-// Cap on uploaded course videos. ~200 MB keeps Convex bandwidth bounded
+// Cap on uploaded course videos. ~95 MB — Cloudflare free plan limit is 100MB
 // while still allowing a 5–10 minute lesson at reasonable quality.
-const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 95 * 1024 * 1024;
 
 interface PostComposerProps {
   onPost: (post: MockPost) => void;
@@ -291,7 +291,12 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
     try {
       const { durationSec } = await probeVideo(file);
 
-      const uploadUrl = await generateVideoUploadUrl({});
+      const rawUploadUrl = await generateVideoUploadUrl({});
+      // Convex returns a relative path — prepend the public Convex URL
+      const convexBase = process.env.NEXT_PUBLIC_CONVEX_SITE_URL ?? "https://convex.dict.it.com";
+      const uploadUrl = rawUploadUrl.startsWith("http")
+        ? rawUploadUrl.replace(/https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?/, convexBase)
+        : `${convexBase}${rawUploadUrl}`;
 
       const storageId: string = await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
