@@ -213,7 +213,7 @@ export const createTestIntern = mutation({
       credentials: {
         email: "test.intern@example.com",
         password: "intern123",
-        loginUrl: "/intern/login"
+        loginUrl: "/login"
       }
     };
   },
@@ -259,7 +259,7 @@ export const createTestSupervisor = mutation({
       credentials: {
         email: "test.supervisor@example.com",
         password: "supervisor123",
-        loginUrl: "/supervisor-auth/login"
+        loginUrl: "/login"
       }
     };
   },
@@ -285,7 +285,7 @@ export const createBothTestAccounts = mutation({
         credentials: {
           email: "test.intern@example.com",
           password: "intern123",
-          loginUrl: "/intern/login"
+          loginUrl: "/login"
         }
       };
     } else {
@@ -324,7 +324,7 @@ export const createBothTestAccounts = mutation({
         credentials: {
           email: "test.intern@example.com",
           password: "intern123",
-          loginUrl: "/intern/login"
+          loginUrl: "/login"
         }
       };
     }
@@ -343,7 +343,7 @@ export const createBothTestAccounts = mutation({
         credentials: {
           email: "test.supervisor@example.com",
           password: "supervisor123",
-          loginUrl: "/supervisor-auth/login"
+          loginUrl: "/login"
         }
       };
     } else {
@@ -364,7 +364,7 @@ export const createBothTestAccounts = mutation({
         credentials: {
           email: "test.supervisor@example.com",
           password: "supervisor123",
-          loginUrl: "/supervisor-auth/login"
+          loginUrl: "/login"
         }
       };
     }
@@ -379,14 +379,14 @@ export const createBothTestAccounts = mutation({
             type: "Intern",
             email: "test.intern@example.com",
             password: "intern123",
-            loginUrl: "/intern/login",
+            loginUrl: "/login",
             name: "Maria Santos"
           },
           {
             type: "Supervisor",
             email: "test.supervisor@example.com",
             password: "supervisor123",
-            loginUrl: "/supervisor-auth/login",
+            loginUrl: "/login",
             name: "Juan Dela Cruz"
           }
         ]

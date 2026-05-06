@@ -459,7 +459,7 @@ export default function SupervisorDashboardPage() {
 
   useEffect(() => {
     const t = localStorage.getItem("supervisor_token");
-    if (!t) { router.push("/supervisor-auth/login"); return; }
+    if (!t) { router.push("/login"); return; }
     setToken(t);
   }, [router]);
 
@@ -532,7 +532,7 @@ export default function SupervisorDashboardPage() {
   function handleLogout() {
     localStorage.removeItem("supervisor_token");
     localStorage.removeItem("supervisor_data");
-    router.push("/supervisor-auth/login");
+    router.push("/login");
   }
 
   function exportCSV() {

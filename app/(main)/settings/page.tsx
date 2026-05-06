@@ -9,7 +9,9 @@ import {
   Settings, Database, Key, Globe, RefreshCw, Trash2,
   CheckCircle2, XCircle, AlertCircle, LogIn, LogOut,
   Copy, ExternalLink, ChevronDown, ChevronUp, BookOpen,
-  Link as LinkIcon, Tag,
+  Link as LinkIcon, Tag, FolderKanban, Plus, Pencil, Save, X,
+  Image as ImageIcon, Video, Upload, ArrowUp, ArrowDown,
+  Loader2, Film, FileImage,
 } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -580,6 +582,986 @@ function DatabaseSyncCard() {
   );
 }
 
+// ── Programs (CRUD on the Convex `projects` table) ──────────
+//
+// Lets admins add / rename / re-color / archive / delete the
+// programs that show up in the sidebar and elsewhere. Wires
+// directly to convex/projects.ts mutations.
+//
+// Heads up: the left-sidebar PROGRAMS list and the per-program
+// routes under /projects/<route>/page.tsx are still hard-coded
+// in components/layout/Sidebar.tsx. Editing or deleting the
+// existing 10 programs Just Works. Adding a brand-new program
+// creates the DB record but won't auto-create a sidebar entry
+// or a /projects/<x> page — that needs a follow-up refactor to
+// make the sidebar data-driven.
+type ProgramRow = {
+  _id: string;
+  code: string;
+  name: string;
+  shortName: string;
+  description: string;
+  division: string;
+  projectType: string;
+  targetSectors: string[];
+  modeOptions: string[];
+  requirementNote?: string;
+  color: string;
+  icon?: string;
+  isActive: boolean;
+  driveId?: string;
+};
+
+type ProgramFormValues = Omit<ProgramRow, "_id">;
+
+const EMPTY_PROGRAM: ProgramFormValues = {
+  code: "",
+  name: "",
+  shortName: "",
+  description: "",
+  division: "ILCDB",
+  projectType: "",
+  targetSectors: [],
+  modeOptions: ["On-Site", "Face-to-Face"],
+  requirementNote: "",
+  color: "#3B82F6",
+  icon: "",
+  isActive: true,
+  driveId: "",
+};
+
+const KNOWN_DIVISIONS = ["DICT Proper", "ILCDB", "IIDB"];
+const KNOWN_MODES     = ["On-Site", "Face-to-Face", "Online", "Hybrid"];
+
+function ProgramForm({
+  initial, mode, onSave, onCancel,
+}: {
+  initial: ProgramFormValues;
+  mode:    "create" | "edit";
+  onSave:  (data: ProgramFormValues) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [v, setV]       = useState<ProgramFormValues>(initial);
+  const [saving, setSv] = useState(false);
+
+  function patch(p: Partial<ProgramFormValues>) { setV(prev => ({ ...prev, ...p })); }
+
+  function setListField(key: "targetSectors" | "modeOptions", csv: string) {
+    patch({ [key]: csv.split(",").map(s => s.trim()).filter(Boolean) } as any);
+  }
+
+  async function handleSubmit() {
+    // Minimal client-side validation — server enforces the rest.
+    if (!v.code.trim())      return toast.error("Code is required.");
+    if (!v.name.trim())      return toast.error("Name is required.");
+    if (!v.shortName.trim()) return toast.error("Short name is required.");
+    setSv(true);
+    try {
+      await onSave({
+        ...v,
+        code:        v.code.trim().toUpperCase(),
+        name:        v.name.trim(),
+        shortName:   v.shortName.trim(),
+        description: v.description.trim(),
+        division:    v.division.trim(),
+        projectType: (v.projectType || v.shortName).trim(),
+        // Empty optional strings → undefined so we don't store ""
+        requirementNote: v.requirementNote?.trim() || undefined,
+        icon:            v.icon?.trim()            || undefined,
+        driveId:         v.driveId?.trim()         || undefined,
+      });
+    } catch (e: any) {
+      toast.error(e?.message ?? String(e));
+    } finally {
+      setSv(false);
+    }
+  }
+
+  // Tiny helpers to keep the JSX readable.
+  const Label = ({ children, hint }: { children: React.ReactNode; hint?: string }) => (
+    <label className="text-xs font-medium text-gray-600 mb-1 block">
+      {children}
+      {hint && <span className="text-gray-400 font-normal ml-1">({hint})</span>}
+    </label>
+  );
+  const inputCls = "w-full h-8 text-xs rounded-md border border-gray-200 px-3 bg-white outline-none focus:ring-1 focus:ring-blue-300";
+
+  return (
+    <div className="border border-blue-200 bg-blue-50/30 rounded-xl p-4 space-y-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+          <Label hint="UPPERCASE, unique">Code</Label>
+          <input
+            className={inputCls}
+            value={v.code}
+            onChange={e => patch({ code: e.target.value.toUpperCase() })}
+            placeholder="EGOV"
+            disabled={mode === "edit"}
+          />
+          {mode === "edit" && (
+            <p className="text-[10px] text-gray-400 mt-1">Code is the natural key — not editable here.</p>
+          )}
+        </div>
+        <div className="sm:col-span-2">
+          <Label>Short name <span className="text-gray-400 font-normal">(sidebar label)</span></Label>
+          <input
+            className={inputCls}
+            value={v.shortName}
+            onChange={e => patch({ shortName: e.target.value })}
+            placeholder="eGovPH"
+          />
+        </div>
+      </div>
+
+      <div>
+        <Label>Full name</Label>
+        <input
+          className={inputCls}
+          value={v.name}
+          onChange={e => patch({ name: e.target.value })}
+          placeholder="eGovPH Mobile Application"
+        />
+      </div>
+
+      <div>
+        <Label>Description</Label>
+        <textarea
+          className="w-full text-xs rounded-md border border-gray-200 px-3 py-2 bg-white outline-none focus:ring-1 focus:ring-blue-300 min-h-[60px]"
+          value={v.description}
+          onChange={e => patch({ description: e.target.value })}
+          placeholder="What does this program do?"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+          <Label>Division</Label>
+          <input
+            className={inputCls}
+            value={v.division}
+            onChange={e => patch({ division: e.target.value })}
+            list="division-suggestions"
+            placeholder="ILCDB"
+          />
+          <datalist id="division-suggestions">
+            {KNOWN_DIVISIONS.map(d => <option key={d} value={d} />)}
+          </datalist>
+        </div>
+        <div>
+          <Label hint="defaults to short name">Project type</Label>
+          <input
+            className={inputCls}
+            value={v.projectType}
+            onChange={e => patch({ projectType: e.target.value })}
+            placeholder="eGovPH"
+          />
+        </div>
+        <div>
+          <Label hint="lucide-react name">Icon</Label>
+          <input
+            className={inputCls}
+            value={v.icon ?? ""}
+            onChange={e => patch({ icon: e.target.value })}
+            placeholder="Monitor"
+          />
+        </div>
+      </div>
+
+      <div>
+        <Label hint="comma-separated">Target sectors</Label>
+        <input
+          className={inputCls}
+          value={v.targetSectors.join(", ")}
+          onChange={e => setListField("targetSectors", e.target.value)}
+          placeholder="NGA, LGU, SUC, Communities"
+        />
+      </div>
+
+      <div>
+        <Label hint="comma-separated — common: On-Site, Face-to-Face, Online, Hybrid">Mode options</Label>
+        <input
+          className={inputCls}
+          value={v.modeOptions.join(", ")}
+          onChange={e => setListField("modeOptions", e.target.value)}
+          placeholder={KNOWN_MODES.join(", ")}
+        />
+      </div>
+
+      <div>
+        <Label hint="optional">Requirement note</Label>
+        <input
+          className={inputCls}
+          value={v.requirementNote ?? ""}
+          onChange={e => patch({ requirementNote: e.target.value })}
+          placeholder="Letter of Intent"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+        <div>
+          <Label>Color</Label>
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={v.color}
+              onChange={e => patch({ color: e.target.value })}
+              className="w-10 h-8 p-0 rounded cursor-pointer border border-gray-200"
+            />
+            <input
+              className={inputCls + " flex-1"}
+              value={v.color}
+              onChange={e => patch({ color: e.target.value })}
+              placeholder="#3B82F6"
+            />
+          </div>
+        </div>
+        <div className="flex items-center gap-3 pb-1">
+          <Switch
+            checked={v.isActive}
+            onCheckedChange={c => patch({ isActive: c })}
+          />
+          <span className="text-xs text-gray-700">
+            {v.isActive ? "Active — visible app-wide" : "Archived — hidden from listings"}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex gap-2 pt-1">
+        <Button size="sm" className="h-8 text-xs gap-1" disabled={saving} onClick={handleSubmit}>
+          <Save className="w-3 h-3" />
+          {saving ? "Saving…" : mode === "create" ? "Create program" : "Save changes"}
+        </Button>
+        <Button size="sm" variant="ghost" className="h-8 text-xs gap-1" onClick={onCancel}>
+          <X className="w-3 h-3" /> Cancel
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Per-program media panel — logo + highlights gallery ─────
+//
+// Both image and video are accepted. We use Convex File Storage end-
+// to-end (see convex/programMedia.ts). The panel is intentionally
+// self-contained so it can be lifted to a per-program admin page
+// later if you want a bigger surface for it.
+const MAX_LOGO_BYTES   = 5 * 1024 * 1024;    //  5 MB
+const MAX_IMAGE_BYTES  = 10 * 1024 * 1024;   // 10 MB
+const MAX_VIDEO_BYTES  = 50 * 1024 * 1024;   // 50 MB
+
+function bytesToHuman(n?: number) {
+  if (!n && n !== 0) return "";
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function ProgramMediaPanel({ projectId }: { projectId: string }) {
+  const logoUrl    = useQuery(api.programMedia.getProgramLogoUrl, { projectId: projectId as any });
+  const highlights = useQuery(api.programMedia.listHighlights,    { projectId: projectId as any });
+
+  const generateUrl   = useMutation(api.programMedia.generateUploadUrl);
+  const setLogo       = useMutation(api.programMedia.setProgramLogo);
+  const clearLogo     = useMutation(api.programMedia.clearProgramLogo);
+  const addHighlight  = useMutation(api.programMedia.addHighlight);
+  const removeHigh    = useMutation(api.programMedia.removeHighlight);
+  const moveHigh      = useMutation(api.programMedia.moveHighlight);
+  const updateHigh    = useMutation(api.programMedia.updateHighlight);
+
+  const [logoBusy,  setLogoBusy]  = useState(false);
+  const [mediaBusy, setMediaBusy] = useState<null | "image" | "video">(null);
+
+  // ── Upload helper — returns a Convex storage ID ──
+  async function uploadToConvex(file: File): Promise<string> {
+    const url = await generateUrl();
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": file.type },
+      body: file,
+    });
+    if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+    const { storageId } = await res.json();
+    if (!storageId) throw new Error("Upload returned no storage ID.");
+    return storageId as string;
+  }
+
+  // ── Logo handlers ──
+  async function handleLogoFile(file: File) {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Logo must be an image (PNG/JPG/SVG/WebP).");
+      return;
+    }
+    if (file.size > MAX_LOGO_BYTES) {
+      toast.error(`Logo too large (max ${bytesToHuman(MAX_LOGO_BYTES)}).`);
+      return;
+    }
+    setLogoBusy(true);
+    try {
+      const storageId = await uploadToConvex(file);
+      await setLogo({ projectId: projectId as any, storageId });
+      toast.success("Logo updated.");
+    } catch (e: any) {
+      toast.error(e?.message ?? String(e));
+    } finally {
+      setLogoBusy(false);
+    }
+  }
+
+  async function handleClearLogo() {
+    if (!confirm("Remove the program logo? The sidebar will fall back to the default icon.")) return;
+    setLogoBusy(true);
+    try {
+      await clearLogo({ projectId: projectId as any });
+      toast.success("Logo removed.");
+    } catch (e: any) {
+      toast.error(e?.message ?? String(e));
+    } finally {
+      setLogoBusy(false);
+    }
+  }
+
+  // ── Highlights handlers ──
+  async function handleHighlightFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    for (const file of Array.from(files)) {
+      const isImage = file.type.startsWith("image/");
+      const isVideo = file.type.startsWith("video/");
+      if (!isImage && !isVideo) {
+        toast.error(`Skipped "${file.name}" — not an image or video.`);
+        continue;
+      }
+      const cap = isImage ? MAX_IMAGE_BYTES : MAX_VIDEO_BYTES;
+      if (file.size > cap) {
+        toast.error(`"${file.name}" too large (max ${bytesToHuman(cap)} for ${isImage ? "image" : "video"}).`);
+        continue;
+      }
+
+      setMediaBusy(isImage ? "image" : "video");
+      try {
+        const storageId = await uploadToConvex(file);
+        await addHighlight({
+          projectId: projectId as any,
+          storageId,
+          mediaType: isImage ? "image" : "video",
+          fileName:  file.name,
+          fileSize:  file.size,
+          mimeType:  file.type,
+        });
+        toast.success(`Added ${isImage ? "image" : "video"} "${file.name}".`);
+      } catch (e: any) {
+        toast.error(e?.message ?? String(e));
+      } finally {
+        setMediaBusy(null);
+      }
+    }
+  }
+
+  return (
+    <div className="border border-indigo-200 bg-indigo-50/30 rounded-xl p-4 space-y-4">
+      {/* ── Logo section ──────────────────────────────── */}
+      <div>
+        <p className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+          <FileImage className="w-3.5 h-3.5 text-indigo-600" /> Logo
+        </p>
+        <div className="flex items-center gap-3">
+          <div className="w-16 h-16 rounded-xl border border-indigo-200 bg-white flex items-center justify-center overflow-hidden shrink-0">
+            {logoUrl === undefined ? (
+              <Loader2 className="w-4 h-4 text-gray-300 animate-spin" />
+            ) : logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoUrl} alt="logo" className="w-full h-full object-contain p-1" />
+            ) : (
+              <ImageIcon className="w-5 h-5 text-gray-300" />
+            )}
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-gray-600">
+              {logoUrl
+                ? "Used in the sidebar PROGRAMS list and program headers."
+                : "Upload a square PNG / SVG / WebP. Falls back to the default icon when blank."}
+            </p>
+            <p className="text-[10px] text-gray-400 mt-0.5">
+              Max {bytesToHuman(MAX_LOGO_BYTES)}. Square 256×256 recommended.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-1.5 shrink-0">
+            <label className={cn(
+              "inline-flex items-center justify-center gap-1 h-7 px-3 text-xs font-medium rounded-md cursor-pointer",
+              "bg-indigo-600 text-white hover:bg-indigo-700 transition-colors",
+              logoBusy && "opacity-50 pointer-events-none"
+            )}>
+              {logoBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+              {logoUrl ? "Replace" : "Upload"}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={logoBusy}
+                onChange={e => {
+                  const f = e.target.files?.[0];
+                  if (f) handleLogoFile(f);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            {logoUrl && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+                disabled={logoBusy}
+                onClick={handleClearLogo}
+              >
+                <Trash2 className="w-3 h-3" /> Remove
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t border-indigo-200/60" />
+
+      {/* ── Highlights section ─────────────────────────── */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+            <Film className="w-3.5 h-3.5 text-indigo-600" /> Highlights
+            {highlights && highlights.length > 0 && (
+              <span className="text-gray-400 font-normal">({highlights.length})</span>
+            )}
+          </p>
+          <div className="flex items-center gap-1.5">
+            <label className={cn(
+              "inline-flex items-center gap-1 h-7 px-2.5 text-xs font-medium rounded-md cursor-pointer",
+              "border border-indigo-200 bg-white hover:bg-indigo-50 text-indigo-700 transition-colors",
+              mediaBusy === "image" && "opacity-50 pointer-events-none"
+            )}>
+              {mediaBusy === "image" ? <Loader2 className="w-3 h-3 animate-spin" /> : <ImageIcon className="w-3 h-3" />}
+              Add Image
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                disabled={mediaBusy !== null}
+                onChange={e => { handleHighlightFiles(e.target.files); e.target.value = ""; }}
+              />
+            </label>
+            <label className={cn(
+              "inline-flex items-center gap-1 h-7 px-2.5 text-xs font-medium rounded-md cursor-pointer",
+              "border border-indigo-200 bg-white hover:bg-indigo-50 text-indigo-700 transition-colors",
+              mediaBusy === "video" && "opacity-50 pointer-events-none"
+            )}>
+              {mediaBusy === "video" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Video className="w-3 h-3" />}
+              Add Video
+              <input
+                type="file"
+                accept="video/*"
+                multiple
+                className="hidden"
+                disabled={mediaBusy !== null}
+                onChange={e => { handleHighlightFiles(e.target.files); e.target.value = ""; }}
+              />
+            </label>
+          </div>
+        </div>
+
+        <p className="text-[10px] text-gray-500 mb-3">
+          Images up to {bytesToHuman(MAX_IMAGE_BYTES)}, videos up to {bytesToHuman(MAX_VIDEO_BYTES)}.
+          Drag-to-reorder coming later — use the arrow buttons for now.
+        </p>
+
+        {highlights === undefined ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {[1, 2, 3].map(i => <Skeleton key={i} className="aspect-video rounded-lg" />)}
+          </div>
+        ) : highlights.length === 0 ? (
+          <div className="text-center py-8 text-xs text-gray-400 border border-dashed border-gray-200 rounded-xl bg-white">
+            No highlights yet. Use <strong>Add Image</strong> or <strong>Add Video</strong> above.
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {highlights.map((h, idx) => (
+              <HighlightTile
+                key={h._id}
+                highlight={h as any}
+                isFirst={idx === 0}
+                isLast={idx === highlights.length - 1}
+                onMoveUp={async () => {
+                  try { await moveHigh({ id: h._id as any, direction: "up" }); }
+                  catch (e: any) { toast.error(e?.message ?? String(e)); }
+                }}
+                onMoveDown={async () => {
+                  try { await moveHigh({ id: h._id as any, direction: "down" }); }
+                  catch (e: any) { toast.error(e?.message ?? String(e)); }
+                }}
+                onCaption={async (caption) => {
+                  try {
+                    await updateHigh({ id: h._id as any, caption: caption || undefined });
+                    toast.success("Caption saved.");
+                  } catch (e: any) { toast.error(e?.message ?? String(e)); }
+                }}
+                onRemove={async () => {
+                  if (!confirm(`Remove this ${h.mediaType}?`)) return;
+                  try {
+                    await removeHigh({ id: h._id as any });
+                    toast.success("Removed.");
+                  } catch (e: any) { toast.error(e?.message ?? String(e)); }
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function HighlightTile({
+  highlight, isFirst, isLast, onMoveUp, onMoveDown, onCaption, onRemove,
+}: {
+  highlight: {
+    _id: string;
+    storageId: string;
+    mediaType: "image" | "video";
+    caption?: string;
+    fileName?: string;
+    fileSize?: number;
+    mimeType?: string;
+    url: string | null;
+  };
+  isFirst:    boolean;
+  isLast:     boolean;
+  onMoveUp:   () => Promise<void>;
+  onMoveDown: () => Promise<void>;
+  onCaption:  (caption: string) => Promise<void>;
+  onRemove:   () => Promise<void>;
+}) {
+  const [editingCaption, setEditingCaption] = useState(false);
+  const [draftCaption,   setDraftCaption]   = useState(highlight.caption ?? "");
+
+  const isVideo = highlight.mediaType === "video";
+
+  return (
+    <div className="group relative rounded-xl overflow-hidden border border-gray-200 bg-white">
+      {/* Media preview */}
+      <div className="aspect-video bg-gray-50 flex items-center justify-center overflow-hidden">
+        {!highlight.url ? (
+          <Loader2 className="w-4 h-4 text-gray-300 animate-spin" />
+        ) : isVideo ? (
+          <video
+            src={highlight.url}
+            controls
+            preload="metadata"
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={highlight.url}
+            alt={highlight.caption ?? highlight.fileName ?? "highlight"}
+            className="w-full h-full object-cover"
+          />
+        )}
+      </div>
+
+      {/* Type + size badge */}
+      <div className="absolute top-1.5 left-1.5 flex items-center gap-1">
+        <Badge
+          variant="outline"
+          className={cn(
+            "text-[9px] h-4 px-1.5 gap-0.5 border-0 font-medium",
+            isVideo ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
+          )}
+        >
+          {isVideo ? <Video className="w-2.5 h-2.5" /> : <ImageIcon className="w-2.5 h-2.5" />}
+          {highlight.mediaType}
+        </Badge>
+        {highlight.fileSize != null && (
+          <span className="text-[9px] bg-black/60 text-white px-1.5 py-0.5 rounded font-mono">
+            {bytesToHuman(highlight.fileSize)}
+          </span>
+        )}
+      </div>
+
+      {/* Actions overlay */}
+      <div className="absolute top-1.5 right-1.5 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button
+          onClick={onMoveUp}
+          disabled={isFirst}
+          title="Move up"
+          className={cn(
+            "p-1 rounded bg-white/90 text-gray-700 hover:text-indigo-600 shadow-sm",
+            isFirst && "opacity-40 cursor-not-allowed"
+          )}
+        >
+          <ArrowUp className="w-3 h-3" />
+        </button>
+        <button
+          onClick={onMoveDown}
+          disabled={isLast}
+          title="Move down"
+          className={cn(
+            "p-1 rounded bg-white/90 text-gray-700 hover:text-indigo-600 shadow-sm",
+            isLast && "opacity-40 cursor-not-allowed"
+          )}
+        >
+          <ArrowDown className="w-3 h-3" />
+        </button>
+        <button
+          onClick={onRemove}
+          title="Remove"
+          className="p-1 rounded bg-white/90 text-gray-700 hover:text-red-600 shadow-sm"
+        >
+          <Trash2 className="w-3 h-3" />
+        </button>
+      </div>
+
+      {/* Caption */}
+      <div className="px-2.5 py-2 border-t border-gray-100">
+        {editingCaption ? (
+          <div className="flex items-center gap-1">
+            <input
+              autoFocus
+              type="text"
+              value={draftCaption}
+              onChange={e => setDraftCaption(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter") {
+                  onCaption(draftCaption.trim());
+                  setEditingCaption(false);
+                } else if (e.key === "Escape") {
+                  setDraftCaption(highlight.caption ?? "");
+                  setEditingCaption(false);
+                }
+              }}
+              placeholder="Caption (optional)"
+              className="flex-1 min-w-0 h-6 text-[11px] rounded border border-indigo-200 px-1.5 outline-none focus:ring-1 focus:ring-indigo-300"
+            />
+            <button
+              onClick={() => { onCaption(draftCaption.trim()); setEditingCaption(false); }}
+              className="p-1 rounded text-green-600 hover:bg-green-50"
+              title="Save caption"
+            >
+              <Save className="w-3 h-3" />
+            </button>
+            <button
+              onClick={() => { setDraftCaption(highlight.caption ?? ""); setEditingCaption(false); }}
+              className="p-1 rounded text-gray-400 hover:bg-gray-50"
+              title="Cancel"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setEditingCaption(true)}
+            className="text-left w-full text-[11px] text-gray-600 hover:text-indigo-600 truncate"
+            title={highlight.caption || highlight.fileName || "Click to add caption"}
+          >
+            {highlight.caption || (
+              <span className="text-gray-400 italic">
+                {highlight.fileName ?? "Click to add caption"}
+              </span>
+            )}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ProgramRow({
+  program, mode, onEdit, onMedia, onCancel, onSave, onDelete, onToggleActive, logoUrl,
+}: {
+  program:        ProgramRow;
+  mode:           "view" | "edit" | "media";
+  onEdit:         () => void;
+  onMedia:        () => void;
+  onCancel:       () => void;
+  onSave:         (data: ProgramFormValues) => Promise<void>;
+  onDelete:       () => Promise<void>;
+  onToggleActive: (next: boolean) => Promise<void>;
+  logoUrl:        string | null;
+}) {
+  if (mode === "edit") {
+    return (
+      <ProgramForm
+        mode="edit"
+        initial={{
+          code:            program.code,
+          name:            program.name,
+          shortName:       program.shortName,
+          description:     program.description,
+          division:        program.division,
+          projectType:     program.projectType,
+          targetSectors:   program.targetSectors,
+          modeOptions:     program.modeOptions,
+          requirementNote: program.requirementNote ?? "",
+          color:           program.color,
+          icon:            program.icon ?? "",
+          isActive:        program.isActive,
+          driveId:         program.driveId ?? "",
+        }}
+        onSave={onSave}
+        onCancel={onCancel}
+      />
+    );
+  }
+
+  // ── Collapsed view + optional inline media panel ─────────
+  const isMediaOpen = mode === "media";
+
+  return (
+    <div
+      className={cn(
+        "border rounded-xl bg-white overflow-hidden",
+        program.isActive ? "border-gray-200" : "border-dashed border-gray-200 bg-gray-50/60",
+        isMediaOpen && "ring-1 ring-indigo-200"
+      )}
+    >
+      {/* Header row */}
+      <div className="flex items-center gap-3 px-4 py-3">
+        {/* Logo / color preview */}
+        <div
+          className={cn(
+            "w-9 h-9 rounded-lg flex items-center justify-center shrink-0 overflow-hidden border",
+            logoUrl ? "bg-white border-gray-200" : "border-transparent"
+          )}
+          style={!logoUrl ? { backgroundColor: `${program.color}18` } : undefined}
+        >
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt={program.shortName} className="w-full h-full object-contain p-0.5" />
+          ) : (
+            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: program.color }} />
+          )}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className={cn("text-sm font-semibold", program.isActive ? "text-gray-800" : "text-gray-500")}>
+              {program.shortName}
+            </p>
+            <Badge variant="outline" className="text-[10px] h-4 px-1.5 font-mono">
+              {program.code}
+            </Badge>
+            <span className="text-[10px] text-gray-400">· {program.division}</span>
+            {!program.isActive && (
+              <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-amber-200 text-amber-700">
+                archived
+              </Badge>
+            )}
+          </div>
+          <p className="text-xs text-gray-500 truncate">{program.name}</p>
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0">
+          <Switch
+            checked={program.isActive}
+            onCheckedChange={c => onToggleActive(c)}
+          />
+          <Button
+            size="sm"
+            variant="ghost"
+            className={cn(
+              "h-7 text-xs gap-1",
+              isMediaOpen && "bg-indigo-50 text-indigo-700"
+            )}
+            onClick={onMedia}
+            title="Manage logo and highlights"
+          >
+            <ImageIcon className="w-3 h-3" /> Media
+          </Button>
+          <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={onEdit}>
+            <Pencil className="w-3 h-3" /> Edit
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+            onClick={onDelete}
+            title="Delete program"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Inline media panel */}
+      {isMediaOpen && (
+        <div className="px-4 pb-4 pt-1 border-t border-gray-100 bg-gray-50/40">
+          <ProgramMediaPanel projectId={program._id} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AppPrograms() {
+  const programs = useQuery(api.projects.list, {}) as ProgramRow[] | undefined;
+  const create   = useMutation(api.projects.create);
+  const update   = useMutation(api.projects.update);
+  const remove   = useMutation(api.projects.remove);
+
+  const [showAdd,   setShowAdd]   = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [mediaId,   setMediaId]   = useState<string | null>(null);
+
+  // Bulk-fetch all program logos in one query so each row doesn't fire
+  // its own. Returns Record<projectId, { code, url }>.
+  const logos = useQuery(api.programMedia.listLogosByProject, {});
+
+  const sorted = (programs ?? []).slice().sort((a, b) => {
+    // Active first, then alpha by shortName.
+    if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
+    return a.shortName.localeCompare(b.shortName);
+  });
+
+  async function handleDelete(p: ProgramRow) {
+    if (
+      !confirm(
+        `Delete program "${p.shortName}" (${p.code})?\n\n` +
+        `This removes the program record and any connected Google Sheet config.\n` +
+        `Existing activities tied to this program are NOT auto-deleted — clean those up via the Database Sync card if needed.\n\n` +
+        `This cannot be undone.`
+      )
+    ) return;
+    try {
+      const res = await remove({ id: p._id as any });
+      const parts: string[] = [];
+      if (res.removedConnections) {
+        parts.push(`${res.removedConnections} sheet connection${res.removedConnections === 1 ? "" : "s"}`);
+      }
+      if ((res as any).removedHighlights) {
+        const n = (res as any).removedHighlights as number;
+        parts.push(`${n} highlight${n === 1 ? "" : "s"}`);
+      }
+      const extras = parts.length ? ` (also removed ${parts.join(" + ")})` : "";
+      toast.success(`Deleted "${p.shortName}"${extras}`);
+    } catch (e: any) {
+      toast.error(e?.message ?? String(e));
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <FolderKanban className="w-4 h-4 text-indigo-600" /> Programs
+            </CardTitle>
+            <CardDescription className="text-xs">
+              The list that powers the sidebar PROGRAMS section, the import flow, and per-program reporting.
+            </CardDescription>
+          </div>
+          <Button
+            size="sm"
+            className="h-7 text-xs gap-1 bg-indigo-600 hover:bg-indigo-700"
+            onClick={() => { setShowAdd(v => !v); setEditingId(null); }}
+          >
+            {showAdd ? <X className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+            {showAdd ? "Cancel" : "Add Program"}
+          </Button>
+        </div>
+      </CardHeader>
+
+      <CardContent className="pt-0 space-y-3">
+        {/* Sidebar caveat — keeps surprises out of the way. */}
+        <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-xl border border-amber-200">
+          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <div className="text-[11px] text-amber-800 leading-relaxed space-y-1">
+            <p>
+              <strong>Editing &amp; archiving existing programs:</strong> works everywhere.
+              {" "}<strong>Logo &amp; highlights uploads:</strong> stored in Convex File Storage and
+              {" "}available via <code className="bg-amber-100 px-1 rounded">api.programMedia.*</code>
+              {" "}— you can render them anywhere (program pages, activity headers, dashboard hero).
+            </p>
+            <p>
+              <strong>Adding a brand-new program:</strong> creates the DB record but the left sidebar&apos;s
+              {" "}PROGRAMS list and per-program pages under
+              {" "}<code className="bg-amber-100 px-1 rounded">/projects/&lt;route&gt;</code>
+              {" "}are still hard-coded in <code className="bg-amber-100 px-1 rounded">components/layout/Sidebar.tsx</code>.
+              {" "}Same goes for uploaded logos — they replace the hard-coded
+              {" "}<code className="bg-amber-100 px-1 rounded">/logo/*.png</code> mapping
+              {" "}only after the sidebar is made data-driven. Ask Cascade for that follow-up when you&apos;re ready.
+            </p>
+          </div>
+        </div>
+
+        {/* Add form */}
+        {showAdd && (
+          <ProgramForm
+            mode="create"
+            initial={EMPTY_PROGRAM}
+            onSave={async (data) => {
+              await create(data as any);
+              setShowAdd(false);
+              toast.success(`Created "${data.shortName}"`);
+            }}
+            onCancel={() => setShowAdd(false)}
+          />
+        )}
+
+        {/* List */}
+        {programs === undefined ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map(i => <Skeleton key={i} className="h-14 rounded-xl" />)}
+          </div>
+        ) : sorted.length === 0 ? (
+          <div className="text-center py-8 text-xs text-gray-400">
+            No programs yet. Click <strong>Add Program</strong> above, or run{" "}
+            <code className="bg-gray-100 px-1 rounded">npx convex run projects:seed</code> to
+            populate the default DICT R5 set.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {sorted.map(p => (
+              <ProgramRow
+                key={p._id}
+                program={p}
+                mode={editingId === p._id ? "edit" : mediaId === p._id ? "media" : "view"}
+                logoUrl={logos?.[p._id]?.url ?? null}
+                onEdit={() => { setEditingId(p._id); setMediaId(null); setShowAdd(false); }}
+                onMedia={() => {
+                  setMediaId(prev => (prev === p._id ? null : p._id));
+                  setEditingId(null);
+                  setShowAdd(false);
+                }}
+                onCancel={() => setEditingId(null)}
+                onSave={async (data) => {
+                  // Strip `code` since it isn't editable in the edit form,
+                  // but the form still echoes it back. Server also re-checks.
+                  const { code: _ignored, ...rest } = data;
+                  try {
+                    await update({ id: p._id as any, ...rest });
+                    setEditingId(null);
+                    toast.success(`Updated "${data.shortName}"`);
+                  } catch (e: any) {
+                    toast.error(e?.message ?? String(e));
+                  }
+                }}
+                onDelete={() => handleDelete(p)}
+                onToggleActive={async (next) => {
+                  try {
+                    await update({ id: p._id as any, isActive: next });
+                    toast.success(next ? `"${p.shortName}" activated` : `"${p.shortName}" archived`);
+                  } catch (e: any) {
+                    toast.error(e?.message ?? String(e));
+                  }
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ── Main Settings Page ──────────────────────────────────────
 export default function SettingsPage() {
   const { data: session, status } = useSession();
@@ -756,6 +1738,9 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ── Programs (CRUD) ── */}
+      <AppPrograms />
 
       {/* ── Sheet Connections ── */}
       <Card>

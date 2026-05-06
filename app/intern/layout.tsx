@@ -15,7 +15,7 @@ const INTERN_OFFLINE_STORES = [
   { store: "internCheckinQueue", endpoint: "/api/intern/qr/checkin" },
 ] as const;
 
-const PUBLIC_PATHS = ["/intern/login", "/intern/register"];
+const PUBLIC_PATHS: string[] = [];
 
 const NAV = [
   { href: "/intern/dashboard",  icon: LayoutDashboard, label: "Home"     },
@@ -46,14 +46,14 @@ export default function InternLayout({ children }: { children: React.ReactNode }
   useEffect(() => {
     if (isPublic) { setReady(true); return; }
     const token = localStorage.getItem("intern_token");
-    if (!token) { router.replace("/intern/login"); return; }
+    if (!token) { router.replace("/login"); return; }
     setReady(true);
   }, [isPublic, router]);
 
   function handleLogout() {
     localStorage.removeItem("intern_token");
     localStorage.removeItem("intern_data");
-    router.push("/intern/login");
+    router.push("/login");
   }
 
   if (!ready) {

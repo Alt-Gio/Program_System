@@ -77,7 +77,7 @@ export default function InternAccountsPage() {
           <h1 className="text-xl font-bold text-gray-900">Intern Accounts</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             Manage login credentials for interns. Share the login link:&nbsp;
-            <span className="font-mono text-blue-600 text-[11px]">/intern-auth/login</span>
+            <span className="font-mono text-blue-600 text-[11px]">/login</span>
           </p>
         </div>
         <Button size="sm" className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white shadow shrink-0"

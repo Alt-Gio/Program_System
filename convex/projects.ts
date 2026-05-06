@@ -96,3 +96,143 @@ export const seed = mutation({
     return { seeded: true, count: projectData.length };
   },
 });
+
+// ── CRUD for the Programs settings page ──────────────────────────
+// These mirror the schema in convex/schema.ts → `projects`. They are
+// intentionally additive — `list` / `getByCode` / `seed` above keep
+// working unchanged.
+//
+// NOTE: Not gated on admin yet to match the existing pattern in this
+// file (`seed` is also ungated). Add an `await requireAdmin(ctx)` here
+// once the Settings page is restricted to admins via middleware/session.
+
+const projectFields = {
+  code:            v.string(),
+  name:            v.string(),
+  shortName:       v.string(),
+  description:     v.string(),
+  division:        v.string(),
+  projectType:     v.string(),
+  targetSectors:   v.array(v.string()),
+  modeOptions:     v.array(v.string()),
+  requirementNote: v.optional(v.string()),
+  color:           v.string(),
+  icon:            v.optional(v.string()),
+  isActive:        v.boolean(),
+  driveId:         v.optional(v.string()),
+  fyTarget: v.optional(v.object({
+    fy:     v.string(),
+    metric: v.string(),
+    value:  v.number(),
+  })),
+};
+
+export const create = mutation({
+  args: projectFields,
+  handler: async (ctx, args) => {
+    const code = args.code.trim().toUpperCase();
+    if (!code) throw new Error("Code is required.");
+
+    // Uniqueness — code is the natural key (used by sheet sync,
+    // dedup, sidebar routing).
+    const dup = await ctx.db
+      .query("projects")
+      .withIndex("by_code", q => q.eq("code", code))
+      .first();
+    if (dup) throw new Error(`A program with code "${code}" already exists.`);
+
+    return await ctx.db.insert("projects", { ...args, code });
+  },
+});
+
+export const update = mutation({
+  args: {
+    id: v.id("projects"),
+    code:            v.optional(v.string()),
+    name:            v.optional(v.string()),
+    shortName:       v.optional(v.string()),
+    description:     v.optional(v.string()),
+    division:        v.optional(v.string()),
+    projectType:     v.optional(v.string()),
+    targetSectors:   v.optional(v.array(v.string())),
+    modeOptions:     v.optional(v.array(v.string())),
+    requirementNote: v.optional(v.string()),
+    color:           v.optional(v.string()),
+    icon:            v.optional(v.string()),
+    isActive:        v.optional(v.boolean()),
+    driveId:         v.optional(v.string()),
+    fyTarget: v.optional(v.object({
+      fy:     v.string(),
+      metric: v.string(),
+      value:  v.number(),
+    })),
+  },
+  handler: async (ctx, { id, ...patch }) => {
+    const existing = await ctx.db.get(id);
+    if (!existing) throw new Error("Program not found.");
+
+    // If code is changing, enforce uniqueness against the new value.
+    if (patch.code !== undefined) {
+      const newCode = patch.code.trim().toUpperCase();
+      if (!newCode) throw new Error("Code cannot be empty.");
+      if (newCode !== existing.code) {
+        const dup = await ctx.db
+          .query("projects")
+          .withIndex("by_code", q => q.eq("code", newCode))
+          .first();
+        if (dup) throw new Error(`A program with code "${newCode}" already exists.`);
+      }
+      patch.code = newCode;
+    }
+
+    // Strip undefined entries so we don't overwrite with `undefined`.
+    const clean: Record<string, any> = {};
+    for (const [k, v] of Object.entries(patch)) {
+      if (v !== undefined) clean[k] = v;
+    }
+    await ctx.db.patch(id, clean);
+    return { success: true };
+  },
+});
+
+export const remove = mutation({
+  args: { id: v.id("projects") },
+  handler: async (ctx, { id }) => {
+    const existing = await ctx.db.get(id);
+    if (!existing) throw new Error("Program not found.");
+
+    // Soft-cascade: drop any sheet sync connections tied to this
+    // project so we don't leave orphans pointing at a missing
+    // projectId. Activities are NOT auto-deleted — the operator
+    // should make that choice from the Database Sync card.
+    const conns = await ctx.db
+      .query("sheetsConnections")
+      .withIndex("by_project", q => q.eq("projectId", id))
+      .collect();
+    for (const c of conns) await ctx.db.delete(c._id);
+
+    // Cascade-delete program media (logo + highlights) along with
+    // their storage blobs — these are 1:1 owned by the program and
+    // would otherwise orphan in storage forever.
+    if (existing.logoStorageId) {
+      try { await ctx.storage.delete(existing.logoStorageId as any); }
+      catch { /* tolerate already-gone */ }
+    }
+    const highlights = await ctx.db
+      .query("programHighlights")
+      .withIndex("by_project", q => q.eq("projectId", id))
+      .collect();
+    for (const h of highlights) {
+      try { await ctx.storage.delete(h.storageId as any); }
+      catch { /* tolerate */ }
+      await ctx.db.delete(h._id);
+    }
+
+    await ctx.db.delete(id);
+    return {
+      success: true,
+      removedConnections: conns.length,
+      removedHighlights: highlights.length,
+    };
+  },
+});

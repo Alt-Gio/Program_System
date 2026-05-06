@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useDeferredValue } from "react";
+import { useState, useMemo, useDeferredValue, useCallback, memo } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
@@ -355,7 +355,7 @@ function RegisterDialog({ open, onClose }: { open: boolean; onClose: () => void 
 }
 
 // ── Intern Row ───────────────────────────────────────────────
-function InternRow({ intern, onDelete }: { intern: InternRow; onDelete: (id: string) => void }) {
+const InternRow = memo(function InternRow({ intern, onDelete }: { intern: InternRow; onDelete: (id: string) => void }) {
   const pct = intern.requiredHours > 0
     ? Math.min(100, Math.round((intern.totalHours / intern.requiredHours) * 100)) : 0;
 
@@ -419,7 +419,7 @@ function InternRow({ intern, onDelete }: { intern: InternRow; onDelete: (id: str
       </td>
     </tr>
   );
-}
+});
 
 // ── Main Page ────────────────────────────────────────────────
 export default function InternsPage() {
@@ -463,7 +463,7 @@ export default function InternsPage() {
     ),
   }), [list]);
 
-  async function handleDelete(id: string) {
+  const handleDelete = useCallback(async (id: string) => {
     if (!confirm("Remove this intern and all their records? This cannot be undone.")) return;
     setDeleting(id);
     try {
@@ -474,7 +474,7 @@ export default function InternsPage() {
     } finally {
       setDeleting(null);
     }
-  }
+  }, [removeIntern]);
 
   return (
     <div className="page-content max-w-7xl mx-auto px-4 py-6 space-y-5">

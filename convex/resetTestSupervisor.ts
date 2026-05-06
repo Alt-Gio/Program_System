@@ -53,7 +53,7 @@ export const resetTestSupervisor = mutation({
       credentials: {
         email: "test.supervisor@example.com",
         password: "supervisor123",
-        loginUrl: "/supervisor-auth/login"
+        loginUrl: "/login"
       }
     };
   },

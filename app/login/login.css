@@ -1,0 +1,165 @@
+/* ─────────────────────────────────────────────
+   DICT Region V — Login Stage CSS
+   Scoped to .login-root so it doesn't leak into
+   the rest of the app.
+   ───────────────────────────────────────────── */
+
+.login-root {
+  width: 100%;
+  min-height: 100vh;
+  background: #05060f;
+  color: #e8eaf4;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+.login-root .serif {
+  font-family: var(--font-dm-serif), "DM Serif Display", serif;
+}
+.login-root .mono {
+  font-family: var(--font-jb-mono), "JetBrains Mono", monospace;
+}
+
+/* ── Keyframes ── */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.85); }
+}
+@keyframes orbFloat1 {
+  0%, 100% { transform: translate(0, 0); }
+  33% { transform: translate(40px, -30px); }
+  66% { transform: translate(-30px, 20px); }
+}
+@keyframes orbFloat2 {
+  0%, 100% { transform: translate(0, 0); }
+  33% { transform: translate(-50px, 30px); }
+  66% { transform: translate(40px, -20px); }
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0.1; }
+  50% { opacity: 0.7; }
+}
+@keyframes seamGlow {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+@keyframes spinSlow {
+  from { transform: rotate(0); }
+  to { transform: rotate(360deg); }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Utility ── */
+.login-root .fade-in {
+  animation: fadeIn 0.4s ease both;
+}
+.login-root .fade-up {
+  animation: fadeUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.login-root .spin {
+  animation: spin 0.7s linear infinite;
+}
+
+/* ── Role-panel hover behaviour ── */
+.login-root .role-panel {
+  transition: flex-grow 0.4s ease, opacity 0.3s ease;
+}
+.login-root [style] .role-panel:hover {
+  /* boosted visual presence on hover */
+  flex-grow: 1.15;
+}
+.login-root .role-panel:hover ~ .role-panel,
+.login-root .role-panel:has(~ :hover) {
+  opacity: 0.72;
+}
+
+/* ── CTA button hover ── */
+.login-root .role-cta:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+  transform: translateY(-1px);
+}
+
+/* ── Google button ── */
+.login-root .gbtn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 22px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #e8eaf4;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+.login-root .gbtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+.login-root .gbtn[data-solid="true"]:hover {
+  filter: brightness(1.08);
+}
+
+/* ── Checkbox (admin form) ── */
+.login-root .cbx {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 15px;
+  height: 15px;
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+  position: relative;
+  transition: all 0.15s;
+}
+.login-root .cbx:checked {
+  background: var(--login-accent, #f97316);
+  border-color: var(--login-accent, #f97316);
+}
+.login-root .cbx:checked::after {
+  content: "✓";
+  position: absolute;
+  top: -2px;
+  left: 1px;
+  color: #0a0d1e;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* ── Remove page scrollbar for login route ── */
+.login-root::-webkit-scrollbar { display: none; }
+.login-root { scrollbar-width: none; }
+
+/* ── Responsive: stack panels below 900px ── */
+@media (max-width: 900px) {
+  .login-root .role-panel {
+    padding: 24px 28px !important;
+  }
+  .login-root .role-panel[data-side="left"] {
+    padding-bottom: 12px !important;
+  }
+  .login-root .role-panel[data-side="right"] {
+    padding-top: 12px !important;
+  }
+}

@@ -1253,21 +1253,21 @@ export default function FrontPage() {
             dark ? "text-white/40" : "text-gray-500"
           )}>
             <span>Staff portal:</span>
-            <Link href="/intern/login" className={cn(
+            <Link href="/login" className={cn(
               "underline underline-offset-2 transition-colors",
               dark ? "text-violet-300/80 hover:text-violet-200" : "text-violet-600 hover:text-violet-700"
             )}>
               Intern
             </Link>
             <span className={dark ? "text-white/15" : "text-gray-300"}>·</span>
-            <Link href="/supervisor/login" className={cn(
+            <Link href="/login" className={cn(
               "underline underline-offset-2 transition-colors",
               dark ? "text-indigo-300/80 hover:text-indigo-200" : "text-indigo-600 hover:text-indigo-700"
             )}>
               Supervisor
             </Link>
             <span className={dark ? "text-white/15" : "text-gray-300"}>·</span>
-            <Link href="/sign-in" className={cn(
+            <Link href="/login" className={cn(
               "underline underline-offset-2 transition-colors",
               dark ? "text-white/30 hover:text-white/60" : "text-gray-400 hover:text-gray-600"
             )}>

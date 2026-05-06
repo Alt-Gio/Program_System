@@ -202,7 +202,7 @@ function AcceptInvitePageInner() {
               <h3 className="font-semibold text-amber-700">Invite already used</h3>
               <p className="text-sm text-gray-700 mt-2">
                 This invite has already been redeemed. Try{" "}
-                <Link href="/signin" className="text-blue-600 underline">signing in</Link>.
+                <Link href="/login" className="text-blue-600 underline">signing in</Link>.
               </p>
             </CardContent>
           )}

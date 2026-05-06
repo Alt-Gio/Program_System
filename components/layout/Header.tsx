@@ -78,7 +78,7 @@ export function Header() {
     document.cookie = "auth_token=; path=/; max-age=0";
     
     toast.success("Logged out successfully");
-    router.push("/signin");
+    router.push("/login");
   }
   
   const provinces = useQuery(api.provinces.list);

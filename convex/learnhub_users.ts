@@ -79,13 +79,46 @@ export const createUser = mutation({
 export const updateProfile = mutation({
   args: {
     id: v.id("learnhub_users"),
+    name: v.optional(v.string()),
+    avatarUrl: v.optional(v.string()),
     bio: v.optional(v.string()),
     school: v.optional(v.string()),
     organization: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { id, ...fields } = args;
-    await ctx.db.patch(id, fields);
+    // Drop undefined fields so we don't overwrite with undefined
+    const clean: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(fields)) {
+      if (v !== undefined) clean[k] = v;
+    }
+    await ctx.db.patch(id, clean);
+  },
+});
+
+export const toggleFollow = mutation({
+  args: {
+    followerId: v.id("learnhub_users"),
+    targetId: v.id("learnhub_users"),
+  },
+  handler: async (ctx, args) => {
+    if (args.followerId === args.targetId) {
+      throw new Error("Cannot follow yourself");
+    }
+    const follower = await ctx.db.get(args.followerId);
+    const target = await ctx.db.get(args.targetId);
+    if (!follower || !target) throw new Error("User not found");
+
+    const isFollowing = follower.followingIds.some((id) => id === args.targetId);
+    const newFollowingIds = isFollowing
+      ? follower.followingIds.filter((id) => id !== args.targetId)
+      : [...follower.followingIds, args.targetId];
+
+    await ctx.db.patch(args.followerId, { followingIds: newFollowingIds });
+    await ctx.db.patch(args.targetId, {
+      followerCount: Math.max(0, target.followerCount + (isFollowing ? -1 : 1)),
+    });
+    return { isFollowing: !isFollowing };
   },
 });
 

@@ -2,15 +2,27 @@
 
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { ROLES, type RoleKey } from "@/components/login/roles";
+import { RoleIcon } from "@/components/login/RoleIcon";
 
-const ROLE_META: Record<string, { label: string; icon: string; accent: string; portal: string; href: string }> = {
-  intern:     { label: "Intern",             icon: "🎓", accent: "#6366f1", portal: "DICT Intern Portal",   href: "/intern-portal" },
-  supervisor: { label: "Supervisor",         icon: "👩‍💼", accent: "#10b981", portal: "DICT Supervisor",      href: "/supervisor" },
-  manager:    { label: "Manager",            icon: "📋", accent: "#8b5cf6", portal: "DICT Admin Area",       href: "/dashboard" },
-  admin:      { label: "Administrator",      icon: "🛡️", accent: "#ef4444", portal: "DTC Admin",             href: "/dtc-admin" },
-  student:    { label: "Student",            icon: "📚", accent: "#3b82f6", portal: "ILCDB LearnHub",        href: "/learnhub/feed" },
-  mentor:     { label: "Mentor",             icon: "🌟", accent: "#f59e0b", portal: "ILCDB LearnHub Mentor", href: "/learnhub/feed" },
-  org_partner: { label: "Org Partner",       icon: "🤝", accent: "#06b6d4", portal: "ILCDB LearnHub",        href: "/learnhub/feed" },
+const ACCENT_BY_ROLE: Record<string, string> = {
+  student: "#f97316",
+  mentor: "#6b8dff",
+  intern: "#10b981",
+  supervisor: "#0ea5e9",
+  manager: "#3b82f6",
+  admin: "#f43f5e",
+  org_partner: "#06b6d4",
+};
+
+const PORTAL_BY_ROLE: Record<string, string> = {
+  student: "ILCDB LearnHub",
+  mentor: "ILCDB LearnHub Mentor",
+  intern: "DICT Intern Portal",
+  supervisor: "DICT Supervisor",
+  manager: "DICT Admin Area",
+  admin: "DTC Admin",
+  org_partner: "ILCDB LearnHub",
 };
 
 function PickRoleContent() {
@@ -21,76 +33,127 @@ function PickRoleContent() {
   const googleName = params.get("googleName");
   const googleEmail = params.get("googleEmail");
 
-  const roles: { key: string; meta: typeof ROLE_META[string] }[] = [];
-  if (dictRole && ROLE_META[dictRole]) roles.push({ key: dictRole, meta: ROLE_META[dictRole] });
-  if (lhRole && ROLE_META[lhRole]) roles.push({ key: lhRole, meta: ROLE_META[lhRole] });
-  if (wantsDictRole && ROLE_META[wantsDictRole] && !roles.find((r) => r.key === wantsDictRole)) {
-    roles.push({ key: wantsDictRole, meta: ROLE_META[wantsDictRole] });
+  const entries: { key: string; meta: typeof ROLES[RoleKey] | null; href: string; accent: string; portal: string; isNewDictRole: boolean }[] = [];
+
+  function push(key: string | null, isNewDictRole = false) {
+    if (!key) return;
+    const meta = (ROLES as Record<string, typeof ROLES[RoleKey] | undefined>)[key] ?? null;
+    const href = isNewDictRole
+      ? `/login/register/${key}`
+      : meta?.landing ?? "/login";
+    entries.push({
+      key,
+      meta,
+      href,
+      accent: ACCENT_BY_ROLE[key] ?? "#6366f1",
+      portal: PORTAL_BY_ROLE[key] ?? key,
+      isNewDictRole,
+    });
   }
 
-  const isNewAccount = !!wantsDictRole && !dictRole;
+  push(dictRole);
+  push(lhRole);
+  if (wantsDictRole && !entries.find((e) => e.key === wantsDictRole)) {
+    push(wantsDictRole, !dictRole);
+  }
 
   return (
-    <main style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px 16px", background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)" }}>
-      <div style={{ position: "fixed", inset: 0, pointerEvents: "none", background: "radial-gradient(ellipse 50% 40% at 50% 30%, rgba(99,102,241,0.15) 0%, transparent 70%)" }} />
-
-      <div style={{ position: "relative", zIndex: 10, width: "100%", maxWidth: 440 }}>
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 56, height: 56, borderRadius: 16, background: "linear-gradient(135deg, #6366f1, #8b5cf6)", fontSize: 24, marginBottom: 16, boxShadow: "0 8px 24px rgba(99,102,241,0.3)" }}>
-            🔀
+    <main
+      style={{
+        ["--login-accent" as any]: "#6366f1",
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px 16px",
+        background:
+          "radial-gradient(ellipse 60% 40% at 50% 30%, rgba(99, 102, 241, 0.18) 0%, transparent 70%), #05060f",
+      }}
+    >
+      <div className="fade-up" style={{ width: "100%", maxWidth: 460 }}>
+        <div style={{ textAlign: "center", marginBottom: 28 }}>
+          <div className="mono" style={{ fontSize: 10, letterSpacing: "0.22em", color: "#a5b4fc", marginBottom: 6 }}>
+            MULTI-PORTAL ACCOUNT
           </div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#f1f5f9", margin: "0 0 6px" }}>
-            {isNewAccount ? "Add Another Role" : "Choose your Portal"}
+          <h1 className="serif" style={{ fontSize: 32, color: "#e8eaf4", margin: "0 0 6px", lineHeight: 1.1 }}>
+            Choose your <em style={{ color: "#a5b4fc" }}>portal</em>
           </h1>
-          <p style={{ fontSize: 13, color: "#64748b", margin: 0 }}>
+          <p style={{ fontSize: 13, color: "rgba(255, 255, 255, 0.55)", margin: 0 }}>
             {googleName ? `Welcome, ${googleName}` : "Your Google account is linked to multiple portals"}
           </p>
-          {googleEmail && <p style={{ fontSize: 11, color: "#475569", margin: "4px 0 0" }}>{googleEmail}</p>}
+          {googleEmail && (
+            <p className="mono" style={{ fontSize: 10, color: "rgba(255, 255, 255, 0.3)", margin: "4px 0 0", letterSpacing: "0.06em" }}>
+              {googleEmail}
+            </p>
+          )}
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {roles.map(({ key, meta }) => {
-            const isLearnHub = key === "mentor" || key === "student" || key === "org_partner";
-            const isNewDictRole = key === wantsDictRole && isNewAccount;
-
-            return (
-              <a
-                key={key}
-                href={isNewDictRole ? `/login/register/${key}` : meta.href}
-                style={{ display: "flex", alignItems: "center", gap: 16, padding: "18px 20px", borderRadius: 16, border: `1px solid ${meta.accent}40`, background: `${meta.accent}0d`, textDecoration: "none", transition: "all 0.15s" }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = `${meta.accent}1a`; (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = `${meta.accent}0d`; (e.currentTarget as HTMLElement).style.transform = "none"; }}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {entries.map(({ key, meta, href, accent, portal, isNewDictRole }) => (
+            <a
+              key={key}
+              href={href}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 16,
+                padding: "16px 18px",
+                borderRadius: 14,
+                border: `1px solid ${accent}44`,
+                background: `${accent}0d`,
+                textDecoration: "none",
+                color: "#e8eaf4",
+                transition: "background 0.15s, transform 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.background = `${accent}1f`;
+                (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.background = `${accent}0d`;
+                (e.currentTarget as HTMLElement).style.transform = "none";
+              }}
+            >
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 12,
+                  background: `${accent}20`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: accent,
+                  flexShrink: 0,
+                }}
               >
-                <div style={{ width: 48, height: 48, borderRadius: 12, background: `${meta.accent}20`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>
-                  {meta.icon}
+                {meta ? <RoleIcon icon={meta.icon} size={24} /> : null}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 600 }}>{meta?.short ?? key}</div>
+                <div className="mono" style={{ fontSize: 10, letterSpacing: "0.12em", color: "rgba(255, 255, 255, 0.45)", marginTop: 2 }}>
+                  {portal.toUpperCase()}
+                  {isNewDictRole && " · CLICK TO COMPLETE REGISTRATION"}
                 </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: "#e2e8f0" }}>
-                    {meta.label}
-                  </div>
-                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
-                    {meta.portal}
-                    {isLearnHub && " · ILCDB"}
-                    {isNewDictRole && " · Click to complete registration"}
-                  </div>
-                </div>
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" style={{ color: meta.accent }}>
-                  <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                </svg>
-              </a>
-            );
-          })}
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ color: accent }} aria-hidden="true">
+                <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </a>
+          ))}
         </div>
 
-        {roles.length === 0 && (
-          <div style={{ textAlign: "center", color: "#64748b", padding: 32, fontSize: 14 }}>
+        {entries.length === 0 && (
+          <div style={{ textAlign: "center", color: "rgba(255, 255, 255, 0.5)", padding: 32, fontSize: 13 }}>
             No active roles found.{" "}
-            <a href="/login/intern" style={{ color: "#6366f1", textDecoration: "none" }}>Return to login</a>
+            <a href="/login" style={{ color: "#a5b4fc", textDecoration: "none" }}>
+              Return to sign-in
+            </a>
           </div>
         )}
 
-        <p style={{ textAlign: "center", fontSize: 11, color: "#334155", marginTop: 28 }}>
-          Your sessions are isolated per portal · DICT Region V
+        <p className="mono" style={{ textAlign: "center", fontSize: 10, color: "rgba(255, 255, 255, 0.3)", marginTop: 24, letterSpacing: "0.14em" }}>
+          SESSIONS ARE ISOLATED PER PORTAL · DICT REGION V
         </p>
       </div>
     </main>

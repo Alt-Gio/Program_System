@@ -1,100 +1,213 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+/**
+ * LearnHub Feed (DTC-HUB redesign).
+ *
+ * The center column of the (lh-main) layout. Replaces the old static
+ * masonry grid with a real, Convex-backed social feed:
+ *
+ *   1. Greeting + streak pill (DTC-HUB header)
+ *   2. PostComposer    — wired to api.learnhub_posts.createPost
+ *   3. Live feed list  — useQuery(api.learnhub_posts.listFeedWithAuthors)
+ *      Each item is mapped into the MockPost shape that FeedPost expects
+ *      so likes, comments, and media renderers (YouTube / Meet / Drive /
+ *      Form / Opportunity / Certificate) all work out of the box.
+ *
+ * No layout changes here — TopNav / LeftPanel / RightPanel come from
+ * the parent layout. CSS lives in app/learnhub/learnhub.css.
+ */
+
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { FeedPost } from "@/components/learnhub/feed/FeedPost";
-import { PostComposer } from "@/components/learnhub/feed/PostComposer";
-import type { MockPost } from "@/components/learnhub/feed/FeedPost";
+import type { Doc, Id } from "@/convex/_generated/dataModel";
+import { Flame } from "lucide-react";
 import { useLearnhubSession } from "@/lib/learnhub/hooks";
+import { PostComposer } from "@/components/learnhub/feed/PostComposer";
+import { FeedPost, type MockPost } from "@/components/learnhub/feed/FeedPost";
 
-const MOCK_MENTOR = { id: "m1", name: "Ma. Lourdes Santos", avatarUrl: "https://api.dicebear.com/7.x/initials/svg?seed=Lourdes", role: "mentor" as const };
-const MOCK_STUDENT = { id: "s1", name: "Carlo Reyes", avatarUrl: "https://api.dicebear.com/7.x/initials/svg?seed=Carlo", role: "student" as const };
-const MOCK_ORG = { id: "o1", name: "TechCorp PH", avatarUrl: "https://api.dicebear.com/7.x/initials/svg?seed=TechCorp", role: "org_partner" as const };
+// ────────────────────────────────────────────────────────────────────
+// Convex doc → MockPost mapper
+// ────────────────────────────────────────────────────────────────────
 
-const SEED: MockPost[] = [
-  { id: "p1", type: "text", author: MOCK_MENTOR, content: "Welcome to ILCDB LearnHub! 🎉 This is your space to learn, connect, and grow within DICT Region V. Share your journey, earn certificates, and explore opportunities. #ILCDB #DICT #Tech4All", metadata: {}, likeCount: 24, commentCount: 5, isPinned: true, createdAt: Date.now() - 2 * 3600000 },
-  { id: "p2", type: "youtube", author: MOCK_MENTOR, content: "Essential cybersecurity skills for every digital citizen. Watch before starting the SPARK module! 🔐", metadata: { videoId: "aEmXT0bKbgE", title: "Cybersecurity Full Course for Beginners", thumbnail: "https://img.youtube.com/vi/aEmXT0bKbgE/mqdefault.jpg", channelName: "freeCodeCamp.org", duration: "11:45:00" }, likeCount: 18, commentCount: 3, isPinned: false, createdAt: Date.now() - 5 * 3600000 },
-  { id: "p3", type: "meet", author: MOCK_MENTOR, content: "📅 Live Q&A for SPARK Module 3. Bring your questions about cloud computing. Attendance required for certification.", metadata: { meetLink: "https://meet.google.com/abc-defg-hij", scheduledAt: Date.now() + 2 * 3600000, durationMinutes: 90, isLive: false, viewerCount: 0 }, likeCount: 12, commentCount: 7, isPinned: false, createdAt: Date.now() - 8 * 3600000 },
-  { id: "p4", type: "opportunity", author: MOCK_ORG, content: "Looking for ILCDB graduates to join our remote support team. Paid opportunity for certified Tech4ED completers.", metadata: { title: "Remote IT Support Specialist", workType: "remote", payType: "paid", payAmount: "₱18,000/mo", slots: 3, deadline: Date.now() + 7 * 86400000, duration: "6 months", requiredCerts: ["Tech4ED", "SPARK"] }, likeCount: 31, commentCount: 14, isPinned: false, createdAt: Date.now() - 86400000 },
-  { id: "p5", type: "drive", author: MOCK_MENTOR, content: "Study guide for DWIA Module 2 assessment. Review before Friday's quiz. #DWIA", metadata: { driveFileId: "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74", fileName: "DWIA Module 2 Study Guide.pdf", mimeType: "application/pdf", previewUrl: "https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74/preview" }, likeCount: 9, commentCount: 2, isPinned: false, createdAt: Date.now() - 2 * 86400000 },
-  { id: "p6", type: "form", author: MOCK_MENTOR, content: "Post-training evaluation for SPARK Module 1 — takes 5 minutes. Your feedback shapes future sessions! 📋", metadata: { formUrl: "https://forms.gle/example", formTitle: "SPARK Module 1 — Post-Training Evaluation", responseCount: 47, closingAt: Date.now() + 3 * 86400000 }, likeCount: 6, commentCount: 1, isPinned: false, createdAt: Date.now() - 3 * 86400000 },
-  { id: "p7", type: "certificate", author: MOCK_STUDENT, content: "Just earned my SPARK Digital Literacy certificate! 🎓 Grateful to all DICT Region V mentors. #ILCDB #SPARK #Certified", metadata: { certTitle: "SPARK Digital Literacy Program", programType: "SPARK", issuedByName: "Ma. Lourdes Santos", verificationId: "LH-2025-SPARK-0042" }, likeCount: 52, commentCount: 11, isPinned: false, createdAt: Date.now() - 4 * 86400000 },
-];
+type AuthorDoc = Doc<"learnhub_users"> | null;
+type PostWithAuthor = Doc<"learnhub_posts"> & { author: AuthorDoc };
 
-function mapConvexPost(p: ReturnType<typeof useQuery<typeof api.learnhub_posts.listFeedWithAuthors>> extends (infer T)[] | undefined ? T : never): MockPost {
+function isMockPostType(t: string): t is MockPost["type"] {
+  return ["text", "youtube", "meet", "drive", "form", "opportunity", "certificate"].includes(t);
+}
+
+function isMockRole(r: string | undefined): r is MockPost["author"]["role"] {
+  return r === "student" || r === "mentor" || r === "org_partner";
+}
+
+function mapConvexPost(p: PostWithAuthor): MockPost {
+  const author = p.author;
+  const authorName = author?.name ?? "Unknown";
+  const fallbackAvatar = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(authorName)}&backgroundColor=5B6CFF&textColor=ffffff`;
+  const role: MockPost["author"]["role"] = isMockRole(author?.role) ? author!.role : "student";
+
   return {
-    id: p._id,
-    convexPostId: p._id,
-    type: p.type as MockPost["type"],
+    id: p._id as string,
+    convexPostId: p._id as string,
+    type: isMockPostType(p.type) ? p.type : "text",
     author: {
-      id: p.authorId,
-      name: p.author?.name ?? "Unknown",
-      avatarUrl: p.author?.avatarUrl ?? `https://api.dicebear.com/7.x/initials/svg?seed=U`,
-      role: (p.author?.role ?? "student") as MockPost["author"]["role"],
+      id: (author?._id as string) ?? "unknown",
+      name: authorName,
+      avatarUrl: author?.avatarUrl ?? fallbackAvatar,
+      role,
     },
     content: p.content,
-    metadata: p.metadata ?? {},
-    likeCount: p.likeCount,
-    commentCount: p.commentCount,
-    isPinned: p.isPinned,
+    metadata: (p.metadata ?? {}) as Record<string, unknown>,
+    likeCount: p.likeCount ?? 0,
+    commentCount: p.commentCount ?? 0,
+    isPinned: p.isPinned ?? false,
     createdAt: p.createdAt,
   };
 }
 
+// ────────────────────────────────────────────────────────────────────
+// Page
+// ────────────────────────────────────────────────────────────────────
+
 export default function FeedPage() {
+  const { session, userId, role } = useLearnhubSession();
+
+  const me = useQuery(
+    api.learnhub_users.getUser,
+    userId ? { id: userId as Id<"learnhub_users"> } : "skip"
+  );
+
+  // Live, real-time feed query. Returns posts with their author docs joined.
+  const feed = useQuery(api.learnhub_posts.listFeedWithAuthors, { limit: 30 });
+
+  // Optimistic local posts — used by PostComposer when the user isn't signed
+  // in yet (anonymous draft) and for instant feedback before the live query
+  // re-snapshots. Once the live feed length grows past what we have locally
+  // we clear the local array (the server is now the source of truth).
   const [localPosts, setLocalPosts] = useState<MockPost[]>([]);
-  const [liked, setLiked] = useState<Set<string>>(new Set());
-  const livePosts = useQuery(api.learnhub_posts.listFeedWithAuthors, { limit: 30 });
-  const { userId, session } = useLearnhubSession();
-  const prevLiveCountRef = useRef(0);
-
-  // Clear optimistic local posts once Convex confirms new posts
   useEffect(() => {
-    if (livePosts && livePosts.length > prevLiveCountRef.current) {
-      setLocalPosts([]);
-      prevLiveCountRef.current = livePosts.length;
-    }
-  }, [livePosts]);
+    if (!feed) return;
+    if (localPosts.length === 0) return;
+    // Drop any local optimistic post that now exists on the server.
+    const liveIds = new Set(feed.map((p) => p._id as string));
+    setLocalPosts((prev) => prev.filter((p) => !liveIds.has(p.id) && !liveIds.has(p.convexPostId ?? "")));
+  }, [feed, localPosts.length]);
 
-  const convexPosts: MockPost[] = livePosts ? livePosts.map(mapConvexPost) : [];
-  const source: MockPost[] = convexPosts.length > 0 ? convexPosts : livePosts === undefined ? [] : SEED;
-  const allPosts: MockPost[] = [...localPosts, ...source.filter((p) => !localPosts.some((l) => l.id === p.id))];
-
-  const handleLike = (id: string) => {
-    setLiked((s) => new Set(Array.from(s).concat(id)));
+  const handleOptimisticPost = (post: MockPost) => {
+    setLocalPosts((prev) => [post, ...prev]);
   };
 
+  // Greeting time-of-day
+  const greeting = useMemo(() => {
+    const h = new Date().getHours();
+    return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+  }, []);
+
+  const firstName = (session?.name ?? "there").split(" ")[0];
+  const streak = (me as { currentStreak?: number } | null | undefined)?.currentStreak ?? 0;
+
+  // Final feed = optimistic prepended → live posts (mapped to MockPost).
+  const posts: MockPost[] = useMemo(() => {
+    const live = (feed ?? []).map(mapConvexPost);
+    return [...localPosts, ...live];
+  }, [feed, localPosts]);
+
+  const composerRole: "student" | "mentor" | "org_partner" =
+    role === "mentor" ? "mentor" : role === "org_partner" ? "org_partner" : "student";
+
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
-      <div className="mb-6">
-        <h1 className="text-xl font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>Feed</h1>
-        <p className="text-sm mt-0.5" style={{ color: "#9ba3cc" }}>What&apos;s happening in your cohort</p>
-      </div>
+    <div className="lh-feed-col" style={{ display: "flex", flexDirection: "column" }}>
+      {/* Greeting header */}
+      <header className="lh-feed-greeting">
+        <div>
+          <h1 className="lh-feed-greeting-title">
+            {greeting}, {firstName} <span aria-hidden>👋</span>
+          </h1>
+          <p className="lh-feed-greeting-sub">
+            What are your peers learning today?
+          </p>
+        </div>
+        {streak > 0 && (
+          <span className="lh-streak-pill" title="Daily learning streak">
+            <Flame size={14} /> {streak} day streak
+          </span>
+        )}
+      </header>
+
+      {/* Composer */}
       <PostComposer
-        onPost={(post) => setLocalPosts((p) => [post, ...p])}
+        onPost={handleOptimisticPost}
         userId={userId}
         userName={session?.name}
         userAvatar={session?.avatarUrl}
-        userRole={session?.role === "admin" ? "mentor" : session?.role}
+        userRole={composerRole}
       />
-      {livePosts === undefined && (
-        <div className="flex flex-col gap-4 mt-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-36 rounded-2xl animate-pulse" style={{ background: "#131626" }} />
-          ))}
+
+      {/* Loading skeletons */}
+      {feed === undefined && (
+        <div className="lh-feed-masonry">
+          <div className="lh-feed-col">
+            {[0, 2].map((i) => (
+              <div key={i} className="lh-card" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <div className="lh-skeleton" style={{ width: 42, height: 42, borderRadius: "50%" }} />
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div className="lh-skeleton" style={{ height: 12, width: "40%" }} />
+                    <div className="lh-skeleton" style={{ height: 10, width: "25%" }} />
+                  </div>
+                </div>
+                <div className="lh-skeleton" style={{ height: 14, width: "92%" }} />
+                <div className="lh-skeleton" style={{ height: 14, width: "78%" }} />
+                <div className="lh-skeleton" style={{ height: 160, width: "100%", borderRadius: 12 }} />
+              </div>
+            ))}
+          </div>
+          <div className="lh-feed-col">
+            {[1].map((i) => (
+              <div key={i} className="lh-card" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <div className="lh-skeleton" style={{ width: 42, height: 42, borderRadius: "50%" }} />
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div className="lh-skeleton" style={{ height: 12, width: "40%" }} />
+                    <div className="lh-skeleton" style={{ height: 10, width: "25%" }} />
+                  </div>
+                </div>
+                <div className="lh-skeleton" style={{ height: 14, width: "92%" }} />
+                <div className="lh-skeleton" style={{ height: 14, width: "78%" }} />
+                <div className="lh-skeleton" style={{ height: 200, width: "100%", borderRadius: 12 }} />
+              </div>
+            ))}
+          </div>
         </div>
       )}
-      <div className="flex flex-col gap-4 mt-4">
-        {allPosts.map((post) => (
-          <FeedPost
-            key={post.id}
-            post={{ ...post, likeCount: post.likeCount + (liked.has(post.id) ? 1 : 0) }}
-            userId={userId}
-            onLike={handleLike}
-          />
-        ))}
-      </div>
+
+      {/* Empty state */}
+      {feed !== undefined && posts.length === 0 && (
+        <div className="lh-feed-empty">
+          <div className="lh-feed-empty-emoji">📭</div>
+          <p className="lh-feed-empty-title">No posts yet</p>
+          <p style={{ margin: 0, fontSize: 12 }}>
+            Be the first to share something with the cohort.
+          </p>
+        </div>
+      )}
+
+      {/* Live feed — 2-column masonry */}
+      {feed !== undefined && posts.length > 0 && (
+        <div className="lh-feed-masonry">
+          <div className="lh-feed-col">
+            {posts.filter((_, i) => i % 2 === 0).map((post) => (
+              <FeedPost key={post.id} post={post} userId={userId} />
+            ))}
+          </div>
+          <div className="lh-feed-col">
+            {posts.filter((_, i) => i % 2 === 1).map((post) => (
+              <FeedPost key={post.id} post={post} userId={userId} />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

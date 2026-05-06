@@ -25,31 +25,19 @@ const PUBLIC_EXACT = new Set<string>([
   "/dtc-logbook",
   "/meeting-hall",
   "/event",
-  "/signin",
   "/accept-invite",
   "/bootstrap",
-  "/signup", // stays reachable so it can show an "invite-only" notice
-  // LearnHub login (backward compat — now at /login/student or /login/mentor)
+  "/signup", // invite-only info page; links to /login
+  // LearnHub login (backward compat)
   "/learnhub/login",
   "/learnhub/onboarding",
   "/learnhub/login/mentor/invite",
-  // New unified role-based login pages
-  "/login",
-  "/login/intern",
-  "/login/supervisor",
-  "/login/mentor",
-  "/login/student",
-  "/login/admin",
-  "/login/manager",
-  "/login/pick-role",
-  "/login/register/intern",
-  "/login/register/supervisor",
 ]);
 
 // Prefix matchers for paths that are always public (no session needed)
 const PUBLIC_PREFIXES = [
   "/learnhub/verify/",
-  "/login/register/",    // new-user registration forms after Google OAuth
+  "/login",           // unified sign-in carousel + /login/register/* + /login/pick-role
 ];
 
 // Prefix matchers for the family each route tree belongs to.
@@ -57,10 +45,8 @@ const PUBLIC_PREFIXES = [
 const FAMILY_RULES: Array<{ prefix: string; family: Family }> = [
   { prefix: "/learnhub", family: "learnhub" },
   { prefix: "/intern-portal", family: "intern-portal" },
-  { prefix: "/intern-auth", family: "intern-portal" },
   { prefix: "/intern/", family: "intern-portal" },
   { prefix: "/intern", family: "intern-portal" }, // /intern itself
-  { prefix: "/supervisor-auth", family: "supervisor" },
   { prefix: "/supervisor", family: "supervisor" },
   { prefix: "/dtc-admin", family: "admin-area" },
   { prefix: "/interns", family: "admin-area" },
@@ -101,7 +87,7 @@ export function middleware(request: NextRequest) {
   if (kind === "learnhub") {
     const lhToken = request.cookies.get("learnhub_session")?.value;
     if (!lhToken) {
-      const url = new URL("/login/student", request.url);
+      const url = new URL("/login", request.url);
       url.searchParams.set("callbackUrl", pathname);
       return NextResponse.redirect(url);
     }
@@ -120,10 +106,10 @@ export function middleware(request: NextRequest) {
   if (!token) {
     // Route to the appropriate role login page based on family
     const loginPath =
-      kind === "admin-area" ? "/login/admin"
-      : kind === "supervisor" ? "/login/supervisor"
-      : kind === "intern-portal" ? "/login/intern"
-      : "/signin"; // fallback keeps old bookmarks working
+      kind === "admin-area" ? "/login"
+      : kind === "supervisor" ? "/login"
+      : kind === "intern-portal" ? "/login"
+      : "/login"; // unified login carousel for all fallbacks
     const url = new URL(loginPath, request.url);
     url.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(url);

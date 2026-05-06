@@ -1,85 +1,205 @@
 "use client";
 
+/**
+ * LearnHub TopNav (DTC-HUB redesign).
+ *
+ * Brand on the left (gradient "D" tile + "LearnHub · ILCDB" wordmark),
+ * centered global search, and a right-cluster of icon buttons:
+ *
+ *   • Calendar  — opens CalendarPopover (live + upcoming Meet posts)
+ *   • Messages  — opens MessagesPopover (recent chats)
+ *   • Bell      — existing NotificationBell
+ *   • ThemeToggle (kept)
+ *   • Avatar    — links to /learnhub/profile
+ *
+ * The Pinterest-style center tab strip is gone; the new LeftRail
+ * handles primary navigation. Sign-out moved into the avatar
+ * dropdown (kept simple here — click avatar = open profile).
+ */
+
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { Bell, Calendar, MessageSquare, Search } from "lucide-react";
 import { ThemeToggle } from "@/components/learnhub/ThemeToggle";
 import { NotificationBell } from "@/components/learnhub/notifications/NotificationBell";
 import { useLearnhubSession } from "@/lib/learnhub/hooks";
+import { CalendarPopover } from "./popovers/CalendarPopover";
+import { MessagesPopover } from "./popovers/MessagesPopover";
 
-const TABS = [
-  { href: "/learnhub/feed",         label: "Feed",         icon: "🏠" },
-  { href: "/learnhub/work",         label: "Opportunities", icon: "💼" },
-  { href: "/learnhub/messages",     label: "Messages",      icon: "💬" },
-  { href: "/learnhub/leaderboard",  label: "Leaderboard",   icon: "🏆" },
-  { href: "/learnhub/mentor",       label: "Mentor",        icon: "🧑‍🏫" },
-];
+type Panel = "cal" | "msg" | null;
 
 export function TopNav() {
-  const pathname = usePathname();
+  const { session, userId } = useLearnhubSession();
   const router = useRouter();
-  const { session } = useLearnhubSession();
+  const [panel, setPanel] = useState<Panel>(null);
+  const [search, setSearch] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
 
-  const signOut = async () => {
-    await fetch("/api/learnhub/auth/session", { method: "DELETE" });
-    router.push("/learnhub/login");
+  // Live unread totals for icon badges.
+  const convs = useQuery(
+    api.learnhub_conversations.listMyConversations,
+    userId ? { userId } : "skip"
+  );
+  const unreadMsgs = useMemo(
+    () => (convs ?? []).reduce((n, c) => n + (c.unreadCount ?? 0), 0),
+    [convs]
+  );
+
+  // Upcoming-events badge — pulled from feed posts where type === meet.
+  const feed = useQuery(api.learnhub_posts.listFeedWithAuthors, { limit: 50 });
+  const upcomingEvents = useMemo(() => {
+    if (!feed) return 0;
+    return feed.filter((p) => {
+      if (p.type !== "meet") return false;
+      const m = (p.metadata ?? {}) as Record<string, unknown>;
+      const ts = (m.scheduledAt as number) ?? p.createdAt;
+      const isLive = Boolean(m.isLive);
+      return isLive || ts > Date.now();
+    }).length;
+  }, [feed]);
+
+  const togglePanel = (p: Panel) => setPanel((cur) => (cur === p ? null : p));
+
+  // Keyboard shortcuts: "/" or Ctrl/Cmd+K focuses search.
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const isTyping =
+        target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+      if ((e.key === "k" || e.key === "K") && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      } else if (e.key === "/" && !isTyping) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      } else if (e.key === "Escape" && panel) {
+        setPanel(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [panel]);
+
+  const onSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!search.trim()) return;
+    router.push(`/learnhub/feed?q=${encodeURIComponent(search.trim())}`);
   };
 
-  const avatarSrc = session
-    ? `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(session.name ?? "U")}`
-    : undefined;
+  const avatarSrc = session?.avatarUrl
+    ?? `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(session?.name ?? "U")}&backgroundColor=FF6B35&textColor=ffffff`;
 
   return (
     <nav className="lh-topnav">
-      {/* Logo */}
+      {/* Brand */}
       <Link href="/learnhub/feed" className="lh-topnav-logo">
-        <div className="lh-logo-icon">📡</div>
+        <div className="lh-brand-tile" aria-hidden>D</div>
         <span className="lh-logo-text">LearnHub</span>
         <span className="lh-logo-sub">ILCDB</span>
       </Link>
 
-      {/* Center tabs */}
-      <div className="lh-topnav-tabs">
-        {TABS.map((tab) => {
-          const active = pathname === tab.href || pathname.startsWith(tab.href + "/");
-          return (
-            <Link
-              key={tab.href}
-              href={tab.href}
-              className={`lh-nav-tab${active ? " active" : ""}`}
+      {/* Search */}
+      <form onSubmit={onSearchSubmit} className="lh-topnav-search-wrap" role="search">
+        <div className={`lh-topnav-search${searchFocused ? " is-focused" : ""}`}>
+          <Search size={14} style={{ color: "var(--lh-text-3)" }} />
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
+            placeholder="Search courses, posts, mentors, events…"
+            aria-label="Search LearnHub"
+          />
+          {!searchFocused && !search && (
+            <kbd
+              style={{
+                fontSize: 10,
+                padding: "2px 6px",
+                borderRadius: 4,
+                background: "rgba(255,255,255,0.06)",
+                color: "var(--lh-text-3)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                marginLeft: "auto",
+              }}
+              aria-hidden
             >
-              <span>{tab.icon}</span>
-              <span>{tab.label}</span>
-            </Link>
-          );
-        })}
-      </div>
+              /
+            </kbd>
+          )}
+        </div>
+      </form>
 
-      {/* Right actions */}
+      {/* Right cluster */}
       <div className="lh-topnav-actions">
+        <IconBtn
+          label="Calendar"
+          icon={<Calendar size={18} />}
+          badge={upcomingEvents}
+          active={panel === "cal"}
+          onClick={() => togglePanel("cal")}
+        />
+        <IconBtn
+          label="Messages"
+          icon={<MessageSquare size={18} />}
+          badge={unreadMsgs}
+          active={panel === "msg"}
+          onClick={() => togglePanel("msg")}
+        />
         <NotificationBell />
         <ThemeToggle />
-        {session ? (
-          <button
-            onClick={signOut}
-            className="lh-icon-btn"
-            title={`Sign out (${session.name})`}
-            style={{ overflow: "hidden" }}
-          >
-            {avatarSrc ? (
-              <img
-                src={avatarSrc}
-                alt={session.name}
-                width={38}
-                height={38}
-                style={{ borderRadius: "50%", objectFit: "cover" }}
-                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-              />
-            ) : (
-              <span style={{ fontSize: 16 }}>👤</span>
-            )}
-          </button>
-        ) : null}
+        <span className="lh-topnav-divider" aria-hidden />
+        <Link
+          href="/learnhub/profile"
+          className="lh-topnav-avatar"
+          title={session?.name ?? "My Profile"}
+          aria-label={session?.name ?? "My Profile"}
+        >
+          <img
+            src={avatarSrc}
+            alt=""
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).src =
+                `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(session?.name ?? "U")}`;
+            }}
+          />
+        </Link>
       </div>
+
+      {/* Popovers — anchored to the topnav, controlled by `panel` */}
+      <CalendarPopover open={panel === "cal"} onClose={() => setPanel(null)} />
+      <MessagesPopover open={panel === "msg"} onClose={() => setPanel(null)} />
     </nav>
+  );
+}
+
+function IconBtn({
+  label, icon, badge, active, onClick,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  badge?: number;
+  active?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`lh-topnav-icon${active ? " is-active" : ""}`}
+      title={label}
+      aria-label={label}
+      aria-pressed={active}
+    >
+      {icon}
+      {badge && badge > 0 ? (
+        <span className="lh-topnav-icon-badge">{badge > 9 ? "9+" : badge}</span>
+      ) : null}
+    </button>
   );
 }

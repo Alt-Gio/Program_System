@@ -1,11 +1,13 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useState, useMemo } from "react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
-
-type ConvexUserId = Parameters<typeof api.learnhub_users.getUser>[1]["id"];
+import { useRouter } from "next/navigation";
+import { useLearnhubSession } from "@/lib/learnhub/hooks";
 
 function getLevel(xp: number) {
   if (xp < 500) return { label: "Seedling", color: "#9ba3cc", icon: "🌱" };
@@ -21,8 +23,37 @@ const ROLE_COLOR: Record<string, string> = { student: "#22d3a0", mentor: "#5b6cf
 interface Props { params: { userId: string } }
 
 export default function ProfilePage({ params }: Props) {
-  const user = useQuery(api.learnhub_users.getUser, { id: params.userId as ConvexUserId });
-  const posts = useQuery(api.learnhub_posts.getPostsByAuthor, user ? { authorId: user._id, limit: 6 } : "skip");
+  const router = useRouter();
+  const { userId: meId } = useLearnhubSession();
+  const targetId = params.userId as Id<"learnhub_users">;
+  const isSelf = meId === params.userId;
+
+  const user = useQuery(api.learnhub_users.getUser, { id: targetId });
+  const me = useQuery(
+    api.learnhub_users.getUser,
+    meId && !isSelf ? { id: meId as Id<"learnhub_users"> } : "skip"
+  );
+  const posts = useQuery(
+    api.learnhub_posts.getPostsByAuthor,
+    user ? { authorId: user._id, limit: 8 } : "skip"
+  );
+
+  const updateProfile = useMutation(api.learnhub_users.updateProfile);
+  const toggleFollow = useMutation(api.learnhub_users.toggleFollow);
+
+  // Edit mode state (self only)
+  const [editing, setEditing] = useState(false);
+  const [formName, setFormName] = useState("");
+  const [formBio, setFormBio] = useState("");
+  const [formSchool, setFormSchool] = useState("");
+  const [formOrg, setFormOrg] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const isFollowing = useMemo(() => {
+    if (!me || !user) return false;
+    return me.followingIds.some((id) => id === user._id);
+  }, [me, user]);
 
   if (user === undefined) {
     return (
@@ -47,6 +78,49 @@ export default function ProfilePage({ params }: Props) {
   const xpToNext = user.xpPoints < 500 ? 500 : user.xpPoints < 1500 ? 1500 : user.xpPoints < 3000 ? 3000 : user.xpPoints < 6000 ? 6000 : null;
   const xpProgress = xpToNext ? (user.xpPoints / xpToNext) * 100 : 100;
 
+  const startEdit = () => {
+    setFormName(user.name);
+    setFormBio(user.bio ?? "");
+    setFormSchool(user.school ?? "");
+    setFormOrg(user.organization ?? "");
+    setEditing(true);
+  };
+
+  const saveEdit = async () => {
+    if (!formName.trim()) return;
+    setSaving(true);
+    try {
+      await updateProfile({
+        id: user._id,
+        name: formName.trim(),
+        bio: formBio.trim() || undefined,
+        school: formSchool.trim() || undefined,
+        organization: formOrg.trim() || undefined,
+      });
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleFollow = async () => {
+    if (!meId || isSelf || busy) return;
+    setBusy(true);
+    try {
+      await toggleFollow({
+        followerId: meId as Id<"learnhub_users">,
+        targetId: user._id,
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleMessage = () => {
+    if (!meId || isSelf) return;
+    router.push(`/learnhub/messages?to=${user._id}`);
+  };
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 flex flex-col gap-4">
       {/* Profile header card */}
@@ -55,26 +129,113 @@ export default function ProfilePage({ params }: Props) {
         <div className="h-20" style={{ background: `linear-gradient(135deg, ${level.color}30 0%, rgba(91,108,255,0.1) 100%)` }} />
 
         <div className="px-5 pb-5">
-          {/* Avatar */}
+          {/* Avatar + actions row */}
           <div className="relative -mt-10 mb-3 flex items-end justify-between">
-            <img src={user.avatarUrl} alt={user.name} width={72} height={72} className="rounded-2xl object-cover" style={{ border: "3px solid #131626", background: "#1a1d30" }} onError={(e) => { (e.currentTarget as HTMLImageElement).src = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name)}`; }} />
-            <div className="flex gap-2 mb-1">
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: ROLE_COLOR[user.role] + "20", color: ROLE_COLOR[user.role] }}>{ROLE_LABEL[user.role]}</span>
+            <img
+              src={user.avatarUrl}
+              alt={user.name}
+              width={72}
+              height={72}
+              className="rounded-2xl object-cover"
+              style={{ border: "3px solid #131626", background: "#1a1d30" }}
+              onError={(e) => { (e.currentTarget as HTMLImageElement).src = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name)}`; }}
+            />
+            <div className="flex gap-2 mb-1 items-center">
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: ROLE_COLOR[user.role] + "20", color: ROLE_COLOR[user.role] }}>
+                {ROLE_LABEL[user.role]}
+              </span>
+              {isSelf ? (
+                <button
+                  onClick={startEdit}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-full transition"
+                  style={{ background: "rgba(91,108,255,0.15)", color: "#7c8bff", border: "1px solid rgba(91,108,255,0.3)" }}
+                >
+                  ✏️ Edit profile
+                </button>
+              ) : meId ? (
+                <>
+                  <button
+                    onClick={handleFollow}
+                    disabled={busy}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-full transition"
+                    style={{
+                      background: isFollowing ? "rgba(255,255,255,0.06)" : "#5b6cff",
+                      color: isFollowing ? "#9ba3cc" : "#fff",
+                      border: "1px solid " + (isFollowing ? "rgba(255,255,255,0.12)" : "#5b6cff"),
+                      opacity: busy ? 0.6 : 1,
+                    }}
+                  >
+                    {isFollowing ? "Following" : "+ Follow"}
+                  </button>
+                  <button
+                    onClick={handleMessage}
+                    disabled={busy}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-full"
+                    style={{
+                      background: "rgba(34,211,160,0.12)",
+                      color: "#22d3a0",
+                      border: "1px solid rgba(34,211,160,0.3)",
+                      opacity: busy ? 0.6 : 1,
+                    }}
+                  >
+                    💬 Message
+                  </button>
+                </>
+              ) : null}
             </div>
           </div>
 
-          {/* Name + level */}
-          <div className="flex items-center gap-2 flex-wrap mb-1">
-            <h1 className="text-xl font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>{user.name}</h1>
-            <span className="text-sm">{level.icon}</span>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: level.color + "20", color: level.color }}>{level.label}</span>
-          </div>
-
-          {user.bio && <p className="text-sm mb-3" style={{ color: "#9ba3cc" }}>{user.bio}</p>}
-          {(user.school || user.organization) && (
-            <p className="text-xs mb-3" style={{ color: "#5c6490" }}>
-              🏫 {user.school ?? user.organization}
-            </p>
+          {/* Editable name/bio/meta */}
+          {editing ? (
+            <div className="flex flex-col gap-2 mb-3">
+              <input
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                placeholder="Your name"
+                className="lh-composer-url-input"
+                style={{ fontSize: 16, fontWeight: 700 }}
+              />
+              <textarea
+                value={formBio}
+                onChange={(e) => setFormBio(e.target.value)}
+                placeholder="Short bio — what are you learning / mentoring?"
+                rows={2}
+                className="lh-composer-textarea"
+              />
+              <input
+                value={formSchool}
+                onChange={(e) => setFormSchool(e.target.value)}
+                placeholder="School"
+                className="lh-composer-url-input"
+              />
+              <input
+                value={formOrg}
+                onChange={(e) => setFormOrg(e.target.value)}
+                placeholder="Organization"
+                className="lh-composer-url-input"
+              />
+              <div className="flex gap-2 justify-end mt-1">
+                <button onClick={() => setEditing(false)} className="lh-composer-cancel">Cancel</button>
+                <button onClick={saveEdit} disabled={saving || !formName.trim()} className="lh-composer-submit">
+                  {saving ? "Saving…" : "Save"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Name + level */}
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <h1 className="text-xl font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>{user.name}</h1>
+                <span className="text-sm">{level.icon}</span>
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: level.color + "20", color: level.color }}>{level.label}</span>
+              </div>
+              {user.bio && <p className="text-sm mb-3" style={{ color: "#9ba3cc" }}>{user.bio}</p>}
+              {(user.school || user.organization) && (
+                <p className="text-xs mb-3" style={{ color: "#5c6490" }}>
+                  🏫 {user.school ?? user.organization}
+                </p>
+              )}
+            </>
           )}
 
           {/* XP bar */}
@@ -89,13 +250,14 @@ export default function ProfilePage({ params }: Props) {
           </div>
 
           {/* Stats grid */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-3">
             {[
-              { label: "XP Points", value: user.xpPoints.toLocaleString(), icon: "⚡" },
-              { label: "Day Streak", value: `${user.currentStreak}🔥`, icon: "" },
+              { label: "XP", value: user.xpPoints.toLocaleString(), icon: "⚡" },
+              { label: "Streak", value: `${user.currentStreak}🔥`, icon: "" },
               { label: "Followers", value: user.followerCount.toString(), icon: "👥" },
+              { label: "Following", value: user.followingIds.length.toString(), icon: "👤" },
             ].map((stat) => (
-              <div key={stat.label} className="rounded-xl px-3 py-2.5 text-center" style={{ background: "rgba(255,255,255,0.04)" }}>
+              <div key={stat.label} className="rounded-xl px-2 py-2.5 text-center" style={{ background: "rgba(255,255,255,0.04)" }}>
                 <p className="text-base font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>{stat.value}</p>
                 <p className="text-[10px] mt-0.5" style={{ color: "#9ba3cc" }}>{stat.label}</p>
               </div>

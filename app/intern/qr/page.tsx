@@ -331,7 +331,7 @@ export default function QrPage() {
     <div className="flex flex-col items-center justify-center h-64 gap-3 px-6 text-center">
       <AlertCircle className="w-10 h-10 text-white/20" />
       <p className="text-white/40 text-sm">Session expired.</p>
-      <Link href="/intern/login" className="text-indigo-400 text-sm font-medium">Sign in again</Link>
+      <Link href="/login" className="text-indigo-400 text-sm font-medium">Sign in again</Link>
     </div>
   );
 

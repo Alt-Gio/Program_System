@@ -87,13 +87,19 @@ export function VoiceOrb() {
           </div>
         )}
 
-        <div className="flex items-center gap-2">
+        {/* Voice control cluster — secondary pills stacked above the
+            primary mic so the whole group is a narrow right-aligned
+            column. This avoids overlapping the QuickAddButton (which
+            sits at right-[108px] bottom-6 on desktop) and reads as
+            one unified control instead of three competing chips. */}
+        <div className="flex flex-col items-end gap-1.5">
           <button
             type="button"
             onClick={voice.openHelp}
-            className="flex items-center gap-1 rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-gray-500 shadow-sm ring-1 ring-gray-200 hover:text-gray-700"
+            title="See what you can say"
+            className="flex items-center gap-1.5 rounded-full bg-white/95 backdrop-blur px-2.5 py-1 text-[11px] font-medium text-gray-500 shadow-sm ring-1 ring-gray-200/80 hover:text-gray-800 hover:ring-gray-300 transition"
           >
-            <HelpCircle className="h-3.5 w-3.5" /> What can I say?
+            <HelpCircle className="h-3 w-3" /> What can I say?
           </button>
 
           <button
@@ -107,13 +113,13 @@ export function VoiceOrb() {
                 : "Enable wake word (say 'hey system')"
             }
             aria-pressed={voice.mode === "wake"}
-            className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium shadow-sm ring-1 transition ${
+            className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium shadow-sm ring-1 transition ${
               voice.mode === "wake"
-                ? "bg-indigo-600 text-white ring-indigo-600"
-                : "bg-white/90 text-gray-500 ring-gray-200 hover:text-gray-700"
+                ? "bg-indigo-600 text-white ring-indigo-600 hover:bg-indigo-700"
+                : "bg-white/95 backdrop-blur text-gray-500 ring-gray-200/80 hover:text-gray-800 hover:ring-gray-300"
             }`}
           >
-            <Radio className="h-3.5 w-3.5" />
+            <Radio className={`h-3 w-3 ${voice.mode === "wake" ? "animate-pulse" : ""}`} />
             {voice.mode === "wake" ? "Wake on" : "Wake off"}
           </button>
 

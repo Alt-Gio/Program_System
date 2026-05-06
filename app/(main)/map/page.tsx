@@ -124,7 +124,7 @@ export default function MapPage() {
   const levelActivities = useQuery(
     api.activities.listActivities,
     selProvince
-      ? { provinceId: selProvince.provinceId as any, year: CURRENT_YEAR }
+      ? { provinceId: selProvince.provinceId as any, year: CURRENT_YEAR, limit: 10 }
       : "skip"
   );
 

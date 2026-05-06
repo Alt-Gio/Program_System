@@ -87,7 +87,7 @@ export default function BootstrapPage() {
             {result.msg}
             {result.ok && (
               <div style={{ marginTop: 10 }}>
-                <a href="/signin" style={{ color: "#60a5fa", fontWeight: 600 }}>→ Go to Sign In</a>
+                <a href="/login" style={{ color: "#60a5fa", fontWeight: 600 }}>→ Go to Sign In</a>
               </div>
             )}
           </div>

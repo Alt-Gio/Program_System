@@ -51,6 +51,7 @@ import type * as meetingHall from "../meetingHall.js";
 import type * as otp from "../otp.js";
 import type * as otpCodes from "../otpCodes.js";
 import type * as personnel from "../personnel.js";
+import type * as programMedia from "../programMedia.js";
 import type * as projects from "../projects.js";
 import type * as provinces from "../provinces.js";
 import type * as resetTestSupervisor from "../resetTestSupervisor.js";
@@ -114,6 +115,7 @@ declare const fullApi: ApiFromModules<{
   otp: typeof otp;
   otpCodes: typeof otpCodes;
   personnel: typeof personnel;
+  programMedia: typeof programMedia;
   projects: typeof projects;
   provinces: typeof provinces;
   resetTestSupervisor: typeof resetTestSupervisor;

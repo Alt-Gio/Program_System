@@ -93,29 +93,38 @@
 /* ── Page layout grid ─────────────────────────────────────────────── */
 .lh-main {
   display: grid;
-  grid-template-columns: 260px 1fr 300px;
-  gap: 20px;
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 80px 20px 40px;
+  /* Edge-to-edge, no floating max-width. minmax(0,1fr) prevents the
+     center column from collapsing during the grid transition when
+     a side panel is toggled. */
+  grid-template-columns: 84px minmax(0, 1fr) 300px;
+  gap: 0;
+  padding: 60px 0 0;
   align-items: start;
+  min-height: calc(100vh - 60px);
+}
+
+/* Main column gets internal padding so content isn't flush to the rail */
+.lh-main > main {
+  padding: 20px 24px 40px;
+  min-width: 0;       /* allow grid cell to shrink below content size */
+  box-sizing: border-box;
 }
 
 @media (max-width: 1200px) {
-  .lh-main { grid-template-columns: 240px 1fr 280px; gap: 16px; }
+  .lh-main { grid-template-columns: 84px minmax(0, 1fr) 280px; }
 }
 
 @media (max-width: 1024px) {
-  .lh-main { grid-template-columns: 240px 1fr; }
+  .lh-main { grid-template-columns: 84px minmax(0, 1fr); }
   .lh-right-panel { display: none !important; }
 }
 
 @media (max-width: 768px) {
   .lh-main {
     grid-template-columns: 1fr;
-    padding: 70px 0 80px;
-    gap: 0;
+    padding: 60px 0 80px;
   }
+  .lh-main > main { padding: 16px; }
   .lh-left-panel { display: none !important; }
   .lh-right-panel { display: none !important; }
 }
@@ -124,10 +133,16 @@
 .lh-left-panel,
 .lh-right-panel {
   position: sticky;
-  top: 80px;
-  max-height: calc(100vh - 100px);
+  top: 60px;
+  height: calc(100vh - 60px);
   overflow-y: auto;
-  scrollbar-width: none;
+  overflow-x: hidden; /* prevent expanded composer bleeding into panels */
+  background: var(--lh-bg); /* same as body so they don't "float" */
+  border-right: 1px solid var(--lh-surface-3);
+}
+.lh-right-panel {
+  border-right: none;
+  border-left: 1px solid var(--lh-surface-3);
 }
 .lh-left-panel::-webkit-scrollbar,
 .lh-right-panel::-webkit-scrollbar { display: none; }
@@ -813,6 +828,9 @@
 
 /* ── Post composer ────────────────────────────────────────────────── */
 .lh-composer {
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
   background: var(--lh-surface);
   border-radius: var(--lh-r-lg);
   box-shadow: var(--lh-shadow-sm);
@@ -1180,3 +1198,1251 @@ button:active { transform: scale(0.97); }
 .lh-upcoming-info { flex: 1; min-width: 0; }
 .lh-upcoming-title { font-size: 12px; font-weight: 600; color: var(--lh-text); }
 .lh-upcoming-time  { font-size: 11px; color: var(--lh-text-3); margin-top: 1px; }
+
+/* ════════════════════════════════════════════════════════════════════
+   Viewport-edge collapse handles  ·  grid modifiers
+   ════════════════════════════════════════════════════════════════════ */
+
+@keyframes lhPulseGlow {
+  0%, 100% { box-shadow: 0 6px 20px rgba(91,108,255,0.30), 0 0 0 0 rgba(91,108,255,0.18); }
+  50%      { box-shadow: 0 8px 24px rgba(91,108,255,0.40), 0 0 0 6px rgba(91,108,255,0.10); }
+}
+
+.lh-edge-handle {
+  position: fixed;
+  top: 38%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 76px;
+  border: 0;
+  cursor: pointer;
+  z-index: 60;
+  color: #fff;
+  background: linear-gradient(135deg, var(--lh-accent-2) 0%, var(--lh-accent) 100%);
+  box-shadow: 0 6px 20px rgba(91,108,255,0.30);
+  transition:
+    width 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.25s ease;
+}
+.lh-edge-handle:hover {
+  width: 38px;
+  animation: lhPulseGlow 1.6s ease-in-out infinite;
+}
+.lh-edge-handle:active { transform: scale(0.96); }
+.lh-edge-handle:focus-visible {
+  outline: 2px solid var(--lh-accent);
+  outline-offset: 3px;
+}
+.lh-edge-handle--left  { left:  0; border-radius: 0 14px 14px 0; }
+.lh-edge-handle--right { right: 0; border-radius: 14px 0 0 14px; }
+
+/* When a panel is collapsed, dim the handle slightly so the user knows
+   it's the "expand" affordance rather than the active "collapse" one. */
+.lh-edge-handle.is-collapsed { opacity: 0.85; }
+.lh-edge-handle.is-collapsed:hover { opacity: 1; }
+
+@media (max-width: 768px) { .lh-edge-handle { display: none; } }
+
+/* Smooth grid transitions when toggling panels */
+.lh-main { transition: grid-template-columns 0.32s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* Modifiers — collapsed = column drops to 0px so the handle is the only
+   visible affordance; expanding restores the default width.
+   We keep minmax(0,1fr) on the center column so it never collapses
+   to 0 during the CSS transition. */
+.lh-main--left-collapsed  { grid-template-columns: 0px minmax(0, 1fr) 300px; }
+.lh-main--right-collapsed { grid-template-columns: 84px minmax(0, 1fr) 0px; }
+.lh-main--left-collapsed.lh-main--right-collapsed {
+  grid-template-columns: 0px minmax(0, 1fr) 0px;
+}
+
+@media (max-width: 1200px) {
+  .lh-main--left-collapsed  { grid-template-columns: 0px minmax(0, 1fr) 280px; }
+  .lh-main--right-collapsed { grid-template-columns: 84px minmax(0, 1fr) 0px; }
+  .lh-main--left-collapsed.lh-main--right-collapsed { grid-template-columns: 0px minmax(0, 1fr) 0px; }
+}
+@media (max-width: 1024px) {
+  .lh-main--left-collapsed  { grid-template-columns: 0px minmax(0, 1fr); }
+}
+
+/* Hide panel contents (and their internal scroll) when their column
+   is collapsed to 0 — prevents weird overflow halos. */
+.lh-main--left-collapsed  .lh-left-panel  { display: none !important; }
+.lh-main--right-collapsed .lh-right-panel { display: none !important; }
+
+/* ════════════════════════════════════════════════════════════════════
+   Unified RightPanel  ·  compact cards + me-card + status picker
+   ════════════════════════════════════════════════════════════════════ */
+
+.lh-rp { display: flex; flex-direction: column; gap: 10px; }
+
+/* Compact card variant — used for every section in the right column.
+   Slimmer padding and tighter margins than the default .lh-card. */
+.lh-card--compact {
+  padding: 12px 14px;
+  margin-bottom: 0;
+}
+.lh-card--compact .lh-card-header { margin-bottom: 8px; }
+.lh-card--compact .lh-card-title  { font-size: 13px; }
+.lh-card--compact .lh-see-all     { font-size: 11px; }
+
+.lh-card-meta {
+  font-size: 11px;
+  color: var(--lh-text-3);
+  font-weight: 600;
+  background: var(--lh-surface-2);
+  padding: 2px 8px;
+  border-radius: var(--lh-r-full);
+}
+
+/* ── Me card (Facebook-style profile + status picker) ─────────────── */
+.lh-me-card {
+  position: relative;
+  padding: 14px 14px 12px;
+  margin-bottom: 0;
+  background: linear-gradient(180deg, var(--lh-accent-2-soft) 0%, var(--lh-surface) 70%);
+}
+
+.lh-me-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lh-me-avatar-wrap {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+.lh-me-avatar {
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--lh-surface);
+}
+.lh-me-dot {
+  position: absolute;
+  right: 0; bottom: 0;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+}
+
+.lh-me-info { flex: 1; min-width: 0; }
+.lh-me-name {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--lh-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.lh-me-sub {
+  font-size: 11px;
+  color: var(--lh-text-3);
+  margin-top: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.lh-me-xp {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+.lh-me-xp-num   { font-weight: 700; font-size: 14px; color: var(--lh-accent); font-family: 'Plus Jakarta Sans', sans-serif; line-height: 1; }
+.lh-me-xp-label { font-size: 9px;  color: var(--lh-text-3); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; }
+
+/* Status pill */
+.lh-status-pill {
+  margin-top: 10px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  background: var(--lh-surface);
+  border: 1px solid var(--lh-surface-3);
+  border-radius: var(--lh-r-full);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--lh-text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.lh-status-pill:hover { background: var(--lh-surface-2); border-color: var(--lh-text-3); }
+.lh-status-pill-dot   { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.lh-status-pill-label { flex: 1; text-align: left; }
+.lh-status-pill-caret { color: var(--lh-text-3); transition: transform 0.18s; }
+.lh-status-pill-caret.is-open { transform: rotate(180deg); }
+
+/* Status menu (popover) */
+.lh-status-menu {
+  position: absolute;
+  left: 14px; right: 14px;
+  margin-top: 6px;
+  background: var(--lh-surface);
+  border: 1px solid var(--lh-surface-3);
+  border-radius: var(--lh-r-md);
+  padding: 5px;
+  box-shadow: var(--lh-shadow-md);
+  z-index: 5;
+  display: flex; flex-direction: column;
+  animation: lhFadeSlideUp 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes lhFadeSlideUp {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.lh-status-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--lh-r-sm);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+}
+.lh-status-option:hover         { background: var(--lh-surface-2); }
+.lh-status-option.is-active     { background: var(--lh-accent-2-soft); }
+.lh-status-option-dot           { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.lh-status-option-body          { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.lh-status-option-label         { font-size: 12px; font-weight: 600; color: var(--lh-text); }
+.lh-status-option-hint          { font-size: 10px; color: var(--lh-text-3); }
+
+/* ── Events list (compact, in unified panel) ──────────────────────── */
+.lh-ev-list { display: flex; flex-direction: column; gap: 2px; }
+
+.lh-ev-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px;
+  border-radius: var(--lh-r-md);
+  transition: background 0.12s;
+}
+.lh-ev-item:hover { background: var(--lh-surface-2); }
+
+.lh-ev-date {
+  display: flex; flex-direction: column; align-items: center;
+  width: 36px; flex-shrink: 0;
+  background: var(--lh-accent-soft);
+  border-radius: var(--lh-r-sm);
+  padding: 4px 0;
+}
+.lh-ev-date-day { font-size: 14px; font-weight: 800; color: var(--lh-accent); line-height: 1; font-family: 'Plus Jakarta Sans', sans-serif; }
+.lh-ev-date-mon { font-size: 9px; font-weight: 700; color: var(--lh-accent); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; }
+
+.lh-ev-body  { flex: 1; min-width: 0; }
+.lh-ev-title {
+  font-size: 12px; font-weight: 600; color: var(--lh-text);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.lh-ev-meta {
+  display: flex; gap: 4px; align-items: center;
+  font-size: 10px; color: var(--lh-text-3);
+  margin-top: 1px;
+  white-space: nowrap; overflow: hidden;
+}
+
+.lh-ev-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: var(--lh-r-full);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  flex-shrink: 0;
+}
+
+/* ── Peer rows (People Online, Suggested, Top XP) ────────────────── */
+.lh-peer-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px;
+  border-radius: var(--lh-r-md);
+  transition: background 0.12s;
+}
+.lh-peer-row:hover { background: var(--lh-surface-2); }
+
+.lh-peer-avatar-wrap {
+  position: relative;
+  width: 32px; height: 32px;
+  flex-shrink: 0;
+}
+.lh-peer-avatar {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.lh-peer-dot {
+  position: absolute;
+  right: -1px; bottom: -1px;
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--lh-green);
+  border: 2px solid var(--lh-surface);
+}
+
+.lh-peer-info { flex: 1; min-width: 0; }
+.lh-peer-name {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--lh-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.lh-peer-meta {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 10px; color: var(--lh-text-3);
+  margin-top: 1px;
+  white-space: nowrap; overflow: hidden;
+}
+.lh-peer-role {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: var(--lh-r-full);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.lh-peer-role--mentor  { background: rgba(91,108,255,0.18); color: var(--lh-accent-2); }
+.lh-peer-role--student { background: rgba(255,107,53,0.18); color: var(--lh-accent); }
+
+.lh-peer-cta {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--lh-accent);
+  text-decoration: none;
+  padding: 4px 10px;
+  border-radius: var(--lh-r-full);
+  border: 1px solid var(--lh-accent);
+  transition: background 0.15s, color 0.15s;
+}
+.lh-peer-cta:hover { background: var(--lh-accent); color: #fff; }
+
+.lh-online-title-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--lh-green);
+  margin-right: 6px;
+  vertical-align: 1px;
+  box-shadow: 0 0 0 3px rgba(16,185,129,0.18);
+}
+
+.lh-xp-rank {
+  width: 22px; flex-shrink: 0;
+  font-size: 13px; text-align: center; font-weight: 700;
+  color: var(--lh-text-2);
+}
+
+/* ── Explore links ────────────────────────────────────────────────── */
+.lh-explore-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px;
+  border-radius: var(--lh-r-md);
+  text-decoration: none;
+  transition: background 0.12s;
+}
+.lh-explore-row:hover { background: var(--lh-surface-2); }
+.lh-explore-icon {
+  width: 32px; height: 32px;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--lh-accent-2-soft);
+  border-radius: var(--lh-r-md);
+  font-size: 16px;
+}
+.lh-explore-title {
+  display: block;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--lh-text);
+  line-height: 1.2;
+}
+.lh-explore-sub {
+  display: block;
+  font-size: 10px;
+  color: var(--lh-text-3);
+  margin-top: 1px;
+}
+
+/* ── Empty state + skeletons ─────────────────────────────────────── */
+.lh-rp-empty {
+  font-size: 11px;
+  color: var(--lh-text-3);
+  padding: 8px 6px;
+  text-align: center;
+}
+.lh-peer-skeletons { display: flex; flex-direction: column; gap: 8px; }
+.lh-skeleton {
+  background: linear-gradient(90deg, var(--lh-surface-2) 0%, var(--lh-surface-3) 50%, var(--lh-surface-2) 100%);
+  background-size: 200% 100%;
+  border-radius: var(--lh-r-sm);
+  animation: lhShimmer 1.4s linear infinite;
+}
+@keyframes lhShimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+/* ── DTC-HUB feed ↔ messenger utilities ─────────────────────────────
+   Shared visual language used by the feed greeting, DTC office cards,
+   the streak pill, and the Messenger split-panel page. Everything here
+   routes through --lh-* tokens so dark/light mode keeps working. */
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes lhPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+.lh-feed-greeting {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+  padding: 4px 4px 14px;
+  flex-wrap: wrap;
+}
+.lh-feed-greeting-title {
+  margin: 0;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 800;
+  font-size: 22px;
+  color: var(--lh-text);
+  letter-spacing: -0.4px;
+}
+.lh-feed-greeting-sub {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--lh-text-3);
+}
+.lh-streak-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--lh-r-full);
+  background: rgba(249, 115, 22, 0.12);
+  color: #f97316;
+  border: 1px solid rgba(249, 115, 22, 0.32);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.lh-feed-empty {
+  margin-top: 16px;
+  padding: 36px 20px;
+  text-align: center;
+  border-radius: var(--lh-r-lg);
+  background: var(--lh-surface);
+  border: 1px dashed var(--lh-surface-3);
+  color: var(--lh-text-3);
+}
+.lh-feed-empty-emoji { font-size: 30px; margin-bottom: 10px; }
+.lh-feed-empty-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+  color: var(--lh-text-2);
+  font-size: 14px;
+  margin: 0 0 4px;
+}
+
+/* DTC office widget (Right Panel) */
+.lh-dtc-card { padding: 14px; }
+.lh-dtc-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--lh-r-md);
+  background: transparent;
+  border: 1px solid transparent;
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+}
+.lh-dtc-row:hover { background: var(--lh-surface-2); border-color: var(--lh-surface-3); }
+.lh-dtc-row + .lh-dtc-row { margin-top: 2px; }
+.lh-dtc-pin {
+  width: 28px; height: 28px; border-radius: 8px;
+  background: var(--lh-accent-soft);
+  color: var(--lh-accent);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.lh-dtc-pin.is-main { background: var(--lh-accent); color: white; }
+.lh-dtc-row-body { flex: 1; min-width: 0; }
+.lh-dtc-row-name {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700; font-size: 12.5px;
+  color: var(--lh-text);
+  display: flex; align-items: center; gap: 6px;
+  flex-wrap: wrap;
+}
+.lh-dtc-row-tag {
+  font-size: 8.5px; font-weight: 800;
+  padding: 1px 5px; border-radius: 4px;
+  background: var(--lh-accent); color: white;
+  letter-spacing: 0.5px;
+}
+.lh-dtc-row-addr {
+  font-size: 10.5px; color: var(--lh-text-3);
+  margin-top: 2px;
+  display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* "Hosted by" badge inside Meet/webinar posts */
+.lh-host-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  margin-top: 6px;
+  border-radius: var(--lh-r-full);
+  background: var(--lh-accent-soft);
+  color: var(--lh-accent);
+  border: 1px solid var(--lh-accent);
+  font-size: 10.5px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+.lh-host-badge:hover { filter: brightness(1.08); }
+
+/* ── Messenger / WhatsApp hybrid messages page ──────────────────── */
+.lh-msg-shell {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  height: calc(100vh - 80px);
+  background: var(--lh-bg);
+  border-radius: var(--lh-r-lg);
+  border: 1px solid var(--lh-surface-3);
+  overflow: hidden;
+}
+@media (max-width: 900px) {
+  .lh-msg-shell { grid-template-columns: 1fr; }
+  .lh-msg-shell.has-thread .lh-msg-list { display: none; }
+  .lh-msg-shell:not(.has-thread) .lh-msg-thread { display: none; }
+}
+
+.lh-msg-list {
+  display: flex; flex-direction: column;
+  background: var(--lh-surface);
+  border-right: 1px solid var(--lh-surface-3);
+  min-height: 0;
+}
+.lh-msg-list-header {
+  padding: 16px 16px 12px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.lh-msg-list-title-row {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.lh-msg-list-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 800; font-size: 22px;
+  color: var(--lh-text);
+  letter-spacing: -0.3px;
+  margin: 0;
+}
+.lh-msg-new-btn {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: var(--lh-accent-soft);
+  color: var(--lh-accent);
+  border: 0;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.lh-msg-new-btn:hover { background: var(--lh-accent); color: white; }
+
+.lh-msg-search {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 12px;
+  border-radius: var(--lh-r-full);
+  background: var(--lh-surface-2);
+  border: 1px solid transparent;
+  transition: border-color 0.15s, background 0.15s;
+}
+.lh-msg-search:focus-within { border-color: var(--lh-accent); background: var(--lh-surface); }
+.lh-msg-search input {
+  flex: 1; min-width: 0; border: 0; outline: 0;
+  background: transparent;
+  color: var(--lh-text);
+  font-size: 13px;
+  font-family: inherit;
+}
+.lh-msg-search input::placeholder { color: var(--lh-text-3); }
+
+.lh-msg-tabs {
+  display: flex; gap: 8px;
+  padding: 0 16px 8px;
+}
+.lh-msg-tab {
+  padding: 6px 14px;
+  border-radius: var(--lh-r-full);
+  border: 0;
+  background: var(--lh-surface-2);
+  color: var(--lh-text-2);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+.lh-msg-tab.is-active {
+  background: var(--lh-accent-soft);
+  color: var(--lh-accent);
+}
+
+.lh-msg-conv-list {
+  flex: 1; overflow-y: auto;
+  padding: 4px 8px 12px;
+}
+.lh-msg-conv-row {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--lh-r-md);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+  margin-bottom: 2px;
+}
+.lh-msg-conv-row:hover { background: var(--lh-surface-2); }
+.lh-msg-conv-row.is-active { background: var(--lh-accent-soft); }
+
+.lh-msg-conv-avatar-wrap { position: relative; flex-shrink: 0; }
+.lh-msg-conv-avatar {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: var(--lh-surface-2);
+  object-fit: cover;
+}
+.lh-msg-conv-online {
+  position: absolute; bottom: 1px; right: 1px;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: #10B981;
+  border: 2px solid var(--lh-surface);
+}
+
+.lh-msg-conv-body {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.lh-msg-conv-top {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 8px;
+}
+.lh-msg-conv-name {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700; font-size: 13.5px;
+  color: var(--lh-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.lh-msg-conv-time {
+  font-size: 10.5px; color: var(--lh-text-3);
+  flex-shrink: 0;
+}
+.lh-msg-conv-bottom {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px;
+}
+.lh-msg-conv-preview {
+  font-size: 12px; color: var(--lh-text-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  flex: 1; min-width: 0;
+}
+.lh-msg-conv-row.has-unread .lh-msg-conv-preview { color: var(--lh-text); font-weight: 600; }
+.lh-msg-conv-badge {
+  min-width: 18px; height: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: var(--lh-accent);
+  color: white;
+  font-size: 10px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Thread (right side) */
+.lh-msg-thread {
+  display: flex; flex-direction: column;
+  background: var(--lh-bg);
+  min-height: 0;
+}
+.lh-msg-thread-header {
+  padding: 12px 18px;
+  display: flex; align-items: center; gap: 10px;
+  border-bottom: 1px solid var(--lh-surface-3);
+  background: var(--lh-surface);
+}
+.lh-msg-thread-back {
+  display: none;
+  background: transparent; border: 0; cursor: pointer;
+  padding: 4px;
+  color: var(--lh-text-2);
+}
+@media (max-width: 900px) { .lh-msg-thread-back { display: inline-flex; } }
+.lh-msg-thread-avatar {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--lh-surface-2);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.lh-msg-thread-name {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700; font-size: 15px;
+  color: var(--lh-text);
+  margin: 0;
+}
+.lh-msg-thread-status {
+  font-size: 11px; color: var(--lh-text-3);
+  margin: 0;
+}
+
+.lh-msg-thread-body {
+  flex: 1; overflow-y: auto;
+  padding: 18px 22px 10px;
+  display: flex; flex-direction: column; gap: 8px;
+  background:
+    radial-gradient(circle at 30% 0%, color-mix(in srgb, var(--lh-accent-2) 6%, transparent) 0%, transparent 60%),
+    var(--lh-bg);
+}
+.lh-msg-row {
+  display: flex; flex-direction: column;
+  max-width: 78%;
+  animation: fadeUp 0.18s ease both;
+}
+.lh-msg-row.is-mine { align-self: flex-end; align-items: flex-end; }
+.lh-msg-row.is-theirs { align-self: flex-start; align-items: flex-start; }
+
+.lh-msg-bubble {
+  padding: 9px 14px;
+  border-radius: 18px;
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+  font-family: 'DM Sans', sans-serif;
+}
+.lh-msg-row.is-mine .lh-msg-bubble {
+  background: linear-gradient(135deg, var(--lh-accent-2) 0%, color-mix(in srgb, var(--lh-accent-2) 70%, var(--lh-accent) 30%) 100%);
+  color: white;
+  border-radius: 18px 18px 4px 18px;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--lh-accent-2) 30%, transparent);
+}
+.lh-msg-row.is-theirs .lh-msg-bubble {
+  background: var(--lh-surface);
+  color: var(--lh-text);
+  border: 1px solid var(--lh-surface-3);
+  border-radius: 18px 18px 18px 4px;
+}
+.lh-msg-time {
+  font-size: 10px; color: var(--lh-text-3);
+  margin-top: 3px;
+  padding: 0 6px;
+}
+
+.lh-msg-input-bar {
+  padding: 10px 14px 14px;
+  display: flex; gap: 10px; align-items: center;
+  border-top: 1px solid var(--lh-surface-3);
+  background: var(--lh-surface);
+}
+.lh-msg-input-wrap {
+  flex: 1;
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 14px;
+  background: var(--lh-surface-2);
+  border: 1px solid transparent;
+  border-radius: var(--lh-r-full);
+  transition: border-color 0.15s;
+}
+.lh-msg-input-wrap:focus-within { border-color: var(--lh-accent); }
+.lh-msg-input-wrap input {
+  flex: 1; min-width: 0;
+  border: 0; outline: 0;
+  background: transparent;
+  color: var(--lh-text);
+  font-size: 14px;
+  font-family: inherit;
+}
+.lh-msg-input-wrap input::placeholder { color: var(--lh-text-3); }
+.lh-msg-send-btn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  border: 0;
+  background: var(--lh-accent);
+  color: white;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.15s, opacity 0.15s;
+}
+.lh-msg-send-btn:hover:not(:disabled) { transform: scale(1.05); }
+.lh-msg-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.lh-msg-empty {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; padding: 24px;
+  color: var(--lh-text-3);
+  text-align: center;
+}
+.lh-msg-empty-icon {
+  width: 70px; height: 70px;
+  border-radius: 22px;
+  background: var(--lh-accent-soft);
+  color: var(--lh-accent);
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* New conversation modal */
+.lh-msg-modal-backdrop {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(5,7,18,0.78); backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  animation: fadeIn 0.15s ease-out;
+}
+.lh-msg-modal {
+  width: 100%; max-width: 440px;
+  background: var(--lh-surface);
+  border: 1px solid var(--lh-surface-3);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.55);
+  display: flex; flex-direction: column; gap: 12px;
+  max-height: 80vh;
+}
+.lh-msg-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.lh-msg-modal-title {
+  margin: 0;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 800;
+  font-size: 17px;
+  color: var(--lh-text);
+}
+.lh-msg-user-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--lh-r-md);
+  background: var(--lh-surface-2);
+  border: 1px solid var(--lh-surface-3);
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: background 0.15s;
+}
+.lh-msg-user-row:hover { background: var(--lh-accent-soft); }
+.lh-msg-user-avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--lh-surface);
+  object-fit: cover;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   DTC-HUB layout: brand tile, top-nav icon row, LeftRail, popovers.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── Brand tile (gradient "D" block) ─────────────────────────────── */
+.lh-brand-tile {
+  width: 34px; height: 34px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, var(--lh-accent) 0%, #7c3aed 100%);
+  color: #fff;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 900;
+  font-size: 15px;
+  letter-spacing: -0.4px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--lh-accent) 30%, transparent);
+  flex-shrink: 0;
+}
+
+/* ── New TopNav icon cluster (replaces tab strip) ────────────────── */
+.lh-topnav-search-wrap {
+  flex: 1;
+  display: flex; justify-content: center;
+  max-width: 680px;
+  margin: 0 auto;
+}
+.lh-topnav-search {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 16px;
+  width: 100%; max-width: 560px;
+  border-radius: 24px;
+  background: var(--lh-surface-2);
+  border: 1px solid transparent;
+  transition: border-color 0.18s, background 0.18s;
+}
+.lh-topnav-search.is-focused {
+  border-color: color-mix(in srgb, var(--lh-accent) 35%, transparent);
+  background: var(--lh-surface);
+}
+.lh-topnav-search input {
+  flex: 1; min-width: 0;
+  border: 0; outline: 0;
+  background: transparent;
+  color: var(--lh-text);
+  font-size: 13px;
+  font-family: inherit;
+}
+.lh-topnav-search input::placeholder { color: var(--lh-text-3); }
+
+.lh-topnav-icon {
+  position: relative;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: transparent;
+  border: 0;
+  color: var(--lh-text-2);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+.lh-topnav-icon:hover { background: var(--lh-surface-2); color: var(--lh-text); }
+.lh-topnav-icon.is-active {
+  background: var(--lh-accent-soft);
+  color: var(--lh-accent);
+}
+.lh-topnav-icon-badge {
+  position: absolute;
+  top: 4px; right: 4px;
+  min-width: 16px; height: 16px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  border: 1.5px solid var(--lh-surface);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+.lh-topnav-divider {
+  width: 1px; height: 24px;
+  background: var(--lh-surface-3);
+  margin: 0 4px;
+}
+
+.lh-topnav-avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: box-shadow 0.18s;
+  display: block;
+}
+.lh-topnav-avatar:hover {
+  box-shadow: 0 0 0 2px var(--lh-accent);
+}
+.lh-topnav-avatar img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  background: var(--lh-surface-2);
+}
+
+/* ── LeftRail (72px Pinterest-style icon nav) ────────────────────── */
+.lh-rail {
+  width: 72px;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 10px 0;
+  background: transparent;
+}
+.lh-rail-items {
+  display: flex; flex-direction: column; gap: 6px;
+  align-items: center;
+  flex: 1;
+}
+.lh-rail-footer {
+  margin-top: 12px;
+  display: flex; flex-direction: column; gap: 6px;
+  align-items: center;
+  border-top: 1px solid var(--lh-surface-3);
+  padding-top: 12px;
+  width: 48px;
+}
+
+.lh-rail-btn {
+  position: relative;
+  width: 48px; height: 48px;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--lh-text-2);
+  border: 0;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.18s, color 0.18s, transform 0.18s;
+  text-decoration: none;
+}
+.lh-rail-btn:hover {
+  background: var(--lh-surface-2);
+  color: var(--lh-text);
+}
+.lh-rail-btn.is-active {
+  background: var(--lh-accent-soft);
+  color: var(--lh-accent);
+}
+.lh-rail-active-bar {
+  position: absolute;
+  left: -10px; top: 50%;
+  transform: translateY(-50%);
+  width: 3px; height: 22px;
+  border-radius: 2px;
+  background: var(--lh-accent);
+}
+
+.lh-rail-fab {
+  background: linear-gradient(135deg, var(--lh-accent) 0%, #ea580c 100%);
+  color: #fff;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--lh-accent) 30%, transparent);
+}
+.lh-rail-fab:hover {
+  background: linear-gradient(135deg, var(--lh-accent) 0%, #ea580c 100%);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--lh-accent) 40%, transparent);
+}
+
+.lh-rail-tip {
+  position: absolute;
+  left: calc(100% + 14px);
+  top: 50%; transform: translateY(-50%);
+  padding: 5px 10px;
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 90;
+  border: 1px solid var(--lh-surface-3);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+.lh-rail-btn:hover .lh-rail-tip,
+.lh-rail-avatar:hover .lh-rail-tip { opacity: 1; }
+
+.lh-rail-avatar {
+  position: relative;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  overflow: visible;
+  cursor: pointer;
+  display: block;
+  text-decoration: none;
+  transition: box-shadow 0.18s;
+}
+.lh-rail-avatar img {
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  background: var(--lh-surface-2);
+}
+.lh-rail-avatar.is-active img,
+.lh-rail-avatar:hover img {
+  box-shadow: 0 0 0 2px var(--lh-accent);
+}
+
+/* ── Popovers anchored to TopNav ─────────────────────────────────── */
+.lh-popover-wrap {
+  position: absolute;
+  top: 100%;
+  right: 18px;
+  margin-top: 6px;
+  z-index: 100;
+  animation: fadeUp 0.18s ease both;
+}
+.lh-popover {
+  width: 380px;
+  max-height: 540px;
+  background: var(--lh-surface);
+  border: 1px solid var(--lh-surface-3);
+  border-radius: 16px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.lh-popover-header {
+  padding: 14px 16px;
+  display: flex; align-items: flex-start; justify-content: space-between;
+  border-bottom: 1px solid var(--lh-surface-3);
+}
+.lh-popover-title {
+  margin: 0;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 800;
+  font-size: 16px;
+  color: var(--lh-text);
+}
+.lh-popover-sub {
+  margin: 3px 0 0;
+  font-size: 11px;
+  color: var(--lh-text-3);
+}
+.lh-popover-close {
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  background: var(--lh-surface-2);
+  border: 1px solid var(--lh-surface-3);
+  color: var(--lh-text-2);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.lh-popover-close:hover { background: var(--lh-surface-3); color: var(--lh-text); }
+
+.lh-popover-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 8px;
+  display: flex; flex-direction: column;
+  gap: 2px;
+}
+.lh-popover-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--lh-surface-3);
+  text-align: center;
+}
+.lh-popover-see-all {
+  color: var(--lh-accent);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+.lh-popover-see-all:hover { text-decoration: underline; }
+
+/* ── Calendar popover rows ───────────────────────────────────────── */
+.lh-cal-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: transparent;
+  transition: background 0.12s;
+}
+.lh-cal-row:hover { background: var(--lh-surface-2); }
+
+.lh-cal-date {
+  flex-shrink: 0;
+  width: 50px;
+  padding: 8px 4px;
+  border-radius: 10px;
+  background: var(--lh-surface-2);
+  border: 1px solid var(--lh-surface-3);
+  color: var(--lh-text);
+  text-align: center;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 800;
+  font-size: 17px;
+  line-height: 1;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.lh-cal-date.is-live {
+  background: rgba(34, 197, 94, 0.14);
+  color: #22c55e;
+  border-color: rgba(34, 197, 94, 0.4);
+  font-size: 11px;
+  letter-spacing: 0.6px;
+}
+.lh-cal-date-mon {
+  font-size: 9px; font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--lh-text-3);
+  text-transform: uppercase;
+}
+.lh-cal-date.is-live .lh-cal-date-mon { display: none; }
+
+.lh-cal-body { flex: 1; min-width: 0; }
+.lh-cal-title {
+  margin: 0;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700; font-size: 13px;
+  color: var(--lh-text);
+  display: -webkit-box; -webkit-line-clamp: 1; line-clamp: 1; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.lh-cal-meta {
+  margin: 2px 0 0;
+  font-size: 11px; color: var(--lh-text-3);
+}
+.lh-cal-join {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: var(--lh-accent-soft);
+  color: var(--lh-accent);
+  border: 1px solid var(--lh-accent);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  flex-shrink: 0;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+.lh-cal-join:hover { filter: brightness(1.08); }
+.lh-cal-join.is-live {
+  background: #22c55e;
+  color: #0d0f1a;
+  border-color: #22c55e;
+}
+
+/* ── Alarm pulse keyframe for upcoming Meet banner ───────────────── */
+@keyframes lhAlarmPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+
+/* ── TopNav needs to be a positioned anchor for popovers ─────────── */
+.lh-topnav { position: fixed; z-index: 60; }
+
+/* ════════════════════════════════════════════════════════════════════
+   Feed masonry layout (2-column Pinterest-style)
+   ════════════════════════════════════════════════════════════════════ */
+.lh-feed-masonry {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: start;
+}
+.lh-feed-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+@media (max-width: 768px) {
+  .lh-feed-masonry { grid-template-columns: 1fr; }
+}
+
+/* ── Hide old tab strip if any references remain ─────────────────── */
+.lh-topnav-tabs { display: none !important; }
+
+/* ── Responsive: hide rail on mobile (handled by MobileBottomNav) ── */
+@media (max-width: 768px) {
+  .lh-popover-wrap { right: 8px; }
+  .lh-popover { width: calc(100vw - 32px); max-width: 380px; }
+}

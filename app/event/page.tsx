@@ -155,7 +155,17 @@ function formatRange(startISO: string, endISO: string): string {
 }
 
 export default function EventCalendarPage() {
-  const activities = useQuery(api.activities.listActivities, {}) as Activity[] | undefined;
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(12, 0, 0, 0);
+    return d;
+  }, []);
+  const [cursor, setCursor] = useState<{ y: number; m: number }>({
+    y: today.getFullYear(),
+    m: today.getMonth(),
+  });
+
+  const activities = useQuery(api.activities.listActivities, { year: cursor.y }) as Activity[] | undefined;
   const projects = useQuery(api.projects.list, {}) as
     | Array<{ _id: Id<"projects">; code: string; name: string; shortName?: string; color?: string }>
     | undefined;
@@ -226,15 +236,6 @@ export default function EventCalendarPage() {
   }, [activities, projectById, provinceById, lguById]);
 
   // ── Calendar state ─────────────────────────────────────────
-  const today = useMemo(() => {
-    const d = new Date();
-    d.setHours(12, 0, 0, 0);
-    return d;
-  }, []);
-  const [cursor, setCursor] = useState<{ y: number; m: number }>({
-    y: today.getFullYear(),
-    m: today.getMonth(),
-  });
   const [historyStack, setHistoryStack] = useState<Array<{ y: number; m: number }>>([]);
   const [spotlight, setSpotlight] = useState<string | null>(null); // YYYY-MM-DD
   const [modal, setModal] = useState<UiEvent | null>(null);

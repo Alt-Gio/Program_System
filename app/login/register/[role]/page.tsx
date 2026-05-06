@@ -1,42 +1,21 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
-import { useRouter } from "next/navigation";
-import { notFound } from "next/navigation";
+import { Suspense, useState } from "react";
+import { notFound, useRouter } from "next/navigation";
+import { ROLES, type RoleKey } from "@/components/login/roles";
+import { RoleIcon } from "@/components/login/RoleIcon";
 
 type RegisterableRole = "intern" | "supervisor";
 const VALID: RegisterableRole[] = ["intern", "supervisor"];
 
-const ROLE_META: Record<RegisterableRole, { label: string; icon: string; accent: string; landing: string; description: string }> = {
-  intern: {
-    label: "Intern",
-    icon: "🎓",
-    accent: "#6366f1",
-    landing: "/intern-portal",
-    description: "Complete your OJT / practicum registration",
-  },
-  supervisor: {
-    label: "Supervisor",
-    icon: "👩‍💼",
-    accent: "#10b981",
-    landing: "/supervisor",
-    description: "Complete your supervisor account setup",
-  },
-};
-
 function RegisterContent({ role }: { role: RegisterableRole }) {
   const router = useRouter();
-  const meta = ROLE_META[role];
+  const meta = ROLES[role as RoleKey];
+  const accent = role === "intern" ? "#10b981" : "#0ea5e9";
 
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  // We cannot read httpOnly cookies client-side, but if there is no pending cookie
-  // the API will reject the request gracefully. Show a nice error in that case.
-  useEffect(() => {
-    setFullName(""); // Reset on mount
-  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -53,54 +32,79 @@ function RegisterContent({ role }: { role: RegisterableRole }) {
       if (!res.ok) throw new Error(data.error || "Registration failed");
       router.push(meta.landing);
       router.refresh();
-    } catch (err: any) {
-      setError(err.message || "Registration failed");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Registration failed";
+      setError(msg);
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <main style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px 16px", position: "relative", background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)" }}>
-      <div style={{ position: "fixed", inset: 0, pointerEvents: "none", background: `radial-gradient(ellipse 50% 40% at 50% 30%, ${meta.accent}18 0%, transparent 70%)` }} />
-
-      <div style={{ position: "relative", zIndex: 10, width: "100%", maxWidth: 420 }}>
-        {/* Header */}
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 56, height: 56, borderRadius: 16, background: `linear-gradient(135deg, ${meta.accent}dd, ${meta.accent}88)`, fontSize: 24, marginBottom: 16, boxShadow: `0 8px 24px ${meta.accent}30` }}>
-            {meta.icon}
+    <main
+      style={{
+        ["--login-accent" as any]: accent,
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px 16px",
+        background:
+          "radial-gradient(ellipse 60% 40% at 50% 30%, " + accent + "22 0%, transparent 70%), #05060f",
+      }}
+    >
+      <div className="fade-up" style={{ width: "100%", maxWidth: 440 }}>
+        <div
+          style={{
+            background: "linear-gradient(180deg, rgba(20, 22, 40, 0.95), rgba(10, 12, 25, 0.95))",
+            border: "1px solid rgba(255, 255, 255, 0.08)",
+            borderRadius: 20,
+            padding: 32,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22, color: accent }}>
+            <RoleIcon icon={meta.icon} size={36} />
+            <div>
+              <div className="mono" style={{ fontSize: 10, letterSpacing: "0.18em", color: accent }}>
+                {meta.short.toUpperCase()} · REGISTRATION
+              </div>
+              <h1 className="serif" style={{ fontSize: 24, color: "#e8eaf4", margin: "4px 0 0", lineHeight: 1.15 }}>
+                One final step
+              </h1>
+            </div>
           </div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#f1f5f9", margin: "0 0 4px" }}>
-            Complete Registration
-          </h1>
-          <p style={{ fontSize: 13, color: "#64748b", margin: 0 }}>{meta.description}</p>
-        </div>
 
-        {/* Card */}
-        <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 20, padding: 32, backdropFilter: "blur(12px)" }}>
-          <div style={{ marginBottom: 20 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: meta.accent, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-              {meta.label} · DICT Region V
-            </span>
-          </div>
-
-          <p style={{ fontSize: 13, color: "#94a3b8", margin: "0 0 24px", lineHeight: 1.6 }}>
+          <p style={{ fontSize: 13, color: "rgba(255, 255, 255, 0.6)", lineHeight: 1.6, margin: "0 0 22px" }}>
             Your Google account has been verified. Please confirm your full name to complete registration.
           </p>
 
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {error && (
-              <div style={{ padding: "10px 14px", borderRadius: 10, fontSize: 13, color: "#fca5a5", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)" }}>
+              <div
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  fontSize: 12,
+                  color: "#fca5a5",
+                  background: "rgba(244, 63, 94, 0.10)",
+                  border: "1px solid rgba(244, 63, 94, 0.3)",
+                }}
+              >
                 {error}
                 {error.includes("expired") && (
-                  <span> <a href={`/login/${role}`} style={{ color: "#93c5fd", textDecoration: "underline" }}>Sign in again</a></span>
+                  <>
+                    {" "}
+                    <a href="/login" style={{ color: "#93c5fd", textDecoration: "underline" }}>
+                      Sign in again
+                    </a>
+                  </>
                 )}
               </div>
             )}
 
             <div>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#94a3b8", marginBottom: 6 }}>
-                Full Name
+              <label className="mono" style={{ display: "block", fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.45)", letterSpacing: "0.14em", marginBottom: 6 }}>
+                FULL NAME
               </label>
               <input
                 type="text"
@@ -109,9 +113,20 @@ function RegisterContent({ role }: { role: RegisterableRole }) {
                 placeholder="Juan dela Cruz"
                 disabled={loading}
                 autoFocus
-                style={{ width: "100%", padding: "11px 14px", borderRadius: 10, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#e2e8f0", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+                style={{
+                  width: "100%",
+                  padding: "11px 14px",
+                  borderRadius: 10,
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  color: "#e8eaf4",
+                  fontSize: 13,
+                  outline: "none",
+                  boxSizing: "border-box",
+                  fontFamily: "inherit",
+                }}
               />
-              <p style={{ fontSize: 11, color: "#475569", marginTop: 4 }}>
+              <p style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 6 }}>
                 Enter your name as it appears on official documents.
               </p>
             </div>
@@ -119,16 +134,27 @@ function RegisterContent({ role }: { role: RegisterableRole }) {
             <button
               type="submit"
               disabled={loading || !fullName.trim()}
-              style={{ padding: "13px 20px", borderRadius: 12, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 14, background: meta.accent, color: "#fff", opacity: loading || !fullName.trim() ? 0.6 : 1, transition: "opacity 0.15s" }}
+              style={{
+                padding: "12px 18px",
+                borderRadius: 10,
+                border: "none",
+                cursor: loading ? "wait" : "pointer",
+                fontWeight: 700,
+                fontSize: 14,
+                background: accent,
+                color: "#0a0d1e",
+                opacity: loading || !fullName.trim() ? 0.6 : 1,
+                transition: "opacity 0.15s",
+              }}
             >
-              {loading ? "Creating account…" : `Create ${meta.label} Account`}
+              {loading ? "Creating account…" : `Create ${meta.short} Account`}
             </button>
           </form>
         </div>
 
-        <p style={{ textAlign: "center", fontSize: 11, color: "#334155", marginTop: 20 }}>
+        <p style={{ textAlign: "center", fontSize: 11, color: "rgba(255,255,255,0.3)", marginTop: 18 }}>
           Already have an account?{" "}
-          <a href={`/login/${role}`} style={{ color: meta.accent, textDecoration: "none" }}>
+          <a href="/login" style={{ color: accent, textDecoration: "none" }}>
             Sign in here
           </a>
         </p>
@@ -140,7 +166,6 @@ function RegisterContent({ role }: { role: RegisterableRole }) {
 export default function RegisterPage({ params }: { params: { role: string } }) {
   const role = params.role as RegisterableRole;
   if (!VALID.includes(role)) notFound();
-
   return (
     <Suspense>
       <RegisterContent role={role} />

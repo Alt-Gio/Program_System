@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
-import UserBadge from "@/components/auth/UserBadge";
 import ServiceWorkerRegistrar from "@/components/ServiceWorkerRegistrar";
 
 const inter = Inter({
@@ -74,7 +73,6 @@ export default function RootLayout({
       <body className={inter.className}>
         <Providers>
           <ServiceWorkerRegistrar />
-          <UserBadge />
           {children}
         </Providers>
       </body>

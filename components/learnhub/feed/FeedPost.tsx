@@ -194,7 +194,11 @@ export function FeedPost({ post, userId, onLike }: FeedPostProps) {
   const commentInputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <article className={`lh-post${post.isPinned ? " lh-post-pinned" : ""}`}>
+    <article
+      id={post.convexPostId ? `post-${post.convexPostId}` : undefined}
+      className={`lh-post${post.isPinned ? " lh-post-pinned" : ""}`}
+      style={{ scrollMarginTop: 80 }}
+    >
       {/* Pinned banner */}
       {post.isPinned && (
         <div className="lh-pinned-banner">
@@ -246,6 +250,18 @@ export function FeedPost({ post, userId, onLike }: FeedPostProps) {
       <div className="lh-post-body">
         <PostBody content={post.content} />
       </div>
+
+      {/* Thumbnail (any post type) */}
+      {Boolean(post.metadata.thumbnailUrl) && (
+        <div style={{ marginTop: 10, borderRadius: 12, overflow: "hidden" }}>
+          <img
+            src={String(post.metadata.thumbnailUrl)}
+            alt="Post attachment"
+            style={{ width: "100%", maxHeight: 320, objectFit: "cover", display: "block" }}
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+          />
+        </div>
+      )}
 
       {/* Media */}
       {post.type === "youtube" && <div style={{ marginTop: 10 }}><YouTubePost metadata={post.metadata} /></div>}

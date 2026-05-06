@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { LogIn, LogOut, User, ShieldCheck, ChevronDown } from "lucide-react";
+import { LogOut, ShieldCheck, ChevronDown } from "lucide-react";
 
 type Role = "intern" | "supervisor" | "manager" | "admin";
 
@@ -21,7 +20,7 @@ const ROLE_COLORS: Record<Role, string> = {
   admin: "bg-violet-100 text-violet-800 border-violet-200",
 };
 
-const HIDDEN_PATHS = new Set(["/signin", "/signup", "/accept-invite", "/meeting-hall", "/event"]);
+const HIDDEN_PATHS = new Set(["/login", "/signup", "/accept-invite", "/meeting-hall", "/event"]);
 
 export default function UserBadge() {
   const router = useRouter();
@@ -64,23 +63,12 @@ export default function UserBadge() {
   }
 
   if (HIDDEN_PATHS.has(pathname)) return null;
-  if (loading) {
-    return (
-      <div className="fixed top-3 right-3 z-50 h-9 w-28 rounded-full bg-white/60 backdrop-blur border border-gray-200 animate-pulse" />
-    );
-  }
 
-  if (!me) {
-    return (
-      <Link
-        href={`/signin${pathname && pathname !== "/" ? `?callbackUrl=${encodeURIComponent(pathname)}` : ""}`}
-        className="fixed top-3 right-3 z-50 inline-flex items-center gap-2 rounded-full bg-white/90 backdrop-blur border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-white hover:shadow transition"
-      >
-        <LogIn className="w-4 h-4" />
-        Sign in
-      </Link>
-    );
-  }
+  // Render nothing while we're still resolving the session, and nothing
+  // for unauthenticated visitors — the floating pill was overlapping the
+  // sidebar PROGRAMS list. Users who need to sign in can navigate to
+  // /signin directly (linked from the home page and protected routes).
+  if (loading || !me) return null;
 
   const roleClass = ROLE_COLORS[me.role] ?? "bg-gray-100 text-gray-800 border-gray-200";
 

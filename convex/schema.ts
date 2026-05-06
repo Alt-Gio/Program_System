@@ -126,7 +126,29 @@ export default defineSchema({
     icon: v.optional(v.string()),
     isActive: v.boolean(),
     driveId: v.optional(v.string()),
+    /** Convex storage ID for an uploaded logo image. Replaces the
+     *  hard-coded /logo/*.png mapping when present. */
+    logoStorageId: v.optional(v.string()),
   }).index("by_code", ["code"]),
+
+  /** Per-program showcase media — images & videos that act as visual
+   *  highlights on the program page / activity headers. Owned by a
+   *  program; deleting the program cascades these (see convex/projects.ts).
+   */
+  programHighlights: defineTable({
+    projectId: v.id("projects"),
+    storageId: v.string(),                   // Convex storage ID
+    mediaType: v.union(v.literal("image"), v.literal("video")),
+    caption:   v.optional(v.string()),
+    order:     v.number(),                   // ascending — drag-to-reorder later
+    fileName:  v.optional(v.string()),       // original filename, nice for UI
+    fileSize:  v.optional(v.number()),       // bytes
+    mimeType:  v.optional(v.string()),
+    createdAt: v.number(),
+    createdBy: v.optional(v.string()),       // email/identifier of uploader
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_order", ["projectId", "order"]),
 
   /** Sub-projects nested under main projects */
   subProjects: defineTable({

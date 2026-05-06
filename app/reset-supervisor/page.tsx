@@ -128,7 +128,7 @@ export default function ResetSupervisorPage() {
 
                 {/* Login Link */}
                 <Link
-                  href="/supervisor-auth/login"
+                  href="/login"
                   className="flex items-center justify-center gap-2 w-full bg-white/[0.08] hover:bg-white/[0.12] border border-white/[0.10] rounded-xl py-2.5 text-white text-sm font-semibold transition-all"
                 >
                   <ExternalLink className="w-4 h-4" />

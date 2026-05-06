@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { formatDistanceToNow, format } from "date-fns";
+import { MapPin } from "lucide-react";
+import { findDtcOffice } from "@/lib/learnhub/dtc-offices";
+import { DtcOfficeModal } from "@/components/learnhub/dtc/DtcOfficeModal";
 
 interface MeetMetadata {
   meetLink: string;
@@ -9,11 +12,15 @@ interface MeetMetadata {
   durationMinutes?: number;
   isLive?: boolean;
   viewerCount?: number;
+  /** Optional DTC office id (e.g. "legazpi") for the "Hosted by" badge. */
+  dtcOffice?: string;
 }
 
 export function MeetPost({ metadata }: { metadata: Record<string, unknown> }) {
   const m = metadata as unknown as MeetMetadata;
   const [now, setNow] = useState(Date.now());
+  const [showOfficeModal, setShowOfficeModal] = useState(false);
+  const office = findDtcOffice(m.dtcOffice);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 30000);
@@ -26,6 +33,9 @@ export function MeetPost({ metadata }: { metadata: Record<string, unknown> }) {
   const isPast =
     !isLive && m.scheduledAt !== undefined && m.scheduledAt <= now;
 
+  const startsSoon =
+    isUpcoming && m.scheduledAt !== undefined && m.scheduledAt - now < 24 * 60 * 60 * 1000;
+
   return (
     <div
       className="rounded-xl overflow-hidden"
@@ -33,9 +43,35 @@ export function MeetPost({ metadata }: { metadata: Record<string, unknown> }) {
         background: "#0d0f1a",
         border: isLive
           ? "1px solid rgba(34,211,160,0.4)"
+          : startsSoon
+          ? "1px solid rgba(249,115,22,0.5)"
           : "1px solid rgba(255,255,255,0.08)",
       }}
     >
+      {/* Alarm banner — shown when meet starts within 24h */}
+      {startsSoon && (
+        <div
+          className="px-4 py-2 flex items-center gap-2"
+          style={{
+            background: "rgba(249,115,22,0.12)",
+            borderBottom: "1px solid rgba(249,115,22,0.2)",
+            animation: "lhAlarmPulse 2s ease-in-out infinite",
+          }}
+        >
+          <span
+            className="inline-block rounded-full"
+            style={{
+              width: 8, height: 8,
+              background: "#f97316",
+              boxShadow: "0 0 8px rgba(249,115,22,0.6)",
+            }}
+          />
+          <span style={{ fontSize: 12, fontWeight: 700, color: "#fb923c" }}>
+            ⏰ Starts {formatDistanceToNow(m.scheduledAt!, { addSuffix: true })}
+          </span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="px-4 py-3 flex items-center gap-3">
         <div
@@ -102,6 +138,20 @@ export function MeetPost({ metadata }: { metadata: Record<string, unknown> }) {
         )}
       </div>
 
+      {/* "Hosted by" DTC office badge */}
+      {office && (
+        <div className="px-4" style={{ paddingBottom: 8 }}>
+          <button
+            type="button"
+            onClick={() => setShowOfficeModal(true)}
+            className="lh-host-badge"
+          >
+            <MapPin size={11} />
+            Hosted by DTC — {office.city}, {office.province}
+          </button>
+        </div>
+      )}
+
       {/* Join button */}
       {!isPast && (
         <div
@@ -138,6 +188,12 @@ export function MeetPost({ metadata }: { metadata: Record<string, unknown> }) {
           </a>
         </div>
       )}
+
+      <DtcOfficeModal
+        open={showOfficeModal}
+        onClose={() => setShowOfficeModal(false)}
+        initialOfficeId={office?.id}
+      />
     </div>
   );
 }

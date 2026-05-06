@@ -446,9 +446,21 @@ export const activitiesBarangayBreakdown = query({
 export const activitiesByProvince = query({
   args: { projectId: v.optional(v.id("projects")), year: v.optional(v.number()) },
   handler: async (ctx, args) => {
-    let activities = await ctx.db.query("activities").collect();
-    if (args.projectId) activities = activities.filter(a => a.projectId === args.projectId);
-    if (args.year) activities = activities.filter(a => a.year === args.year);
+    let activities;
+    if (args.projectId) {
+      activities = await ctx.db
+        .query("activities")
+        .withIndex("by_project", (i) => i.eq("projectId", args.projectId!))
+        .collect();
+      if (args.year) activities = activities.filter((a) => a.year === args.year);
+    } else if (args.year) {
+      activities = await ctx.db
+        .query("activities")
+        .withIndex("by_year_month", (i) => i.eq("year", args.year!))
+        .collect();
+    } else {
+      activities = await ctx.db.query("activities").collect();
+    }
 
     const provinceMap: Record<string, { count: number; participants: number; byProject: Record<string, number> }> = {};
     for (const a of activities) {
