@@ -23,9 +23,9 @@ const ALL_POST_TYPES: readonly PostTypeDef[] = [
   { value: "form", label: "Form", emoji: "📋" },
 ];
 
-// Cap on uploaded course videos. ~200 MB keeps Convex bandwidth bounded
+// Cap on uploaded course videos. ~95 MB — Cloudflare free plan limit is 100MB
 // while still allowing a 5–10 minute lesson at reasonable quality.
-const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 95 * 1024 * 1024;
 
 interface PostComposerProps {
   onPost: (post: MockPost) => void;
