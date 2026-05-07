@@ -1,9 +1,10 @@
 "use client";
+import { Suspense } from "react";
 
 import { useSearchParams } from "next/navigation";
 import { VideoFlowWorkspace } from "@/components/learnhub/video-flow/VideoFlowWorkspace";
 
-export default function VideoFlowPage() {
+function VideoFlowPageInner() {
   const sp = useSearchParams();
   return (
     <VideoFlowWorkspace
@@ -15,4 +16,12 @@ export default function VideoFlowPage() {
       initialChannelName={sp.get("channel")}
     />
   );
+}
+
+export default function VideoFlowPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>}>
+      <VideoFlowPageInner />
+    </Suspense>
+  )
 }
