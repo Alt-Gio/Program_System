@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchMutation } from "convex/nextjs";
+import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
+const convex = new ConvexHttpClient(
+  process.env.CONVEX_URL ?? process.env.NEXT_PUBLIC_CONVEX_URL!
+);
 import {
   verifyDictPendingCookie,
   DICT_PENDING_COOKIE,
@@ -42,7 +45,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Full name is required." }, { status: 400 });
     }
 
-    const result = await fetchMutation(api.auth.registerWithGoogle, {
+    const result = await convex.mutation(api.auth.registerWithGoogle, {
       googleId: pending.googleId,
       email: pending.email,
       fullName,

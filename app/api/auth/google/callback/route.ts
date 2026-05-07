@@ -11,7 +11,7 @@ import { SESSION_COOKIE, sessionCookieOptions } from "@/lib/session";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+const convex = new ConvexHttpClient(process.env.CONVEX_URL ?? process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 /**
  * GET /api/auth/google/callback
