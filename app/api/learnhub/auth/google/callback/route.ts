@@ -1,12 +1,6 @@
-
-const getBaseUrl = (req: Request) =>
-  process.env.NEXTAUTH_URL ??
-  process.env.NEXT_PUBLIC_APP_URL ??
-  new URL(req.url).origin;
-
-
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
+
 import { NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
@@ -20,8 +14,10 @@ import {
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
-// GET /api/learnhub/auth/google/callback
-// Receives the OAuth code from Google, exchanges it for tokens, checks Convex.
+const getBaseUrl = (req: Request) =>
+  process.env.NEXTAUTH_URL ??
+  process.env.NEXT_PUBLIC_APP_URL ??
+  new URL(req.url).origin;
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -36,7 +32,6 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Exchange code for tokens
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -53,12 +48,10 @@ export async function GET(request: Request) {
       const errBody = await tokenRes.text();
       console.error("[LearnHub] Token exchange error:", tokenRes.status, errBody);
       throw new Error(`Token exchange failed: ${tokenRes.status} — ${errBody}`);
-    }`);
     }
 
     const tokens = await tokenRes.json();
 
-    // Get user profile from Google
     const profileRes = await fetch(
       "https://www.googleapis.com/oauth2/v2/userinfo",
       { headers: { Authorization: `Bearer ${tokens.access_token}` } }
@@ -71,14 +64,12 @@ export async function GET(request: Request) {
     const profile = await profileRes.json();
     const { id: googleId, email, name, picture: avatarUrl } = profile;
 
-    // Check if user exists in Convex
     const existingUser = await convex.query(
       api.learnhub_users.getUserByGoogleId,
       { googleId }
     );
 
     if (existingUser) {
-      // Returning user — create session and redirect to feed
       const sessionToken = await createSession({
         sub: existingUser._id,
         googleId,
@@ -88,8 +79,7 @@ export async function GET(request: Request) {
         role: existingUser.role,
       });
 
-      const callbackUrl =
-        state ? decodeURIComponent(state) : "/learnhub/feed";
+      const callbackUrl = state ? decodeURIComponent(state) : "/learnhub/feed";
       const res = NextResponse.redirect(new URL(callbackUrl, getBaseUrl(request)));
       res.cookies.set(SESSION_COOKIE, sessionToken, {
         httpOnly: true,
@@ -101,7 +91,6 @@ export async function GET(request: Request) {
       return res;
     }
 
-    // New user — store pending profile and redirect to onboarding
     const pendingToken = await createPendingProfile({
       googleId,
       email,
@@ -116,10 +105,11 @@ export async function GET(request: Request) {
       httpOnly: true,
       sameSite: "lax",
       path: "/",
-      maxAge: 10 * 60, // 10 minutes
+      maxAge: 10 * 60,
       secure: process.env.NODE_ENV === "production",
     });
     return res;
+
   } catch (err) {
     console.error("[LearnHub] OAuth callback error:", err);
     return NextResponse.redirect(
