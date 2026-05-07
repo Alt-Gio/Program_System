@@ -50,7 +50,10 @@ export async function GET(request: Request) {
     });
 
     if (!tokenRes.ok) {
-      throw new Error(`Token exchange failed: ${tokenRes.status}`);
+      const errBody = await tokenRes.text();
+      console.error("[LearnHub] Token exchange error:", tokenRes.status, errBody);
+      throw new Error(`Token exchange failed: ${tokenRes.status} — ${errBody}`);
+    }`);
     }
 
     const tokens = await tokenRes.json();
