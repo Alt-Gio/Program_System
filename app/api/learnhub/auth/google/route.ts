@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     ].join(" "),
     access_type: "online",
     prompt: "select_account",
-    state: encodeURIComponent(callbackUrl),
+    state: callbackUrl,
   });
 
   const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
