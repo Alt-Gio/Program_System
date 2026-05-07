@@ -402,6 +402,7 @@ export const learnhubTables = {
       v.literal("takeaway")
     ),
     label: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
     isShared: v.boolean(),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -430,6 +431,140 @@ export const learnhubTables = {
   })
     .index("by_session", ["sessionId"])
     .index("by_user", ["userId"]),
+
+  learnhub_video_flashcards: defineTable({
+    sessionId: v.id("learnhub_video_sessions"),
+    userId: v.id("learnhub_users"),
+    sourceNoteId: v.optional(v.id("learnhub_video_notes")),
+    front: v.string(),
+    back: v.string(),
+    timestampSec: v.optional(v.number()),
+    ease: v.number(),
+    intervalDays: v.number(),
+    reviewCount: v.number(),
+    dueAt: v.number(),
+    lastReviewedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_user", ["userId"])
+    .index("by_user_due", ["userId", "dueAt"])
+    .index("by_session_due", ["sessionId", "dueAt"]),
+
+  learnhub_video_quizzes: defineTable({
+    sessionId: v.id("learnhub_video_sessions"),
+    userId: v.id("learnhub_users"),
+    questions: v.array(
+      v.object({
+        question: v.string(),
+        choices: v.array(v.string()),
+        answerIndex: v.number(),
+        explanation: v.optional(v.string()),
+        timestampSec: v.optional(v.number()),
+      })
+    ),
+    bestScore: v.optional(v.number()),
+    attempts: v.number(),
+    lastAttemptAt: v.optional(v.number()),
+    generatedAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_user", ["userId"]),
+
+  learnhub_video_courses: defineTable({
+    ownerId: v.id("learnhub_users"),
+    title: v.string(),
+    description: v.optional(v.string()),
+    coverImageUrl: v.optional(v.string()),
+    visibility: v.union(
+      v.literal("private"),
+      v.literal("learnhub"),
+      v.literal("public")
+    ),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("active"),
+      v.literal("archived")
+    ),
+    itemCount: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner", ["ownerId"])
+    .index("by_visibility", ["visibility"])
+    .index("by_owner_status", ["ownerId", "status"]),
+
+  learnhub_video_course_items: defineTable({
+    courseId: v.id("learnhub_video_courses"),
+    ownerId: v.id("learnhub_users"),
+    videoId: v.string(),
+    title: v.optional(v.string()),
+    channelName: v.optional(v.string()),
+    thumbnail: v.optional(v.string()),
+    position: v.number(),
+    itemNote: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_course", ["courseId"])
+    .index("by_course_position", ["courseId", "position"])
+    .index("by_owner", ["ownerId"]),
+
+  learnhub_video_note_comments: defineTable({
+    sessionId: v.id("learnhub_video_sessions"),
+    noteId: v.id("learnhub_video_notes"),
+    authorId: v.id("learnhub_users"),
+    content: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_note", ["noteId"])
+    .index("by_session", ["sessionId"])
+    .index("by_author", ["authorId"]),
+
+  learnhub_video_note_reactions: defineTable({
+    sessionId: v.id("learnhub_video_sessions"),
+    noteId: v.id("learnhub_video_notes"),
+    userId: v.id("learnhub_users"),
+    emoji: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_note", ["noteId"])
+    .index("by_note_user_emoji", ["noteId", "userId", "emoji"])
+    .index("by_session", ["sessionId"]),
+
+  learnhub_video_viewers: defineTable({
+    sessionId: v.id("learnhub_video_sessions"),
+    userId: v.id("learnhub_users"),
+    videoId: v.optional(v.string()),
+    currentSec: v.optional(v.number()),
+    lastPingAt: v.number(),
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_session_user", ["sessionId", "userId"])
+    .index("by_session_lastping", ["sessionId", "lastPingAt"])
+    .index("by_video", ["videoId"])
+    .index("by_video_user", ["videoId", "userId"]),
+
+  learnhub_video_chat_messages: defineTable({
+    sessionId: v.id("learnhub_video_sessions"),
+    userId: v.id("learnhub_users"),
+    role: v.union(v.literal("user"), v.literal("assistant")),
+    content: v.string(),
+    citations: v.optional(
+      v.array(
+        v.object({
+          timestampSec: v.number(),
+          quote: v.optional(v.string()),
+        })
+      )
+    ),
+    createdAt: v.number(),
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_session_created", ["sessionId", "createdAt"]),
 
   learnhub_goals: defineTable({
     userId: v.id("learnhub_users"),

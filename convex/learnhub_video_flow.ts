@@ -15,6 +15,13 @@ const noteKind = v.union(
   v.literal("takeaway")
 );
 
+const chatRole = v.union(v.literal("user"), v.literal("assistant"));
+
+const chatCitation = v.object({
+  timestampSec: v.number(),
+  quote: v.optional(v.string()),
+});
+
 async function addTimelineEvent(
   ctx: any,
   args: {
@@ -266,13 +273,6 @@ export const createNote = mutation({
       updatedAt: now,
       ...(args.label !== undefined ? { label: args.label } : {}),
     });
-    await addTimelineEvent(ctx, {
-      sessionId: args.sessionId,
-      userId: args.userId,
-      type: args.kind === "question" ? "question" : "note",
-      timestampSec: args.timestampSec,
-      message: args.kind === "question" ? "Added a timestamped question" : "Added a timestamped note",
-    });
     return noteId;
   },
 });
@@ -299,6 +299,23 @@ export const updateNote = mutation({
   },
 });
 
+export const setNoteTags = mutation({
+  args: {
+    noteId: v.id("learnhub_video_notes"),
+    userId: v.id("learnhub_users"),
+    tags: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const note = await ctx.db.get(args.noteId);
+    if (!note || note.userId !== args.userId) return null;
+    const cleaned = Array.from(
+      new Set(args.tags.map((t) => t.trim().toLowerCase()).filter((t) => t.length > 0 && t.length <= 24))
+    ).slice(0, 8);
+    await ctx.db.patch(args.noteId, { tags: cleaned, updatedAt: Date.now() });
+    return cleaned;
+  },
+});
+
 export const deleteNote = mutation({
   args: {
     noteId: v.id("learnhub_video_notes"),
@@ -308,6 +325,276 @@ export const deleteNote = mutation({
     const note = await ctx.db.get(args.noteId);
     if (!note || note.userId !== args.userId) return null;
     await ctx.db.delete(args.noteId);
+    return true;
+  },
+});
+
+export const listChatMessages = query({
+  args: {
+    sessionId: v.id("learnhub_video_sessions"),
+    userId: v.id("learnhub_users"),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session || session.userId !== args.userId) return [];
+    return await ctx.db
+      .query("learnhub_video_chat_messages")
+      .withIndex("by_session_created", (q) => q.eq("sessionId", args.sessionId))
+      .order("asc")
+      .collect();
+  },
+});
+
+export const appendChatMessage = mutation({
+  args: {
+    sessionId: v.id("learnhub_video_sessions"),
+    userId: v.id("learnhub_users"),
+    role: chatRole,
+    content: v.string(),
+    citations: v.optional(v.array(chatCitation)),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session || session.userId !== args.userId) return null;
+    const trimmed = args.content.trim().slice(0, 6000);
+    if (!trimmed) return null;
+    const doc: Record<string, unknown> = {
+      sessionId: args.sessionId,
+      userId: args.userId,
+      role: args.role,
+      content: trimmed,
+      createdAt: Date.now(),
+    };
+    if (args.citations && args.citations.length > 0) doc.citations = args.citations.slice(0, 12);
+    return await ctx.db.insert("learnhub_video_chat_messages", doc as any);
+  },
+});
+
+export const clearChatMessages = mutation({
+  args: {
+    sessionId: v.id("learnhub_video_sessions"),
+    userId: v.id("learnhub_users"),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session || session.userId !== args.userId) return null;
+    const msgs = await ctx.db
+      .query("learnhub_video_chat_messages")
+      .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+      .collect();
+    for (const m of msgs) await ctx.db.delete(m._id);
+    return msgs.length;
+  },
+});
+
+// === Flashcards (SM-2) ===
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export const createFlashcard = mutation({
+  args: {
+    sessionId: v.id("learnhub_video_sessions"),
+    userId: v.id("learnhub_users"),
+    front: v.string(),
+    back: v.string(),
+    sourceNoteId: v.optional(v.id("learnhub_video_notes")),
+    timestampSec: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session || session.userId !== args.userId) return null;
+    const front = args.front.trim().slice(0, 400);
+    const back = args.back.trim().slice(0, 1200);
+    if (!front || !back) return null;
+    const now = Date.now();
+    const doc: Record<string, unknown> = {
+      sessionId: args.sessionId,
+      userId: args.userId,
+      front,
+      back,
+      ease: 2.5,
+      intervalDays: 0,
+      reviewCount: 0,
+      dueAt: now,
+      createdAt: now,
+      updatedAt: now,
+    };
+    if (args.sourceNoteId) doc.sourceNoteId = args.sourceNoteId;
+    if (args.timestampSec !== undefined) doc.timestampSec = Math.max(0, args.timestampSec);
+    return await ctx.db.insert("learnhub_video_flashcards", doc as any);
+  },
+});
+
+export const listSessionFlashcards = query({
+  args: {
+    sessionId: v.id("learnhub_video_sessions"),
+    userId: v.id("learnhub_users"),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session || session.userId !== args.userId) return [];
+    return await ctx.db
+      .query("learnhub_video_flashcards")
+      .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+      .collect();
+  },
+});
+
+export const reviewFlashcard = mutation({
+  args: {
+    cardId: v.id("learnhub_video_flashcards"),
+    userId: v.id("learnhub_users"),
+    rating: v.union(v.literal("hard"), v.literal("good"), v.literal("easy")),
+  },
+  handler: async (ctx, args) => {
+    const card = await ctx.db.get(args.cardId);
+    if (!card || card.userId !== args.userId) return null;
+    const now = Date.now();
+    const quality = args.rating === "hard" ? 2 : args.rating === "good" ? 4 : 5;
+    let ease = card.ease;
+    let interval = card.intervalDays;
+    let reviewCount = card.reviewCount;
+
+    if (quality < 3) {
+      reviewCount = 0;
+      interval = 1;
+      ease = Math.max(1.3, ease - 0.2);
+    } else {
+      if (reviewCount === 0) interval = 1;
+      else if (reviewCount === 1) interval = 6;
+      else interval = Math.max(1, Math.round(interval * ease));
+      ease = ease + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
+      ease = Math.max(1.3, Math.min(3.0, ease));
+      if (quality === 5) interval = Math.max(interval, Math.round(interval * 1.3));
+      reviewCount += 1;
+    }
+
+    await ctx.db.patch(args.cardId, {
+      ease,
+      intervalDays: interval,
+      reviewCount,
+      dueAt: now + interval * DAY_MS,
+      lastReviewedAt: now,
+      updatedAt: now,
+    });
+    return { interval, ease, reviewCount };
+  },
+});
+
+export const deleteFlashcard = mutation({
+  args: {
+    cardId: v.id("learnhub_video_flashcards"),
+    userId: v.id("learnhub_users"),
+  },
+  handler: async (ctx, args) => {
+    const card = await ctx.db.get(args.cardId);
+    if (!card || card.userId !== args.userId) return null;
+    await ctx.db.delete(args.cardId);
+    return true;
+  },
+});
+
+// === Quiz ===
+
+const quizQuestion = v.object({
+  question: v.string(),
+  choices: v.array(v.string()),
+  answerIndex: v.number(),
+  explanation: v.optional(v.string()),
+  timestampSec: v.optional(v.number()),
+});
+
+export const saveQuiz = mutation({
+  args: {
+    sessionId: v.id("learnhub_video_sessions"),
+    userId: v.id("learnhub_users"),
+    questions: v.array(quizQuestion),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session || session.userId !== args.userId) return null;
+    const now = Date.now();
+    const existing = await ctx.db
+      .query("learnhub_video_quizzes")
+      .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+      .first();
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        questions: args.questions,
+        generatedAt: now,
+        updatedAt: now,
+      });
+      return existing._id;
+    }
+    return await ctx.db.insert("learnhub_video_quizzes", {
+      sessionId: args.sessionId,
+      userId: args.userId,
+      questions: args.questions,
+      attempts: 0,
+      generatedAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
+export const getSessionQuiz = query({
+  args: {
+    sessionId: v.id("learnhub_video_sessions"),
+    userId: v.id("learnhub_users"),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session || session.userId !== args.userId) return null;
+    return await ctx.db
+      .query("learnhub_video_quizzes")
+      .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+      .first();
+  },
+});
+
+export const recordQuizAttempt = mutation({
+  args: {
+    quizId: v.id("learnhub_video_quizzes"),
+    userId: v.id("learnhub_users"),
+    score: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const quiz = await ctx.db.get(args.quizId);
+    if (!quiz || quiz.userId !== args.userId) return null;
+    const score = Math.max(0, Math.min(100, Math.round(args.score)));
+    const next: Record<string, unknown> = {
+      attempts: quiz.attempts + 1,
+      lastAttemptAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    if (quiz.bestScore === undefined || score > quiz.bestScore) next.bestScore = score;
+    await ctx.db.patch(args.quizId, next);
+    if (score >= 70) {
+      await addTimelineEvent(ctx, {
+        sessionId: quiz.sessionId,
+        userId: args.userId,
+        type: "quiz",
+        message: `Passed quiz with ${score}%`,
+      });
+    }
+    return { bestScore: (next.bestScore as number | undefined) ?? quiz.bestScore, score };
+  },
+});
+
+export const logExportEvent = mutation({
+  args: {
+    sessionId: v.id("learnhub_video_sessions"),
+    userId: v.id("learnhub_users"),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session || session.userId !== args.userId) return null;
+    await addTimelineEvent(ctx, {
+      sessionId: args.sessionId,
+      userId: args.userId,
+      type: "exported",
+      message: "Exported study pack",
+    });
     return true;
   },
 });
