@@ -27,6 +27,20 @@ const ALL_POST_TYPES: readonly PostTypeDef[] = [
 // while still allowing a 5–10 minute lesson at reasonable quality.
 const MAX_VIDEO_BYTES = 95 * 1024 * 1024;
 
+// Same vocabulary as INTEREST_TAXONOMY in app/learnhub/onboarding/page.tsx.
+// Posts tagged with any of these surface higher for students who picked them.
+const POST_TAGS = [
+  "Digital Literacy",
+  "Python",
+  "Data Analysis",
+  "Web Dev",
+  "Cybersecurity",
+  "Project Management",
+  "Communication",
+  "Career Pivot",
+] as const;
+const MAX_POST_TAGS = 3;
+
 interface PostComposerProps {
   onPost: (post: MockPost) => void;
   userId?: string | null;
@@ -127,8 +141,75 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
   const [videoProgress, setVideoProgress] = useState(0);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [videoCourseTitle, setVideoCourseTitle] = useState("");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [meetMode, setMeetMode] = useState<"generate" | "paste">("generate");
+  const [meetGenerating, setMeetGenerating] = useState(false);
+  const [meetGenerateError, setMeetGenerateError] = useState<string | null>(null);
+  const [meetCalendarEventId, setMeetCalendarEventId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const videoFileRef = useRef<HTMLInputElement | null>(null);
+
+  const toggleTag = (tag: string) => {
+    setSelectedTags((prev) => {
+      if (prev.includes(tag)) return prev.filter((t) => t !== tag);
+      if (prev.length >= MAX_POST_TAGS) return prev;
+      return [...prev, tag];
+    });
+  };
+
+  // Generate a real Meet link via the user's Google Calendar.
+  // The composer treats the result as the Meet link going forward;
+  // the post metadata stores both the URL and the calendar event id.
+  const generateMeetLink = async () => {
+    setMeetGenerateError(null);
+    if (!content.trim()) {
+      setMeetGenerateError("Add a title in the post content first.");
+      return;
+    }
+    if (!meetDate) {
+      setMeetGenerateError("Pick a date and time first.");
+      return;
+    }
+    const startMs = new Date(meetDate).getTime();
+    if (Number.isNaN(startMs) || startMs < Date.now()) {
+      setMeetGenerateError("Date must be in the future.");
+      return;
+    }
+    setMeetGenerating(true);
+    try {
+      const res = await fetch("/api/learnhub/calendar/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          summary: content.trim(),
+          start: new Date(startMs).toISOString(),
+          end: new Date(startMs + 60 * 60_000).toISOString(),
+          withMeet: true,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        if (data?.error === "not_connected" || data?.error === "reconnect_required") {
+          setMeetGenerateError("Connect Google Calendar in Settings to auto-generate Meet links.");
+        } else {
+          setMeetGenerateError(data?.error ?? "Failed to generate Meet link.");
+        }
+        return;
+      }
+      const hangoutLink: string | undefined = data.event?.hangoutLink;
+      const eventId: string | undefined = data.event?.id;
+      if (!hangoutLink) {
+        setMeetGenerateError("Google did not return a Meet link — try again.");
+        return;
+      }
+      setMeetLink(hangoutLink);
+      setMeetCalendarEventId(eventId ?? null);
+    } catch (err) {
+      setMeetGenerateError(err instanceof Error ? err.message : "Failed to generate Meet link.");
+    } finally {
+      setMeetGenerating(false);
+    }
+  };
 
   const createPost = useMutation(api.learnhub_posts.createPost);
   const generateVideoUploadUrl = useMutation(api.learnhub_posts.generateVideoUploadUrl);
@@ -174,6 +255,7 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
         scheduledAt,
         durationMinutes: 60,
         ...(meetOfficeId ? { dtcOffice: meetOfficeId } : {}),
+        ...(meetCalendarEventId ? { calendarEventId: meetCalendarEventId } : {}),
       };
     } else if (type === "drive" && driveUrl) {
       const driveFileId = extractDriveId(driveUrl);
@@ -224,6 +306,7 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
           type,
           content,
           metadata,
+          ...(selectedTags.length > 0 ? { tags: selectedTags } : {}),
         });
         // Alarm students: write a Firestore notification for meet posts
         if (type === "meet" && meetLink) {
@@ -250,6 +333,10 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
     setVideoCourseTitle("");
     setVideoError(null);
     setVideoProgress(0);
+    setSelectedTags([]);
+    setMeetGenerateError(null);
+    setMeetCalendarEventId(null);
+    setMeetMode("generate");
     setExpanded(false);
     setType("text");
   };
@@ -562,8 +649,6 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
           )}
           {type === "meet" && (
             <>
-              <input type="url" value={meetLink} onChange={(e) => setMeetLink(e.target.value)}
-                placeholder="https://meet.google.com/..." className="lh-composer-url-input" />
               <input
                 type="datetime-local"
                 value={meetDate}
@@ -572,6 +657,113 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
                 style={{ cursor: "pointer", colorScheme: "dark" }}
                 aria-label="Meeting date and time"
               />
+
+              {meetMode === "generate" ? (
+                meetLink ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "10px 12px",
+                      borderRadius: 10,
+                      background: "rgba(34,211,160,0.08)",
+                      border: "1px solid rgba(34,211,160,0.3)",
+                      fontSize: 12,
+                      color: "#22d3a0",
+                    }}
+                  >
+                    <span style={{ flex: 1 }}>
+                      ✓ Meet link generated
+                      <a
+                        href={meetLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: "#22d3a0", marginLeft: 6, textDecoration: "underline" }}
+                      >
+                        Open
+                      </a>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMeetLink("");
+                        setMeetCalendarEventId(null);
+                      }}
+                      style={{ background: "transparent", border: 0, color: "#22d3a0", cursor: "pointer", fontSize: 11 }}
+                    >
+                      Regenerate
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <button
+                      type="button"
+                      onClick={generateMeetLink}
+                      disabled={meetGenerating}
+                      className="lh-composer-url-input"
+                      style={{
+                        cursor: meetGenerating ? "wait" : "pointer",
+                        background: "rgba(91,108,255,0.12)",
+                        border: "1px solid rgba(91,108,255,0.4)",
+                        color: "#7c8bff",
+                        fontWeight: 600,
+                        textAlign: "center",
+                        flex: 1,
+                      }}
+                    >
+                      {meetGenerating ? "Generating…" : "🎥  Generate Meet link"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMeetMode("paste")}
+                      style={{
+                        background: "transparent",
+                        border: 0,
+                        color: "#9ba3cc",
+                        cursor: "pointer",
+                        fontSize: 11,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      Paste a link instead
+                    </button>
+                  </div>
+                )
+              ) : (
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    type="url"
+                    value={meetLink}
+                    onChange={(e) => setMeetLink(e.target.value)}
+                    placeholder="https://meet.google.com/..."
+                    className="lh-composer-url-input"
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMeetMode("generate");
+                      setMeetLink("");
+                    }}
+                    style={{
+                      background: "transparent",
+                      border: 0,
+                      color: "#9ba3cc",
+                      cursor: "pointer",
+                      fontSize: 11,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Generate instead
+                  </button>
+                </div>
+              )}
+
+              {meetGenerateError && (
+                <div style={{ fontSize: 11, color: "#ff5f6d" }}>{meetGenerateError}</div>
+              )}
+
               <select
                 value={meetOfficeId}
                 onChange={(e) => setMeetOfficeId(e.target.value)}
@@ -596,6 +788,41 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
             <input type="url" value={formUrl} onChange={(e) => setFormUrl(e.target.value)}
               placeholder="https://forms.gle/..." className="lh-composer-url-input" />
           )}
+
+          {/* Topic tags — surface this post to students whose interests overlap */}
+          <div style={{ marginTop: 10, marginBottom: 4 }}>
+            <div style={{ fontSize: 11, color: "#9ba3cc", marginBottom: 6, letterSpacing: "0.04em" }}>
+              Topics <span style={{ color: "#5c6490" }}>(optional · pick up to {MAX_POST_TAGS})</span>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {POST_TAGS.map((tag) => {
+                const active = selectedTags.includes(tag);
+                const atCap = !active && selectedTags.length >= MAX_POST_TAGS;
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => toggleTag(tag)}
+                    disabled={atCap}
+                    style={{
+                      padding: "4px 10px",
+                      borderRadius: 999,
+                      fontSize: 11,
+                      fontWeight: 500,
+                      background: active ? "rgba(91,108,255,0.18)" : "transparent",
+                      border: active ? "1px solid #5b6cff" : "1px solid rgba(255,255,255,0.1)",
+                      color: active ? "#7c8bff" : "#e8eaff",
+                      cursor: atCap ? "not-allowed" : "pointer",
+                      opacity: atCap ? 0.4 : 1,
+                      transition: "all 0.12s ease",
+                    }}
+                  >
+                    {tag}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           {/* Footer */}
           <div className="lh-composer-footer">

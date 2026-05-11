@@ -15,6 +15,7 @@ const PUSH_EVENTS = new Set([
   "work_applied",
   "work_status_changed",
   "work_completed",
+  "work_opportunity_posted",
   "endorsement_request",
   "new_message",
   "streak_reminder",

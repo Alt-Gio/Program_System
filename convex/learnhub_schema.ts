@@ -54,6 +54,7 @@ export const learnhubTables = {
     vulnerableGroup: v.optional(v.string()),
     isWillingToHelp: v.optional(v.boolean()),
     expertiseTags: v.optional(v.array(v.string())),
+    interests: v.optional(v.array(v.string())),
     maxMentees: v.optional(v.number()),
     currentMenteeCount: v.optional(v.number()),
     availability: v.optional(v.string()),
@@ -217,6 +218,7 @@ export const learnhubTables = {
     ),
     content: v.string(),
     metadata: v.any(),
+    tags: v.optional(v.array(v.string())),
     compressed: v.optional(v.boolean()),
     likeCount: v.number(),
     commentCount: v.number(),
@@ -721,6 +723,7 @@ export const learnhubTables = {
     ),
     createdAt: v.number(),
     updatedAt: v.number(),
+    completedAt: v.optional(v.number()),
   })
     .index("by_opportunity", ["opportunityId"])
     .index("by_student", ["studentId"]),
@@ -821,4 +824,18 @@ export const learnhubTables = {
     errorMessage: v.optional(v.string()),
     syncedAt: v.number(),
   }),
+
+  // ── Google OAuth credentials (Calendar + Meet) ───────────
+  // Refresh tokens are encrypted at rest via AES-GCM
+  // (see lib/learnhub/token-crypto.ts). NEVER expose the *Enc
+  // fields to the client — only metadata (scopes, expiresAt)
+  // is safe via the getForUser public query.
+  learnhub_google_credentials: defineTable({
+    userId: v.id("learnhub_users"),
+    accessTokenEnc: v.string(),
+    refreshTokenEnc: v.string(),
+    expiresAt: v.number(),
+    scopes: v.array(v.string()),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
 };

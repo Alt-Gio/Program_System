@@ -13,11 +13,28 @@ const ROLES: Array<{ value: Role; label: string; desc: string; emoji: string }> 
   { value: "org_partner", label: "Org Partner", desc: "My organization posts online work opportunities for ILCDB graduates", emoji: "🏢" },
 ];
 
+// Initial taxonomy. Stored as plain strings so posts can be tagged with the
+// same vocabulary (see learnhub_posts.tags + listFeed* re-rank).
+export const INTEREST_TAXONOMY = [
+  "Digital Literacy",
+  "Python",
+  "Data Analysis",
+  "Web Dev",
+  "Cybersecurity",
+  "Project Management",
+  "Communication",
+  "Career Pivot",
+] as const;
+
+const MIN_INTERESTS = 3;
+const MAX_INTERESTS = 5;
+
 export default function OnboardingPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<PendingProfile | null>(null);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [extra, setExtra] = useState("");
+  const [interests, setInterests] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -37,12 +54,25 @@ export default function OnboardingPage() {
       .finally(() => setLoading(false));
   }, [router]);
 
+  const toggleInterest = (tag: string) => {
+    setInterests((prev) => {
+      if (prev.includes(tag)) return prev.filter((t) => t !== tag);
+      if (prev.length >= MAX_INTERESTS) return prev;
+      return [...prev, tag];
+    });
+  };
+
   const handleSubmit = async () => {
     if (!selectedRole) { setError("Please select a role to continue."); return; }
+    if (selectedRole === "student" && interests.length < MIN_INTERESTS) {
+      setError(`Pick at least ${MIN_INTERESTS} interests so we can personalize your feed.`);
+      return;
+    }
     setSubmitting(true); setError("");
-    const body: Record<string, string> = { role: selectedRole };
+    const body: Record<string, unknown> = { role: selectedRole };
     if (selectedRole === "student") body.school = extra;
     else body.organization = extra;
+    if (selectedRole === "student" && interests.length > 0) body.interests = interests;
     const res = await fetch("/api/learnhub/auth/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     if (res.ok) {
       fetch("/api/learnhub/auth/firebase-token", { method: "POST" }).catch(() => {});
@@ -59,6 +89,8 @@ export default function OnboardingPage() {
       <div className="w-8 h-8 rounded-full border-2 animate-spin" style={{ borderColor: "#5b6cff", borderTopColor: "transparent" }} />
     </main>
   );
+
+  const studentInterestsValid = selectedRole !== "student" || interests.length >= MIN_INTERESTS;
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center px-4 py-12" style={{ background: "#0d0f1a" }}>
@@ -89,9 +121,43 @@ export default function OnboardingPage() {
           </div>
         )}
 
+        {selectedRole === "student" && (
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: "#9ba3cc" }}>
+              What do you want to learn? <span style={{ color: "#5c6490" }}>(pick {MIN_INTERESTS}–{MAX_INTERESTS})</span>
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {INTEREST_TAXONOMY.map((tag) => {
+                const active = interests.includes(tag);
+                const atCap = !active && interests.length >= MAX_INTERESTS;
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => toggleInterest(tag)}
+                    disabled={atCap}
+                    className="rounded-full px-3 py-1.5 text-xs font-medium transition-all disabled:opacity-40"
+                    style={{
+                      background: active ? "rgba(91,108,255,0.18)" : "#1a1d30",
+                      border: active ? "1px solid #5b6cff" : "1px solid rgba(255,255,255,0.08)",
+                      color: active ? "#7c8bff" : "#e8eaff",
+                      cursor: atCap ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {tag}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs mt-2" style={{ color: "#5c6490" }}>
+              We'll use these to surface the most relevant posts in your feed.
+            </p>
+          </div>
+        )}
+
         {error && <p className="text-sm" style={{ color: "#ff5f6d" }}>{error}</p>}
 
-        <button onClick={handleSubmit} disabled={!selectedRole || submitting} className="w-full rounded-xl py-3 font-semibold text-sm transition-all disabled:opacity-40" style={{ background: "#5b6cff", color: "#fff", fontFamily: "var(--font-sora)" }}>
+        <button onClick={handleSubmit} disabled={!selectedRole || submitting || !studentInterestsValid} className="w-full rounded-xl py-3 font-semibold text-sm transition-all disabled:opacity-40" style={{ background: "#5b6cff", color: "#fff", fontFamily: "var(--font-sora)" }}>
           {submitting ? "Setting up your account…" : "Join LearnHub →"}
         </button>
       </div>

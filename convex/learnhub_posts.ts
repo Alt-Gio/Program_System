@@ -1,16 +1,42 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
+
+// Stable re-rank: posts whose `tags` overlap the viewer's `interests` float
+// to the top while preserving the underlying createdAt-desc order within
+// each bucket. Only the first `limit` posts are considered — older highly
+// relevant posts will not be pulled forward. Accepted breadth-first trade-off.
+function reRankByInterests<T extends { tags?: string[] }>(
+  posts: T[],
+  interests: string[] | undefined
+): T[] {
+  if (!interests || interests.length === 0) return posts;
+  const interestSet = new Set(interests);
+  const matched: T[] = [];
+  const rest: T[] = [];
+  for (const post of posts) {
+    const hit = post.tags?.some((t) => interestSet.has(t));
+    if (hit) matched.push(post);
+    else rest.push(post);
+  }
+  return [...matched, ...rest];
+}
 
 export const listFeedWithAuthors = query({
-  args: { limit: v.optional(v.number()) },
+  args: {
+    limit: v.optional(v.number()),
+    userId: v.optional(v.id("learnhub_users")),
+  },
   handler: async (ctx, args) => {
     const posts = await ctx.db
       .query("learnhub_posts")
       .withIndex("by_created")
       .order("desc")
       .take(args.limit ?? 30);
+    const viewer = args.userId ? await ctx.db.get(args.userId) : null;
+    const ranked = reRankByInterests(posts, viewer?.interests);
     return Promise.all(
-      posts.map(async (p) => ({
+      ranked.map(async (p) => ({
         ...p,
         author: await ctx.db.get(p.authorId),
       }))
@@ -19,13 +45,18 @@ export const listFeedWithAuthors = query({
 });
 
 export const listFeedPosts = query({
-  args: { limit: v.optional(v.number()) },
+  args: {
+    limit: v.optional(v.number()),
+    userId: v.optional(v.id("learnhub_users")),
+  },
   handler: async (ctx, args) => {
-    return await ctx.db
+    const posts = await ctx.db
       .query("learnhub_posts")
       .withIndex("by_created")
       .order("desc")
       .take(args.limit ?? 30);
+    const viewer = args.userId ? await ctx.db.get(args.userId) : null;
+    return reRankByInterests(posts, viewer?.interests);
   },
 });
 
@@ -62,11 +93,12 @@ export const createPost = mutation({
     ),
     content: v.string(),
     metadata: v.any(),
+    tags: v.optional(v.array(v.string())),
     scheduledAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    return await ctx.db.insert("learnhub_posts", {
+    const postId = await ctx.db.insert("learnhub_posts", {
       ...args,
       likeCount: 0,
       commentCount: 0,
@@ -74,6 +106,27 @@ export const createPost = mutation({
       createdAt: now,
       updatedAt: now,
     });
+
+    // For Meet posts, schedule the lifecycle hooks (15-min "starting
+    // soon" bell, markLive at scheduledAt, markEnded after duration).
+    if (args.type === "meet") {
+      const m = (args.metadata ?? {}) as Record<string, unknown>;
+      const scheduledAt =
+        typeof m.scheduledAt === "number" ? (m.scheduledAt as number) : null;
+      const durationMinutes =
+        typeof m.durationMinutes === "number"
+          ? (m.durationMinutes as number)
+          : 60;
+      if (scheduledAt && scheduledAt > now) {
+        await ctx.scheduler.runAfter(
+          0,
+          internal.learnhub_meet.scheduleLifecycle,
+          { postId, scheduledAt, durationMinutes }
+        );
+      }
+    }
+
+    return postId;
   },
 });
 

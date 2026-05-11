@@ -57,15 +57,20 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { role, school, organization } = body as {
+  const { role, school, organization, interests } = body as {
     role: "student" | "mentor" | "org_partner";
     school?: string;
     organization?: string;
+    interests?: string[];
   };
 
   if (!role || !["student", "mentor", "org_partner"].includes(role)) {
     return NextResponse.json({ error: "Invalid role" }, { status: 400 });
   }
+
+  const cleanInterests = Array.isArray(interests)
+    ? interests.filter((t) => typeof t === "string" && t.length > 0 && t.length <= 64).slice(0, 8)
+    : undefined;
 
   try {
     // Create or get the Convex learnhub user
@@ -77,6 +82,7 @@ export async function POST(request: NextRequest) {
       role,
       school,
       organization,
+      interests: cleanInterests,
     });
 
     // Check for pending certificates matching this email

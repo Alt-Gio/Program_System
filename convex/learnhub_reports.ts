@@ -1,5 +1,8 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
+import { Doc } from "./_generated/dataModel";
+
+type LhUser = Doc<"learnhub_users">;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -61,10 +64,10 @@ export const getQuarterlyReport = query({
     );
     const allRegistrants = registrantRows.flat();
 
-    const uniqueStudentIds = [...new Set(allRegistrants.map((r) => r.userId))];
+    const uniqueStudentIds = Array.from(new Set(allRegistrants.map((r) => r.userId)));
     const students = (
-      await Promise.all(uniqueStudentIds.map((id) => ctx.db.get(id)))
-    ).filter(Boolean);
+      (await Promise.all(uniqueStudentIds.map((id) => ctx.db.get(id)))) as Array<LhUser | null>
+    ).filter((s): s is LhUser => s !== null);
 
     // Modality breakdown
     const online = quarterEvents.filter((e) => e.type === "meet" || e.type === "webinar").length;

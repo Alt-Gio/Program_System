@@ -14,7 +14,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, LayoutGrid, Plus, Zap, Briefcase, Trophy, Settings, Youtube } from "lucide-react";
+import { Home, LayoutGrid, Plus, Zap, Briefcase, Trophy, Settings, Youtube, Calendar } from "lucide-react";
 import { useLearnhubSession } from "@/lib/learnhub/hooks";
 
 interface RailItem {
@@ -28,6 +28,7 @@ const ITEMS: RailItem[] = [
   { id: "feed",        href: "/learnhub/feed",        icon: <Home size={20} />,        label: "Home" },
   { id: "learning",    href: "/learnhub/learning-path", icon: <LayoutGrid size={20} />, label: "My Learning" },
   { id: "video-flow",  href: "/learnhub/video-flow",  icon: <Youtube size={20} />,     label: "Video Flow" },
+  { id: "calendar",    href: "/learnhub/calendar",    icon: <Calendar size={20} />,    label: "Calendar" },
   { id: "flow",        href: "/learnhub/journal",     icon: <Zap size={20} />,         label: "Flow State" },
   { id: "work",        href: "/learnhub/work",        icon: <Briefcase size={20} />,   label: "Opportunities" },
   { id: "leaderboard", href: "/learnhub/leaderboard", icon: <Trophy size={20} />,      label: "Leaderboard" },

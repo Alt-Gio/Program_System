@@ -2,6 +2,7 @@
 
 import { format } from "date-fns";
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useLearnhubSession } from "@/lib/learnhub/hooks";
@@ -28,7 +29,8 @@ export default function WorkPage() {
   const [payFilter, setPayFilter] = useState<PayFilter>("all");
   const [applied, setApplied] = useState<Set<string>>(new Set());
   const [applying, setApplying] = useState<string | null>(null);
-  const { userId } = useLearnhubSession();
+  const { userId, role } = useLearnhubSession();
+  const canPost = role === "org_partner" || role === "admin";
   const applyMutation = useMutation(api.learnhub_work.applyForOpportunity);
 
   const liveOpps = useQuery(api.learnhub_work.listOpenOpportunities, {});
@@ -49,6 +51,7 @@ export default function WorkPage() {
         await applyMutation({
           opportunityId: id as Id<"learnhub_work_opportunities">,
           studentId: userId as Id<"learnhub_users">,
+          actorId: userId as Id<"learnhub_users">,
         });
       }
     } catch {
@@ -60,9 +63,29 @@ export default function WorkPage() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
-      <div className="mb-6">
-        <h1 className="text-xl font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>Work Opportunities</h1>
-        <p className="text-sm mt-0.5" style={{ color: "#9ba3cc" }}>Paid and volunteer positions for ILCDB graduates</p>
+      <div className="mb-6 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>Work Opportunities</h1>
+          <p className="text-sm mt-0.5" style={{ color: "#9ba3cc" }}>Paid and volunteer positions for ILCDB graduates</p>
+        </div>
+        {canPost && (
+          <div className="flex gap-2 shrink-0">
+            <Link
+              href="/learnhub/work/post"
+              className="text-xs px-3 py-2 rounded-lg font-semibold"
+              style={{ background: "#ff8c42", color: "#fff", fontFamily: "var(--font-sora)" }}
+            >
+              + Post Opportunity
+            </Link>
+            <Link
+              href="/learnhub/work/manage"
+              className="text-xs px-3 py-2 rounded-lg font-semibold"
+              style={{ background: "rgba(91,108,255,0.15)", color: "#7c8bff", border: "1px solid rgba(91,108,255,0.35)", fontFamily: "var(--font-sora)" }}
+            >
+              Manage
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* Filters */}

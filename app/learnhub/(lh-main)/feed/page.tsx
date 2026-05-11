@@ -98,7 +98,14 @@ export default function FeedPage() {
   );
 
   // Live, real-time feed query. Returns posts with their author docs joined.
-  const feed = useQuery(api.learnhub_posts.listFeedWithAuthors, { limit: 30 });
+  // Pass userId so the server re-ranks posts whose tags overlap the viewer's
+  // interests (set during onboarding). Falls back to chronological if no userId.
+  const feed = useQuery(
+    api.learnhub_posts.listFeedWithAuthors,
+    userId
+      ? { limit: 30, userId: userId as Id<"learnhub_users"> }
+      : { limit: 30 }
+  );
 
   // Bookmarks for the signed-in user (only loaded when the Saved tab is open
   // — but we also use it to decorate "For you" with bookmark state via the

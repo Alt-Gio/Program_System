@@ -1,4 +1,4 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 
 export const getUserByGoogleId = query({
@@ -48,6 +48,7 @@ export const createUser = mutation({
     ),
     organization: v.optional(v.string()),
     school: v.optional(v.string()),
+    interests: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -73,6 +74,18 @@ export const createUser = mutation({
         emailDigest: "weekly",
       },
     });
+  },
+});
+
+// Internal: fetch a bounded list of students for fan-out notifications.
+// TODO: paginate via .paginate() once student count exceeds ~1k.
+export const listStudentsForNotification = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db
+      .query("learnhub_users")
+      .withIndex("by_role", (q) => q.eq("role", "student"))
+      .take(500);
   },
 });
 

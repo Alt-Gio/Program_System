@@ -98,6 +98,7 @@ export function TopNav() {
   const tabs = [
     { href: "/learnhub/feed", label: "Feed" },
     { href: "/learnhub/learning-path", label: "My Trainings" },
+    { href: "/learnhub/calendar", label: "Calendar" },
     { href: "/learnhub/work", label: "Opportunities" },
     { href: "/learnhub/leaderboard", label: "Leaderboard" },
     { href: "/learnhub/journal", label: "My Journal" },

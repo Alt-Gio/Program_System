@@ -1,15 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
+import { useSearchParams } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { useLearnhubSession } from "@/lib/learnhub/hooks";
+import type { Id } from "@/convex/_generated/dataModel";
 
 type ConvexUserId = Parameters<ReturnType<typeof useMutation<typeof api.learnhub_users.updateNotifPrefs>>>[0]["userId"];
 type EmailDigest = "daily" | "weekly" | "never";
 
 export default function SettingsPage() {
   const { userId } = useLearnhubSession();
+  const sp = useSearchParams();
   const [pushEnabled, setPushEnabled] = useState(false);
   const [emailDigest, setEmailDigest] = useState<EmailDigest>("weekly");
   const [quietFrom, setQuietFrom] = useState("");
@@ -17,8 +20,37 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [pushSupported, setPushSupported] = useState(false);
+  const [calToast, setCalToast] = useState<string | null>(null);
+  const [disconnecting, setDisconnecting] = useState(false);
 
   const updatePrefs = useMutation(api.learnhub_users.updateNotifPrefs);
+
+  const calCreds = useQuery(
+    api.learnhub_google_credentials.getForUser,
+    userId ? { userId: userId as Id<"learnhub_users"> } : "skip"
+  );
+
+  // Toast on round-trip from /api/learnhub/calendar/connect/callback
+  useEffect(() => {
+    const status = sp.get("calendar");
+    if (status === "connected") setCalToast("Google Calendar connected ✓");
+    else if (status === "error") setCalToast(`Connect failed: ${sp.get("reason") ?? "unknown"}`);
+    if (status) {
+      const t = setTimeout(() => setCalToast(null), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [sp]);
+
+  const handleDisconnect = async () => {
+    setDisconnecting(true);
+    try {
+      await fetch("/api/learnhub/calendar/disconnect", { method: "POST" });
+      setCalToast("Google Calendar disconnected");
+      setTimeout(() => setCalToast(null), 4000);
+    } finally {
+      setDisconnecting(false);
+    }
+  };
 
   useEffect(() => {
     setPushSupported("Notification" in window && "serviceWorker" in navigator);
@@ -77,7 +109,53 @@ export default function SettingsPage() {
         <p className="text-sm mt-0.5" style={{ color: "#9ba3cc" }}>Manage your LearnHub preferences</p>
       </div>
 
+      {calToast && (
+        <div
+          className="rounded-xl px-4 py-2 mb-4 text-sm"
+          style={{
+            background: calToast.startsWith("Connect failed") ? "rgba(255,95,109,0.1)" : "rgba(34,211,160,0.1)",
+            color: calToast.startsWith("Connect failed") ? "#ff5f6d" : "#22d3a0",
+            border: `1px solid ${calToast.startsWith("Connect failed") ? "rgba(255,95,109,0.3)" : "rgba(34,211,160,0.3)"}`,
+          }}
+        >
+          {calToast}
+        </div>
+      )}
+
       <div className="flex flex-col gap-4">
+        <Section title="Integrations">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm" style={{ color: "#e8eaff" }}>Google Calendar &amp; Meet</p>
+              <p className="text-xs mt-0.5" style={{ color: "#9ba3cc" }}>
+                {calCreds === undefined
+                  ? "Loading…"
+                  : calCreds === null
+                  ? "Connect to auto-generate Meet links and see your real calendar."
+                  : `Connected · ${calCreds.scopes.filter((s) => s.includes("calendar")).length} calendar scopes`}
+              </p>
+            </div>
+            {calCreds === null ? (
+              <a
+                href="/api/learnhub/calendar/connect"
+                className="text-xs font-semibold px-3 py-2 rounded-lg shrink-0"
+                style={{ background: "#5b6cff", color: "#fff", fontFamily: "var(--font-sora)" }}
+              >
+                Connect
+              </a>
+            ) : calCreds ? (
+              <button
+                onClick={handleDisconnect}
+                disabled={disconnecting}
+                className="text-xs font-semibold px-3 py-2 rounded-lg shrink-0 disabled:opacity-50"
+                style={{ background: "rgba(255,95,109,0.1)", color: "#ff5f6d", border: "1px solid rgba(255,95,109,0.3)" }}
+              >
+                {disconnecting ? "…" : "Disconnect"}
+              </button>
+            ) : null}
+          </div>
+        </Section>
+
         <Section title="Push Notifications">
           <Toggle checked={pushEnabled} onChange={(v) => { if (v) requestPushPermission(); else setPushEnabled(false); }} label="Enable push notifications" sub="Receive alerts for new posts, mentions, and opportunities" />
           {!pushSupported && <p className="text-xs" style={{ color: "#ff8c42" }}>Push notifications are not supported in your browser.</p>}

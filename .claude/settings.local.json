@@ -9,7 +9,12 @@
       "Bash(npx convex *)",
       "Bash(git stash *)",
       "Bash(findstr /i \"location\")",
-      "PowerShell(try { \\(Invoke-WebRequest -Uri \"http://localhost:3000/api/learnhub/auth/google?role=mentor&callbackUrl=/dashboard\" -MaximumRedirection 0 -ErrorAction SilentlyContinue\\).Headers.Location } catch { $_.Exception.Response.Headers.Location.AbsoluteUri })"
+      "PowerShell(try { \\(Invoke-WebRequest -Uri \"http://localhost:3000/api/learnhub/auth/google?role=mentor&callbackUrl=/dashboard\" -MaximumRedirection 0 -ErrorAction SilentlyContinue\\).Headers.Location } catch { $_.Exception.Response.Headers.Location.AbsoluteUri })",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\actal\\\\Music\\\\Project\\\\CascadeProjects\\\\windsurf-project\\\\convex\" -Filter \"*.ts\")",
+      "Bash(Select-Object Name)",
+      "Bash(Head -20)",
+      "Bash(grep -E \"\\(\\\\.tsx|\\\\.ts\\)$\")",
+      "Bash(xargs grep -l \"use node\\\\|internalAction\")"
     ]
   }
 }
