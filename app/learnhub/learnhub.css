@@ -1277,44 +1277,46 @@ button:active { transform: scale(0.97); }
   outline: 2px solid var(--lh-accent);
   outline-offset: 3px;
 }
-.lh-edge-handle--left  { left:  72px; border-radius: 0 14px 14px 0; }
-.lh-edge-handle--right { right: 300px; border-radius: 14px 0 0 14px; }
+.lh-edge-handle--left  { left:  72px; border-radius: 0 14px 14px 0; transition: left 0.32s cubic-bezier(0.16, 1, 0.3, 1); }
+.lh-edge-handle--right { right: 300px; border-radius: 14px 0 0 14px; transition: right 0.32s cubic-bezier(0.16, 1, 0.3, 1); }
 
-/* When a panel is collapsed, dim the handle slightly so the user knows
-   it's the "expand" affordance rather than the active "collapse" one. */
+/* When a panel is collapsed (right), dim the handle slightly. */
 .lh-edge-handle.is-collapsed { opacity: 0.85; }
 .lh-edge-handle.is-collapsed:hover { opacity: 1; }
-.lh-edge-handle--left.is-collapsed { left: 0; }
 .lh-edge-handle--right.is-collapsed { right: 0; }
+
+/* Left-panel handle sits flush against whichever column is current. */
+.lh-main--left-full ~ .lh-edge-handle--left,
+.lh-edge-handle--left.is-full { left: 288px; }
 
 @media (max-width: 768px) { .lh-edge-handle { display: none; } }
 
 /* Smooth grid transitions when toggling panels */
 .lh-main { transition: grid-template-columns 0.32s cubic-bezier(0.16, 1, 0.3, 1); }
 
-/* Modifiers — collapsed = column drops to 0px so the handle is the only
-   visible affordance; expanding restores the default width.
-   We keep minmax(0,1fr) on the center column so it never collapses
-   to 0 during the CSS transition. */
-.lh-main--left-collapsed  { grid-template-columns: 0px minmax(0, 1fr) 300px; }
+/* Modifiers — `lh-main--left-full` widens the left column to fit the full
+   profile card; the rail (default) keeps the 84px column from the base
+   `.lh-main` rule. We keep minmax(0,1fr) on the center column so it never
+   collapses to 0 during the CSS transition. */
+.lh-main--left-full       { grid-template-columns: 300px minmax(0, 1fr) 300px; }
 .lh-main--right-collapsed { grid-template-columns: 84px minmax(0, 1fr) 0px; }
-.lh-main--left-collapsed.lh-main--right-collapsed {
-  grid-template-columns: 0px minmax(0, 1fr) 0px;
+.lh-main--left-full.lh-main--right-collapsed {
+  grid-template-columns: 300px minmax(0, 1fr) 0px;
 }
 
 @media (max-width: 1200px) {
-  .lh-main--left-collapsed  { grid-template-columns: 0px minmax(0, 1fr) 280px; }
+  .lh-main--left-full       { grid-template-columns: 280px minmax(0, 1fr) 280px; }
   .lh-main--right-collapsed { grid-template-columns: 84px minmax(0, 1fr) 0px; }
-  .lh-main--left-collapsed.lh-main--right-collapsed { grid-template-columns: 0px minmax(0, 1fr) 0px; }
+  .lh-main--left-full.lh-main--right-collapsed { grid-template-columns: 280px minmax(0, 1fr) 0px; }
+  .lh-edge-handle--left.is-full { left: 268px; }
 }
 @media (max-width: 1024px) {
-  .lh-main--left-collapsed  { grid-template-columns: 0px minmax(0, 1fr); }
+  .lh-main--left-full       { grid-template-columns: 260px minmax(0, 1fr); }
+  .lh-edge-handle--left.is-full { left: 248px; }
 }
 
-/* Hide panel contents (and their internal scroll) when their column
-   is collapsed to 0 — prevents weird overflow halos. */
-.lh-main--left-collapsed  .lh-left-panel  { display: none !important; }
-.lh-main--right-collapsed .lh-right-panel { display: none !important; }
+/* Breathing room when the left aside is showing the full profile card */
+.lh-main--left-full .lh-left-panel { padding: 14px 14px 24px; }
 
 /* ════════════════════════════════════════════════════════════════════
    Unified RightPanel  ·  compact cards + me-card + status picker

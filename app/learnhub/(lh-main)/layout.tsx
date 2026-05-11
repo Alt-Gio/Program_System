@@ -3,46 +3,43 @@
 /**
  * (lh-main) layout.
  *
- * Shared chrome for every signed-in LearnHub page (feed, journal,
- * certificates, leaderboard, etc).
+ * Shared chrome for every signed-in LearnHub page.
  *
- * Two collapse states:
- *   • leftCollapsed  — hides the left profile panel
- *   • rightCollapsed — hides the unified right panel
+ * Left panel cycles between two visible modes (never fully hidden,
+ * Pinterest-style):
+ *   • "rail" — 84-px icon strip (LeftRail)
+ *   • "full" — wider profile panel (LeftPanel)
  *
- * The toggle handles are NOT inside the panels anymore. They are
- * fixed to the viewport's left and right edges so the user can grab
- * them at any scroll position, and they stay reachable even when
- * their respective panel is collapsed (otherwise re-opening would be
- * impossible). Both states persist to localStorage.
+ * Right panel still has a binary collapsed/visible state.
  *
- * The previous "right panel mode switch" (default vs. expanded
- * events view) is gone — RightPanel now contains everything in one
- * scrollable column, including the user's mini-profile + status
- * picker at the top.
+ * Both states persist to localStorage.
  */
 
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, PanelLeftOpen, PanelLeftClose } from "lucide-react";
 import { NotificationProvider } from "@/components/learnhub/notifications/NotificationProvider";
 import { TopNav } from "@/components/learnhub/layout/TopNav";
 import { MobileBottomNav } from "@/components/learnhub/layout/MobileBottomNav";
 import { LeftRail } from "@/components/learnhub/layout/LeftRail";
+import { LeftPanel } from "@/components/learnhub/panels/LeftPanel";
 import { RightPanel } from "@/components/learnhub/panels/RightPanel";
 
-const LS_KEY_LEFT  = "lh-panel-left-collapsed";
+const LS_KEY_LEFT  = "lh-panel-left-mode";
 const LS_KEY_RIGHT = "lh-panel-right-collapsed";
 
+type LeftMode = "rail" | "full";
+
 export default function LhMainLayout({ children }: { children: React.ReactNode }) {
-  // Left rail is now a fixed 72px icon strip; the "collapsed" toggle
-  // hides it entirely on desktop (mobile nav still works).
-  const [leftCollapsed,  setLeftCollapsed]  = useState(false);
+  const [leftMode,       setLeftMode]       = useState<LeftMode>("rail");
   const [rightCollapsed, setRightCollapsed] = useState(false);
 
   // Hydrate from localStorage after mount to avoid SSR mismatch.
   useEffect(() => {
     try {
-      if (localStorage.getItem(LS_KEY_LEFT)  === "1") setLeftCollapsed(true);
+      const saved = localStorage.getItem(LS_KEY_LEFT);
+      if (saved === "full" || saved === "rail") {
+        setLeftMode(saved);
+      }
       if (localStorage.getItem(LS_KEY_RIGHT) === "1") setRightCollapsed(true);
     } catch { /* private mode or sandboxed iframe */ }
   }, []);
@@ -53,9 +50,9 @@ export default function LhMainLayout({ children }: { children: React.ReactNode }
     if (typeof window !== "undefined") {
       window.dispatchEvent(new Event("lh-composer-collapse"));
     }
-    setLeftCollapsed((prev) => {
-      const next = !prev;
-      try { localStorage.setItem(LS_KEY_LEFT, next ? "1" : "0"); } catch {}
+    setLeftMode((prev) => {
+      const next: LeftMode = prev === "full" ? "rail" : "full";
+      try { localStorage.setItem(LS_KEY_LEFT, next); } catch {}
       return next;
     });
   }
@@ -71,9 +68,10 @@ export default function LhMainLayout({ children }: { children: React.ReactNode }
     });
   }
 
+  const isFull = leftMode === "full";
   const mainClass = [
     "lh-main",
-    leftCollapsed  ? "lh-main--left-collapsed"  : "",
+    isFull ? "lh-main--left-full" : "",
     rightCollapsed ? "lh-main--right-collapsed" : "",
   ].filter(Boolean).join(" ");
 
@@ -84,7 +82,7 @@ export default function LhMainLayout({ children }: { children: React.ReactNode }
 
         <div className={mainClass}>
           <aside className="lh-left-panel">
-            <LeftRail />
+            {isFull ? <LeftPanel /> : <LeftRail />}
           </aside>
 
           <main style={{ minWidth: 0 }}>{children}</main>
@@ -95,18 +93,17 @@ export default function LhMainLayout({ children }: { children: React.ReactNode }
         </div>
 
         {/* Viewport-edge handles ───────────────────────────────────
-            Fixed to the left and right edges of the window. They sit
-            on top of every panel/scrollbar (z-index 60) so they can
-            still be used to RE-OPEN their panel when collapsed. */}
+            Left handle cycles rail ↔ full; right handle still toggles
+            visible/hidden. Fixed-position so they reach across panels. */}
         <button
           type="button"
           onClick={toggleLeft}
-          className={`lh-edge-handle lh-edge-handle--left ${leftCollapsed ? "is-collapsed" : ""}`}
-          aria-label={leftCollapsed ? "Show profile panel" : "Hide profile panel"}
-          aria-expanded={!leftCollapsed}
-          title={leftCollapsed ? "Show profile panel" : "Hide profile panel"}
+          className={`lh-edge-handle lh-edge-handle--left ${isFull ? "is-full" : ""}`}
+          aria-label={isFull ? "Switch to compact icon rail" : "Show full profile panel"}
+          aria-expanded={isFull}
+          title={isFull ? "Compact view" : "Expanded profile"}
         >
-          {leftCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+          {isFull ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
         </button>
 
         <button
