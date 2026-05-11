@@ -1,4 +1,5 @@
 "use client";
+import { Suspense } from "react";
 
 import { format } from "date-fns";
 import { useState } from "react";
@@ -24,7 +25,7 @@ type PayFilter = "all" | "paid" | "stipend" | "volunteer";
 
 type Opportunity = (typeof SEED_OPPORTUNITIES)[0];
 
-export default function WorkPage() {
+function WorkPageInner() {
   const [workFilter, setWorkFilter] = useState<FilterType>("all");
   const [payFilter, setPayFilter] = useState<PayFilter>("all");
   const [applied, setApplied] = useState<Set<string>>(new Set());
@@ -165,4 +166,12 @@ export default function WorkPage() {
       </div>
     </div>
   );
+}
+
+export default function WorkPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>}>
+      <WorkPageInner />
+    </Suspense>
+  )
 }

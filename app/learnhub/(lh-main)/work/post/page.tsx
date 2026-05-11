@@ -1,4 +1,5 @@
 "use client";
+import { Suspense } from "react";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -13,7 +14,7 @@ const CERT_TYPES = ["Tech4ED", "SPARK", "DWIA", "Project CLICK"] as const;
 type WorkType = "remote" | "hybrid" | "onsite";
 type PayType = "volunteer" | "stipend" | "paid";
 
-export default function PostOpportunityPage() {
+function PostOpportunityPageInner() {
   const router = useRouter();
   const { userId, role, loading: sessionLoading } = useLearnhubSession();
   const createOpportunity = useMutation(api.learnhub_work.createOpportunity);
@@ -221,3 +222,11 @@ const inputStyle: React.CSSProperties = {
   fontSize: 13,
   outline: "none",
 };
+
+export default function PostOpportunityPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>}>
+      <PostOpportunityPageInner />
+    </Suspense>
+  )
+}

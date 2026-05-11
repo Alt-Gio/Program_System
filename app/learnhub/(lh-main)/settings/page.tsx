@@ -1,4 +1,5 @@
 "use client";
+import { Suspense } from "react";
 
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
@@ -10,7 +11,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 type ConvexUserId = Parameters<ReturnType<typeof useMutation<typeof api.learnhub_users.updateNotifPrefs>>>[0]["userId"];
 type EmailDigest = "daily" | "weekly" | "never";
 
-export default function SettingsPage() {
+function SettingsPageInner() {
   const { userId } = useLearnhubSession();
   const sp = useSearchParams();
   const [pushEnabled, setPushEnabled] = useState(false);
@@ -193,4 +194,12 @@ export default function SettingsPage() {
       </div>
     </div>
   );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>}>
+      <SettingsPageInner />
+    </Suspense>
+  )
 }

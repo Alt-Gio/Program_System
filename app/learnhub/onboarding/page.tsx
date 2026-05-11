@@ -1,4 +1,5 @@
 "use client";
+import { Suspense } from "react";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -29,7 +30,7 @@ export const INTEREST_TAXONOMY = [
 const MIN_INTERESTS = 3;
 const MAX_INTERESTS = 5;
 
-export default function OnboardingPage() {
+function OnboardingPageInner() {
   const router = useRouter();
   const [profile, setProfile] = useState<PendingProfile | null>(null);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
@@ -163,4 +164,12 @@ export default function OnboardingPage() {
       </div>
     </main>
   );
+}
+
+export default function OnboardingPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>}>
+      <OnboardingPageInner />
+    </Suspense>
+  )
 }

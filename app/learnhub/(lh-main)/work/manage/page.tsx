@@ -1,4 +1,5 @@
 "use client";
+import { Suspense } from "react";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -31,7 +32,7 @@ const STATUS_COLOR: Record<ApplicationStatus, string> = {
   completed: "#7c8bff",
 };
 
-export default function ManageOpportunitiesPage() {
+function ManageOpportunitiesPageInner() {
   const { userId, role, isMentor, isAdmin, loading } = useLearnhubSession();
   const [selectedOppId, setSelectedOppId] = useState<Id<"learnhub_work_opportunities"> | null>(null);
 
@@ -240,4 +241,12 @@ export default function ManageOpportunitiesPage() {
       </div>
     </div>
   );
+}
+
+export default function ManageOpportunitiesPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>}>
+      <ManageOpportunitiesPageInner />
+    </Suspense>
+  )
 }

@@ -1,4 +1,5 @@
 "use client";
+import { Suspense } from "react";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -46,7 +47,7 @@ function toLocalInput(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export default function CalendarPage() {
+function CalendarPageInner() {
   const [cursor, setCursor] = useState<Date>(new Date());
   const [state, setState] = useState<ApiState>({ kind: "loading" });
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -571,3 +572,11 @@ const inputStyle: React.CSSProperties = {
   outline: "none",
   colorScheme: "dark",
 };
+
+export default function CalendarPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>}>
+      <CalendarPageInner />
+    </Suspense>
+  )
+}
