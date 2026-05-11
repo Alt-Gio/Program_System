@@ -1,4 +1,5 @@
 "use client";
+import { Suspense } from "react";
 
 /**
  * LearnHub Feed (DTC-HUB redesign).
@@ -85,7 +86,7 @@ const SAVED_GROUPS: { key: "in_progress" | "want_to_learn" | "done"; label: stri
 // Page
 // ────────────────────────────────────────────────────────────────────
 
-export default function FeedPage() {
+function FeedPageInner() {
   const { session, userId, role } = useLearnhubSession();
   const sp = useSearchParams();
   const [tab, setTab] = useState<FeedTab>("for_you");
@@ -349,4 +350,12 @@ export default function FeedPage() {
       )}
     </div>
   );
+}
+
+export default function FeedPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>}>
+      <FeedPageInner />
+    </Suspense>
+  )
 }
