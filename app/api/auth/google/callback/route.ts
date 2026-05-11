@@ -13,6 +13,37 @@ export const dynamic = "force-dynamic";
 
 const convex = new ConvexHttpClient(process.env.CONVEX_URL ?? process.env.NEXT_PUBLIC_CONVEX_URL!);
 
+const getBaseUrl = (req: Request) =>
+  process.env.NEXTAUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? new URL(req.url).origin;
+
+// Sanitize the post-sign-in destination for the DICT (intern/supervisor) flow.
+// /learnhub/* routes are gated by the LearnHub cookie, so a dict-session user
+// landing there would just be bounced back to /login forever. We also reject
+// absolute/protocol-relative URLs to avoid open-redirects. When unsafe, fall
+// back to the role's natural landing.
+function safeDictCallback(url: string | null | undefined, role: "intern" | "supervisor"): string {
+  const fallback = role === "supervisor" ? "/supervisor" : "/intern-portal";
+  if (typeof url !== "string" || url.length === 0) return fallback;
+  if (!url.startsWith("/") || url.startsWith("//") || url.includes("\\")) return fallback;
+  if (url === "/learnhub" || url.startsWith("/learnhub/")) return fallback;
+  return url;
+}
+
+// Build an error redirect URL back to the carousel so the user sees what failed
+// and can retry on the same portal they picked.
+function errorRedirect(
+  request: Request,
+  role: "intern" | "supervisor",
+  code: string,
+  detail?: string,
+): NextResponse {
+  const url = new URL("/login", getBaseUrl(request));
+  url.searchParams.set("error", code);
+  url.searchParams.set("role", role);
+  if (detail) url.searchParams.set("detail", detail.slice(0, 200));
+  return NextResponse.redirect(url);
+}
+
 /**
  * GET /api/auth/google/callback
  *
@@ -46,23 +77,27 @@ export async function GET(request: Request) {
   }
 
   if (error || !code) {
-    return NextResponse.redirect(
-      new URL(`/login/${role}?error=oauth_failed`, process.env.NEXTAUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin)
-    );
+    return errorRedirect(request, role, "oauth_denied", error ?? "no_code");
   }
 
   try {
     const clientId =
       process.env.DICT_GOOGLE_CLIENT_ID ??
       process.env.LEARNHUB_GOOGLE_CLIENT_ID ??
-      process.env.GOOGLE_CLIENT_ID!;
+      process.env.GOOGLE_CLIENT_ID;
     const clientSecret =
       process.env.DICT_GOOGLE_CLIENT_SECRET ??
       process.env.LEARNHUB_GOOGLE_CLIENT_SECRET ??
-      process.env.GOOGLE_CLIENT_SECRET!;
+      process.env.GOOGLE_CLIENT_SECRET;
     const redirectUri =
       process.env.DICT_GOOGLE_REDIRECT_URI ??
-      new URL("/api/auth/google/callback", process.env.NEXTAUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin).toString();
+      new URL("/api/auth/google/callback", getBaseUrl(request)).toString();
+
+    if (!clientId || !clientSecret) {
+      const missing = [!clientId && "GOOGLE_CLIENT_ID", !clientSecret && "GOOGLE_CLIENT_SECRET"].filter(Boolean).join(",");
+      console.error("[DICT OAuth] Missing env:", missing);
+      return errorRedirect(request, role, "config_missing", missing);
+    }
 
     // Exchange code for tokens
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
@@ -76,17 +111,31 @@ export async function GET(request: Request) {
         grant_type: "authorization_code",
       }),
     });
-    if (!tokenRes.ok) throw new Error(`Token exchange failed: ${tokenRes.status}`);
+    if (!tokenRes.ok) {
+      const body = await tokenRes.text();
+      console.error("[DICT OAuth] Token exchange error:", tokenRes.status, body);
+      return errorRedirect(request, role, "token_exchange", `${tokenRes.status}: ${body}`);
+    }
     const tokens = await tokenRes.json();
+    if (!tokens.access_token) {
+      return errorRedirect(request, role, "token_exchange", "no_access_token");
+    }
 
     // Get Google profile
     const profileRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
-    if (!profileRes.ok) throw new Error(`Profile fetch failed: ${profileRes.status}`);
+    if (!profileRes.ok) {
+      const body = await profileRes.text().catch(() => "");
+      console.error("[DICT OAuth] Profile fetch error:", profileRes.status, body);
+      return errorRedirect(request, role, "profile_fetch", `${profileRes.status}`);
+    }
 
     const profile = await profileRes.json();
     const { id: googleId, email, name, picture: avatarUrl } = profile;
+    if (!googleId || !email) {
+      return errorRedirect(request, role, "profile_fetch", "missing_id_or_email");
+    }
 
     // ── 1. Try to sign in to DICT system ──
     const result = await convex.mutation(api.auth.signInWithGoogle, {
@@ -101,7 +150,7 @@ export async function GET(request: Request) {
       const identities = await convex.query(api.identities.findByGoogleId, { googleId });
       const hasLearnHub = !!identities.lhUser;
 
-      const landing = callbackUrl || landingForRole(result.user.role as "intern" | "supervisor");
+      const landing = safeDictCallback(callbackUrl, result.user.role as "intern" | "supervisor");
 
       // Cross-system: has both DICT + LearnHub accounts → offer role picker
       if (hasLearnHub) {
@@ -155,13 +204,9 @@ export async function GET(request: Request) {
     });
     return res;
   } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
     console.error("[DICT OAuth] Callback error:", err);
-    return NextResponse.redirect(
-      new URL(`/login/${role}?error=server_error`, process.env.NEXTAUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin)
-    );
+    return errorRedirect(request, role, "server_error", msg);
   }
 }
 
-function landingForRole(role: "intern" | "supervisor"): string {
-  return role === "supervisor" ? "/supervisor" : "/intern-portal";
-}

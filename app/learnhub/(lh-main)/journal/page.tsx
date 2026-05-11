@@ -12,7 +12,7 @@ const TODAY = () => new Date().toISOString().split("T")[0];
 
 function extractTags(text: string): string[] {
   const matches = text.match(/#[\w\u00C0-\u024F]+/g) ?? [];
-  return [...new Set(matches.map((t) => t.slice(1).toLowerCase()))];
+  return Array.from(new Set(matches.map((t) => t.slice(1).toLowerCase())));
 }
 
 export default function JournalPage() {

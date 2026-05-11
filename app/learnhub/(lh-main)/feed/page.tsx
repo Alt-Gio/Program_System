@@ -17,10 +17,11 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
-import { Flame } from "lucide-react";
+import { Flame, Search } from "lucide-react";
 import { useLearnhubSession } from "@/lib/learnhub/hooks";
 import { PostComposer } from "@/components/learnhub/feed/PostComposer";
 import { FeedPost, type MockPost } from "@/components/learnhub/feed/FeedPost";
@@ -70,6 +71,9 @@ function mapStandalonePost(p: Doc<"learnhub_posts">): MockPost {
 }
 
 type FeedTab = "for_you" | "saved";
+type FeedCategory = "All" | "YouTube" | "Meet" | "Drive" | "Forms" | "Opportunities" | "Certificates";
+
+const FEED_CATEGORIES: FeedCategory[] = ["All", "YouTube", "Meet", "Drive", "Forms", "Opportunities", "Certificates"];
 
 const SAVED_GROUPS: { key: "in_progress" | "want_to_learn" | "done"; label: string; emoji: string }[] = [
   { key: "in_progress", label: "Continue learning", emoji: "▶️" },
@@ -83,7 +87,10 @@ const SAVED_GROUPS: { key: "in_progress" | "want_to_learn" | "done"; label: stri
 
 export default function FeedPage() {
   const { session, userId, role } = useLearnhubSession();
+  const sp = useSearchParams();
   const [tab, setTab] = useState<FeedTab>("for_you");
+  const [query, setQuery] = useState(sp.get("q") ?? "");
+  const [category, setCategory] = useState<FeedCategory>("All");
 
   const me = useQuery(
     api.learnhub_users.getUser,
@@ -132,6 +139,25 @@ export default function FeedPage() {
     return [...localPosts, ...live];
   }, [feed, localPosts]);
 
+  const filteredPosts = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return posts.filter((post) => {
+      const matchesQuery = !q
+        || post.content.toLowerCase().includes(q)
+        || post.author.name.toLowerCase().includes(q)
+        || String(post.metadata.title ?? post.metadata.courseTitle ?? "").toLowerCase().includes(q);
+      const matchesCategory =
+        category === "All"
+        || (category === "YouTube" && post.type === "youtube")
+        || (category === "Meet" && post.type === "meet")
+        || (category === "Drive" && post.type === "drive")
+        || (category === "Forms" && post.type === "form")
+        || (category === "Opportunities" && post.type === "opportunity")
+        || (category === "Certificates" && post.type === "certificate");
+      return matchesQuery && matchesCategory;
+    });
+  }, [posts, query, category]);
+
   const composerRole: "student" | "mentor" | "org_partner" =
     role === "mentor" ? "mentor" : role === "org_partner" ? "org_partner" : "student";
 
@@ -169,6 +195,29 @@ export default function FeedPage() {
           </span>
         )}
       </header>
+
+      <div className="lh-feed-control-card">
+        <div className="lh-feed-search">
+          <Search size={14} />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search courses, articles, topics..."
+          />
+        </div>
+        <div className="lh-feed-category-row" aria-label="Feed categories">
+          {FEED_CATEGORIES.map((item) => (
+            <button
+              key={item}
+              type="button"
+              className={`lh-feed-category${category === item ? " is-active" : ""}`}
+              onClick={() => setCategory(item)}
+            >
+              {item}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Composer — only visible on the For you tab */}
       {tab === "for_you" && (
@@ -225,19 +274,19 @@ export default function FeedPage() {
             </div>
           )}
 
-          {feed !== undefined && posts.length === 0 && (
+          {feed !== undefined && filteredPosts.length === 0 && (
             <div className="lh-feed-empty">
               <div className="lh-feed-empty-emoji">📭</div>
-              <p className="lh-feed-empty-title">No posts yet</p>
+              <p className="lh-feed-empty-title">{posts.length === 0 ? "No posts yet" : "No matching posts"}</p>
               <p style={{ margin: 0, fontSize: 12 }}>
-                Be the first to share something with the cohort.
+                {posts.length === 0 ? "Be the first to share something with the cohort." : "Try another search or category."}
               </p>
             </div>
           )}
 
-          {feed !== undefined && posts.length > 0 && (
+          {feed !== undefined && filteredPosts.length > 0 && (
             <div className="lh-feed-masonry">
-              {posts.map((post) => (
+              {filteredPosts.map((post) => (
                 <FeedPost key={post.id} post={post} userId={userId} />
               ))}
             </div>

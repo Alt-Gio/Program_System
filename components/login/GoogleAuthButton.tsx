@@ -22,7 +22,7 @@ interface Props {
 export function GoogleAuthButton({ role, callbackUrl, solid = false }: Props) {
   const target = callbackUrl || role.landing;
   const href = role.oauthUrl
-    ? `${role.oauthUrl}?callbackUrl=${encodeURIComponent(target)}`
+    ? `${role.oauthUrl}?role=${role.key}&callbackUrl=${encodeURIComponent(target)}`
     : `/api/auth/google?role=${role.key}&callbackUrl=${encodeURIComponent(target)}`;
 
   return (

@@ -5,8 +5,9 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { formatDistanceToNow, format } from "date-fns";
 import { useLearnhubSession } from "@/lib/learnhub/hooks";
+import type { Id } from "@/convex/_generated/dataModel";
 
-type ConvexUserId = Parameters<typeof api.learnhub_certificates.getCertsByStudent>[1]["studentId"];
+type ConvexUserId = Id<"learnhub_users">;
 
 interface SessionInfo { sub: string; email: string; name: string; role: string; }
 
@@ -50,7 +51,7 @@ function IssueCertModal({ mentorId, mentorName, onClose, onSuccess }: {
         ].map((f) => (
           <div key={f.key}>
             <label className="text-xs mb-1.5 block" style={{ color: "#9ba3cc" }}>{f.label}</label>
-            <input type={f.type} placeholder={f.placeholder} value={(form as Record<string, string>)[f.key]} onChange={(e) => setForm((p) => ({ ...p, [f.key]: e.target.value }))} className="w-full rounded-xl px-3 py-2.5 text-sm outline-none" style={{ background: "#0d0f1a", border: "1px solid rgba(255,255,255,0.08)", color: "#e8eaff" }} onFocus={(e) => (e.currentTarget.style.borderColor = "#5b6cff")} onBlur={(e) => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)")} />
+            <input type={f.type} placeholder={f.placeholder} value={(form as unknown as Record<string, string>)[f.key]} onChange={(e) => setForm((p) => ({ ...p, [f.key]: e.target.value }))} className="w-full rounded-xl px-3 py-2.5 text-sm outline-none" style={{ background: "#0d0f1a", border: "1px solid rgba(255,255,255,0.08)", color: "#e8eaff" }} onFocus={(e) => (e.currentTarget.style.borderColor = "#5b6cff")} onBlur={(e) => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)")} />
           </div>
         ))}
         <div className="grid grid-cols-2 gap-3">

@@ -81,7 +81,7 @@ export function LeftPanel() {
 
         <div className="lh-profile-stats">
           <div className="lh-stat">
-            <span className="lh-stat-num">{user?.postCount ?? 0}</span>
+            <span className="lh-stat-num">{(user as { postCount?: number } | null | undefined)?.postCount ?? 0}</span>
             <span className="lh-stat-label">Posts</span>
           </div>
           <div className="lh-stat-divider" />

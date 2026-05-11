@@ -18,6 +18,7 @@ export interface PendingProfile {
   email: string;
   name: string;
   avatarUrl: string;
+  intendedRole?: "student" | "mentor" | "org_partner";
 }
 
 function b64url(buf: ArrayBuffer): string {

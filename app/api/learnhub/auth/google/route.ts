@@ -8,6 +8,13 @@ import { NextResponse } from "next/server";
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const callbackUrl = searchParams.get("callbackUrl") ?? "/learnhub/feed";
+  const rawRole = searchParams.get("role");
+  const role =
+    rawRole === "student" || rawRole === "mentor" || rawRole === "org_partner"
+      ? rawRole
+      : null;
+
+  const state = encodeURIComponent(JSON.stringify({ callbackUrl, role }));
 
   const params = new URLSearchParams({
     client_id: process.env.LEARNHUB_GOOGLE_CLIENT_ID!,
@@ -20,7 +27,7 @@ export async function GET(request: Request) {
     ].join(" "),
     access_type: "online",
     prompt: "select_account",
-    state: callbackUrl,
+    state,
   });
 
   const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;

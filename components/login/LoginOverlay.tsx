@@ -10,10 +10,22 @@ interface Props {
   role: RoleMeta;
   callbackUrl?: string | null;
   oauthError?: string | null;
+  oauthErrorDetail?: string | null;
   onClose: () => void;
 }
 
-export function LoginOverlay({ role, callbackUrl, oauthError, onClose }: Props) {
+const ERROR_MESSAGES: Record<string, string> = {
+  oauth_denied:    "Google sign-in was cancelled or denied. Please try again.",
+  oauth_failed:    "Google sign-in was cancelled or failed. Please try again.",
+  config_missing:  "The server is missing OAuth configuration. Please contact support.",
+  token_exchange:  "We couldn't complete the Google handshake. Try signing in again.",
+  profile_fetch:   "Google didn't return a usable profile. Please try again.",
+  convex_query:    "We couldn't reach the database to verify your account. Please retry.",
+  session_create:  "Sign-in succeeded but we couldn't create your session. Please retry.",
+  server_error:    "Something went wrong on our side. Please try again.",
+};
+
+export function LoginOverlay({ role, callbackUrl, oauthError, oauthErrorDetail, onClose }: Props) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -102,11 +114,25 @@ export function LoginOverlay({ role, callbackUrl, oauthError, onClose }: Props) 
               background: "rgba(244, 63, 94, 0.10)",
               border: "1px solid rgba(244, 63, 94, 0.3)",
               marginBottom: 16,
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
             }}
           >
-            {oauthError === "oauth_failed"
-              ? "Google sign-in was cancelled or failed. Please try again."
-              : "Something went wrong. Please try again."}
+            <span>{ERROR_MESSAGES[oauthError] ?? "Something went wrong. Please try again."}</span>
+            {oauthErrorDetail && (
+              <span
+                className="mono"
+                style={{
+                  fontSize: 10,
+                  letterSpacing: "0.04em",
+                  color: "rgba(252, 165, 165, 0.7)",
+                  wordBreak: "break-word",
+                }}
+              >
+                {oauthError}: {oauthErrorDetail}
+              </span>
+            )}
           </div>
         )}
 

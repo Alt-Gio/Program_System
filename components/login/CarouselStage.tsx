@@ -22,6 +22,8 @@ const TYPE_SEQUENCE = "admin";
 export function CarouselStage() {
   const searchParams = useSearchParams();
   const oauthError = searchParams.get("error");
+  const oauthErrorDetail = searchParams.get("detail");
+  const errorRoleParam = searchParams.get("role");
   const callbackUrl = searchParams.get("callbackUrl");
 
   const [tweaks, setTweaks] = useState<LoginTweaks>(DEFAULT_TWEAKS);
@@ -38,6 +40,18 @@ export function CarouselStage() {
     setTweaks(readTweaks());
     setAdminUnlocked(isAdminUnlocked());
   }, []);
+
+  // If we came back from an OAuth error with role context, jump to that slide
+  // and pop the overlay so the user sees the failure on the portal they picked.
+  useEffect(() => {
+    if (!oauthError || !errorRoleParam) return;
+    if (!(errorRoleParam in ROLES)) return;
+    const role = errorRoleParam as RoleKey;
+    const slideIndex = SLIDES.findIndex((s) => s.left === role || s.right === role);
+    if (slideIndex >= 0) setSlideIdx(slideIndex);
+    setSelectedRole(role);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [oauthError, errorRoleParam]);
 
   // Persist tweaks on change
   useEffect(() => {
@@ -445,6 +459,7 @@ export function CarouselStage() {
           role={selectedRoleMeta}
           callbackUrl={callbackUrl}
           oauthError={oauthError}
+          oauthErrorDetail={oauthErrorDetail}
           onClose={() => setSelectedRole(null)}
         />
       )}

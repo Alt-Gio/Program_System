@@ -19,10 +19,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Bell, Calendar, MessageSquare, Search } from "lucide-react";
+import { Calendar, MessageSquare, Search } from "lucide-react";
 import { ThemeToggle } from "@/components/learnhub/ThemeToggle";
 import { NotificationBell } from "@/components/learnhub/notifications/NotificationBell";
 import { useLearnhubSession } from "@/lib/learnhub/hooks";
@@ -34,9 +34,11 @@ type Panel = "cal" | "msg" | null;
 export function TopNav() {
   const { session, userId } = useLearnhubSession();
   const router = useRouter();
+  const pathname = usePathname();
   const [panel, setPanel] = useState<Panel>(null);
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
+  const [brandExpanded, setBrandExpanded] = useState(false);
 
   // Live unread totals for icon badges.
   const convs = useQuery(
@@ -93,14 +95,47 @@ export function TopNav() {
   const avatarSrc = session?.avatarUrl
     ?? `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(session?.name ?? "U")}&backgroundColor=FF6B35&textColor=ffffff`;
 
+  const tabs = [
+    { href: "/learnhub/feed", label: "Feed" },
+    { href: "/learnhub/learning-path", label: "My Trainings" },
+    { href: "/learnhub/work", label: "Opportunities" },
+    { href: "/learnhub/leaderboard", label: "Leaderboard" },
+    { href: "/learnhub/journal", label: "My Journal" },
+    { href: "/learnhub/certificates", label: "My Certificates" },
+  ];
+
   return (
     <nav className="lh-topnav">
       {/* Brand */}
-      <Link href="/learnhub/feed" className="lh-topnav-logo">
+      <Link
+        href="/learnhub/feed"
+        className={`lh-topnav-logo${brandExpanded ? " is-expanded" : ""}`}
+        onMouseEnter={() => setBrandExpanded(true)}
+        onMouseLeave={() => setBrandExpanded(false)}
+      >
         <div className="lh-brand-tile" aria-hidden>D</div>
-        <span className="lh-logo-text">LearnHub</span>
-        <span className="lh-logo-sub">ILCDB</span>
+        <span className="lh-logo-copy">
+          <span className="lh-logo-text">{brandExpanded ? "Digital Transformation" : "DTC-HUB"}</span>
+          <span className="lh-logo-sub">{brandExpanded ? "CENTER HUB · ILCDB" : "ILCDB"}</span>
+        </span>
       </Link>
+
+      <div className="lh-dtc-pill" title="DTC Region V hub">
+        <span className="lh-dtc-dot" aria-hidden />
+        <span>DTC · Naga City</span>
+      </div>
+
+      {/* Primary tabs */}
+      <div className="lh-topnav-tabs" aria-label="LearnHub sections">
+        {tabs.map((tab) => {
+          const active = pathname === tab.href || pathname.startsWith(tab.href + "/");
+          return (
+            <Link key={tab.href} href={tab.href} className={`lh-nav-tab${active ? " active" : ""}`}>
+              {tab.label}
+            </Link>
+          );
+        })}
+      </div>
 
       {/* Search */}
       <form onSubmit={onSearchSubmit} className="lh-topnav-search-wrap" role="search">

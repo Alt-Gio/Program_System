@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 type Role = "student" | "mentor" | "org_partner";
 
-interface PendingProfile { googleId: string; email: string; name: string; avatarUrl: string; }
+interface PendingProfile { googleId: string; email: string; name: string; avatarUrl: string; intendedRole?: Role; }
 
 const ROLES: Array<{ value: Role; label: string; desc: string; emoji: string }> = [
   { value: "student", label: "Student", desc: "I'm enrolled in an ILCDB program (SPARK, DWIA, Project CLICK, Tech4ED)", emoji: "🎓" },
@@ -27,7 +27,10 @@ export default function OnboardingPage() {
       .then((r) => r.json())
       .then((data) => {
         if (data.type === "session") router.replace("/learnhub/feed");
-        else if (data.type === "pending") setProfile(data.profile);
+        else if (data.type === "pending") {
+          setProfile(data.profile);
+          if (data.profile?.intendedRole) setSelectedRole(data.profile.intendedRole);
+        }
         else router.replace("/learnhub/login");
       })
       .catch(() => router.replace("/learnhub/login"))
