@@ -147,6 +147,15 @@ export async function GET(request: Request) {
         api.learnhub_users.getUserByGoogleId,
         { googleId }
       );
+      // Edge case: same email, different Google account. Treat the email as
+      // the source of truth so one human can't accumulate parallel mentor /
+      // student profiles by swapping Google logins.
+      if (!existingUser) {
+        existingUser = await convex.query(
+          api.learnhub_users.getUserByEmail,
+          { email },
+        );
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error("[LearnHub] Convex query error:", msg);
@@ -154,14 +163,31 @@ export async function GET(request: Request) {
     }
 
     if (existingUser) {
+      // Role strictness — a user who registered as a `student` cannot sign in
+      // through the mentor or org-partner portal (and vice versa). We only
+      // enforce when the caller actually picked a portal (intendedRole).
+      // Admins bypass the check since they need access to every surface.
+      if (
+        intendedRole &&
+        existingUser.role !== "admin" &&
+        existingUser.role !== intendedRole
+      ) {
+        return errorRedirect(
+          request,
+          intendedRole,
+          "role_mismatch",
+          `existing:${existingUser.role}`,
+        );
+      }
+
       let sessionToken: string;
       try {
         sessionToken = await createSession({
           sub: existingUser._id,
           googleId,
           email,
-          name,
-          avatarUrl,
+          name: existingUser.name || name,
+          avatarUrl: existingUser.avatarUrl || avatarUrl,
           role: existingUser.role,
         });
       } catch (e) {

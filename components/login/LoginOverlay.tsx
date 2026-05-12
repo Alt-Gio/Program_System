@@ -22,6 +22,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   profile_fetch:   "Google didn't return a usable profile. Please try again.",
   convex_query:    "We couldn't reach the database to verify your account. Please retry.",
   session_create:  "Sign-in succeeded but we couldn't create your session. Please retry.",
+  role_mismatch:   "This account is registered under a different role. Sign in through the correct portal — your role is fixed once you sign up.",
   server_error:    "Something went wrong on our side. Please try again.",
 };
 

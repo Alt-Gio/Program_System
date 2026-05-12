@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   addMonths,
@@ -47,24 +47,38 @@ function toLocalInput(d: Date): string {
 }
 
 export default function CalendarPage() {
-  const [cursor, setCursor] = useState<Date>(new Date());
+  const [cursor, setCursor] = useState<Date>(() => new Date());
   const [state, setState] = useState<ApiState>({ kind: "loading" });
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [modalEvent, setModalEvent] = useState<GcalEvent | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
   const [newPrefill, setNewPrefill] = useState<Date | null>(null);
 
-  // Visible window for the month grid (includes leading/trailing days)
-  const monthStart = startOfMonth(cursor);
-  const monthEnd = endOfMonth(cursor);
-  const gridStart = startOfWeek(monthStart);
-  const gridEnd = endOfWeek(monthEnd);
+  // Stable month key (e.g. "2026-05") — every other Date derived from this
+  // is recomputed only when the month changes. The earlier implementation
+  // computed gridStart/gridEnd as new Date instances every render and used
+  // them as useCallback / useEffect deps, which created a fetch → setState
+  // → re-render → new Date → fetch loop and froze the tab.
+  const monthKey = format(cursor, "yyyy-MM");
 
-  const fetchEvents = useCallback(async () => {
-    setState({ kind: "loading" });
+  const { gridStart, gridEnd } = useMemo(() => {
+    const ms = startOfMonth(cursor);
+    const me = endOfMonth(cursor);
+    return { gridStart: startOfWeek(ms), gridEnd: endOfWeek(me) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monthKey]);
+
+  const fetchEvents = useCallback(async (signal?: AbortSignal) => {
+    // Keep last-known events visible during refresh — only flash the loading
+    // screen on a true cold start. The refreshing pill in the header shows
+    // the user a background update is in flight without yanking the UI.
+    setState((cur) => (cur.kind === "ready" ? cur : { kind: "loading" }));
+    setRefreshing(true);
     try {
       const res = await fetch(
-        `/api/learnhub/calendar/events?timeMin=${gridStart.toISOString()}&timeMax=${gridEnd.toISOString()}`
+        `/api/learnhub/calendar/events?timeMin=${gridStart.toISOString()}&timeMax=${gridEnd.toISOString()}`,
+        { signal },
       );
       const data = await res.json();
       if (!res.ok || !data.ok) {
@@ -77,13 +91,33 @@ export default function CalendarPage() {
       }
       setState({ kind: "ready", events: (data.events ?? []) as GcalEvent[] });
     } catch (err) {
+      if ((err as { name?: string })?.name === "AbortError") return;
       setState({ kind: "error", message: err instanceof Error ? err.message : String(err) });
+    } finally {
+      if (!signal?.aborted) setRefreshing(false);
     }
   }, [gridStart, gridEnd]);
 
   useEffect(() => {
-    fetchEvents();
+    const ctrl = new AbortController();
+    fetchEvents(ctrl.signal);
+    return () => ctrl.abort();
   }, [fetchEvents]);
+
+  // Keyboard nav: ← / → flips months, "t" jumps to today. Skips when a
+  // modal is open or the user is typing in a field.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (showNewModal || modalEvent) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+      if (e.key === "ArrowLeft") setCursor((c) => addMonths(c, -1));
+      else if (e.key === "ArrowRight") setCursor((c) => addMonths(c, 1));
+      else if (e.key === "t" || e.key === "T") setCursor(new Date());
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showNewModal, modalEvent]);
 
   // Group events by their local-date key (YYYY-MM-DD)
   const eventsByDay = useMemo(() => {
@@ -112,14 +146,33 @@ export default function CalendarPage() {
 
   const todayKey = format(new Date(), "yyyy-MM-dd");
 
+  // Touch swipe: drag the grid left = next month, right = previous month.
+  // Threshold of 60px / 30deg keeps it from triggering on diagonal scrolls.
+  const swipeRef = useRef<{ x: number; y: number } | null>(null);
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    swipeRef.current = { x: t.clientX, y: t.clientY };
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (!swipeRef.current) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - swipeRef.current.x;
+    const dy = t.clientY - swipeRef.current.y;
+    swipeRef.current = null;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) {
+      if (dx < 0) setCursor((c) => addMonths(c, 1));
+      else setCursor((c) => addMonths(c, -1));
+    }
+  };
+
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6">
-      <header className="flex items-center justify-between mb-5">
-        <div>
-          <h1 className="text-xl font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>
+    <div className="max-w-5xl mx-auto px-2 sm:px-4 py-4 sm:py-6">
+      <header className="flex items-center justify-between mb-4 sm:mb-5 gap-2">
+        <div className="min-w-0">
+          <h1 className="text-lg sm:text-xl font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>
             Calendar
           </h1>
-          <p className="text-sm mt-0.5" style={{ color: "#9ba3cc" }}>
+          <p className="hidden sm:block text-sm mt-0.5" style={{ color: "#9ba3cc" }}>
             Your real Google Calendar — manage events and Meet links from here.
           </p>
         </div>
@@ -161,9 +214,26 @@ export default function CalendarPage() {
             Today
           </button>
         </div>
-        <p className="text-sm font-semibold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>
-          {format(cursor, "MMMM yyyy")}
-        </p>
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-semibold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>
+            {format(cursor, "MMMM yyyy")}
+          </p>
+          {refreshing && state.kind === "ready" && (
+            <span
+              aria-hidden
+              style={{
+                width: 12,
+                height: 12,
+                border: "2px solid rgba(91,108,255,0.25)",
+                borderTopColor: "#7c8bff",
+                borderRadius: "50%",
+                animation: "spin 0.7s linear infinite",
+                display: "inline-block",
+              }}
+              title="Refreshing"
+            />
+          )}
+        </div>
         <div style={{ width: 80 }} />
       </div>
 
@@ -196,15 +266,21 @@ export default function CalendarPage() {
       )}
 
       {/* Day-of-week header */}
-      <div className="grid grid-cols-7 gap-1 mb-1">
+      <div className="grid grid-cols-7 gap-0.5 sm:gap-1 mb-1">
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
           <div key={d} className="text-[10px] font-semibold text-center py-1" style={{ color: "#9ba3cc", letterSpacing: "0.06em" }}>
-            {d.toUpperCase()}
+            <span className="sm:hidden">{d[0]}</span>
+            <span className="hidden sm:inline">{d.toUpperCase()}</span>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-1">
+      <div
+        className="grid grid-cols-7 gap-0.5 sm:gap-1"
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+        style={{ touchAction: "pan-y" }}
+      >
         {days.map((day) => {
           const key = format(day, "yyyy-MM-dd");
           const inMonth = isSameMonth(day, cursor);
@@ -214,14 +290,23 @@ export default function CalendarPage() {
           return (
             <button
               key={key}
-              onClick={() => setSelectedDate(day)}
+              onClick={() => {
+                setSelectedDate(day);
+                // On phones the cell is too small to render multiple event
+                // chips legibly. A tap on a day with events opens the first
+                // one directly so users can act on it without a long-press
+                // or zooming. Empty days still just select the date.
+                if (dayEvents.length > 0 && typeof window !== "undefined" && window.matchMedia("(max-width: 540px)").matches) {
+                  setModalEvent(dayEvents[0]);
+                }
+              }}
               onDoubleClick={() => {
                 const at = new Date(day);
                 at.setHours(9, 0, 0, 0);
                 setNewPrefill(at);
                 setShowNewModal(true);
               }}
-              className="rounded-lg p-2 min-h-[88px] text-left flex flex-col gap-1"
+              className="rounded-md sm:rounded-lg p-1 sm:p-2 min-h-[56px] sm:min-h-[88px] text-left flex flex-col gap-0.5 sm:gap-1"
               style={{
                 background: isSelected ? "rgba(91,108,255,0.15)" : inMonth ? "#131626" : "#0d0f1a",
                 border: isSelected
@@ -232,38 +317,64 @@ export default function CalendarPage() {
                 cursor: "pointer",
                 opacity: inMonth ? 1 : 0.5,
               }}
+              aria-label={`${format(day, "EEEE, MMMM d")}${dayEvents.length ? ` — ${dayEvents.length} event${dayEvents.length > 1 ? "s" : ""}` : ""}`}
             >
               <span
-                className="text-xs font-semibold"
+                className="text-[11px] sm:text-xs font-semibold"
                 style={{ color: isTodayCell ? "#7c8bff" : inMonth ? "#e8eaff" : "#5c6490" }}
               >
                 {format(day, "d")}
               </span>
-              {dayEvents.slice(0, 3).map((ev) => (
-                <span
-                  key={ev.id ?? `${key}-${ev.summary}`}
-                  role="button"
-                  tabIndex={0}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setModalEvent(ev);
-                  }}
-                  className="text-[10px] font-medium truncate rounded px-1.5 py-0.5"
-                  style={{
-                    background: ev.hangoutLink ? "rgba(34,211,160,0.15)" : "rgba(91,108,255,0.15)",
-                    color: ev.hangoutLink ? "#22d3a0" : "#7c8bff",
-                    cursor: "pointer",
-                  }}
-                  title={ev.summary ?? ""}
-                >
-                  {ev.summary ?? "Untitled"}
-                </span>
-              ))}
-              {dayEvents.length > 3 && (
-                <span className="text-[10px]" style={{ color: "#9ba3cc" }}>
-                  +{dayEvents.length - 3} more
+
+              {/* Mobile: a tight row of colored dots — one per event, up to 3.
+                  Saves vertical space and stays legible on a 360px screen. */}
+              {dayEvents.length > 0 && (
+                <span className="flex sm:hidden gap-0.5 mt-auto" aria-hidden>
+                  {dayEvents.slice(0, 3).map((ev, i) => (
+                    <span
+                      key={i}
+                      style={{
+                        width: 5,
+                        height: 5,
+                        borderRadius: "50%",
+                        background: ev.hangoutLink ? "#22d3a0" : "#7c8bff",
+                      }}
+                    />
+                  ))}
+                  {dayEvents.length > 3 && (
+                    <span style={{ fontSize: 8, color: "#9ba3cc", marginLeft: 1 }}>+{dayEvents.length - 3}</span>
+                  )}
                 </span>
               )}
+
+              {/* Desktop / tablet: classic event chips. */}
+              <div className="hidden sm:flex sm:flex-col sm:gap-1">
+                {dayEvents.slice(0, 3).map((ev) => (
+                  <span
+                    key={ev.id ?? `${key}-${ev.summary}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setModalEvent(ev);
+                    }}
+                    className="text-[10px] font-medium truncate rounded px-1.5 py-0.5"
+                    style={{
+                      background: ev.hangoutLink ? "rgba(34,211,160,0.15)" : "rgba(91,108,255,0.15)",
+                      color: ev.hangoutLink ? "#22d3a0" : "#7c8bff",
+                      cursor: "pointer",
+                    }}
+                    title={ev.summary ?? ""}
+                  >
+                    {ev.summary ?? "Untitled"}
+                  </span>
+                ))}
+                {dayEvents.length > 3 && (
+                  <span className="text-[10px]" style={{ color: "#9ba3cc" }}>
+                    +{dayEvents.length - 3} more
+                  </span>
+                )}
+              </div>
             </button>
           );
         })}
@@ -529,20 +640,41 @@ function EventModal({
 function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center px-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:px-4"
       style={{ background: "rgba(5,6,15,0.6)" }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="w-full max-w-md rounded-2xl p-5 flex flex-col gap-3"
-        style={{ background: "#131626", border: "1px solid rgba(91,108,255,0.2)" }}
+        className="w-full max-w-md p-5 flex flex-col gap-3 rounded-t-2xl sm:rounded-2xl"
+        style={{
+          background: "#131626",
+          border: "1px solid rgba(91,108,255,0.2)",
+          maxHeight: "92vh",
+          overflowY: "auto",
+          paddingBottom: "calc(20px + env(safe-area-inset-bottom, 0px))",
+        }}
       >
-        <div className="flex items-center justify-between">
-          <h2 className="font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>{title}</h2>
-          <button onClick={onClose} aria-label="Close" style={{ color: "#9ba3cc", background: "transparent", border: 0, cursor: "pointer" }}>
-            <X size={18} />
+        <div className="flex items-center justify-between sticky top-0 -mt-5 -mx-5 px-5 py-3" style={{ background: "#131626", borderBottom: "1px solid rgba(255,255,255,0.05)", zIndex: 1 }}>
+          <h2 className="font-bold text-base sm:text-lg" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>{title}</h2>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            style={{
+              color: "#9ba3cc",
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 999,
+              cursor: "pointer",
+              width: 32,
+              height: 32,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <X size={16} />
           </button>
         </div>
         {children}

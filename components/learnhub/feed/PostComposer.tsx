@@ -218,9 +218,51 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
   // form doesn't squeeze during the CSS grid column transition.
   useEffect(() => {
     const onCollapse = () => setExpanded(false);
+    const onOpen = (e: Event) => {
+      const detail = (e as CustomEvent<{ type?: PostTypeValue }>).detail;
+      if (detail?.type) setType(detail.type);
+      setExpanded(true);
+    };
     window.addEventListener("lh-composer-collapse", onCollapse);
-    return () => window.removeEventListener("lh-composer-collapse", onCollapse);
+    window.addEventListener("lh-composer-open", onOpen as EventListener);
+    return () => {
+      window.removeEventListener("lh-composer-collapse", onCollapse);
+      window.removeEventListener("lh-composer-open", onOpen as EventListener);
+    };
   }, []);
+
+  // When expanded on mobile we render as a full-screen sheet. Lock body
+  // scroll so the page underneath doesn't move while the user is typing,
+  // and re-enable it the moment the composer closes.
+  useEffect(() => {
+    if (!expanded) return;
+    if (typeof document === "undefined") return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [expanded]);
+
+  // Auto-open when the page is navigated to with #compose (the LeftRail and
+  // MobileBottomNav both deep-link this way when "Create" is tapped from
+  // another route).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.location.hash === "#compose") {
+      setExpanded(true);
+      // Clear the hash so a back-nav doesn't re-trigger.
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+  }, []);
+
+  // Esc closes the composer on every breakpoint.
+  useEffect(() => {
+    if (!expanded) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setExpanded(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [expanded]);
 
   const handlePost = async () => {
     if (!content.trim() || posting) return;
@@ -425,7 +467,7 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
     ?? `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(userName ?? "U")}&backgroundColor=5B6CFF&textColor=ffffff`;
 
   return (
-    <div className="lh-composer">
+    <div className={`lh-composer${expanded ? " is-expanded" : ""}`}>
       {!expanded ? (
         <>
           {/* Collapsed — click trigger */}
@@ -462,6 +504,29 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
         </>
       ) : (
         <div className="lh-composer-expanded">
+          {/* Mobile sheet header — shown only when the composer is rendered
+              as a full-screen sheet (≤768px via CSS). Gives users a clear
+              back affordance and a sticky Post action without scrolling. */}
+          <div className="lh-composer-sheet-header">
+            <button
+              type="button"
+              onClick={() => setExpanded(false)}
+              className="lh-composer-sheet-close"
+              aria-label="Close composer"
+            >
+              ←
+            </button>
+            <span className="lh-composer-sheet-title">Create post</span>
+            <button
+              type="button"
+              onClick={handlePost}
+              disabled={!content.trim() || posting}
+              className="lh-composer-sheet-post"
+            >
+              {posting ? "Posting…" : "Post"}
+            </button>
+          </div>
+
           {/* Author row */}
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <img src={avatarSrc} alt={userName ?? "You"} className="lh-composer-avatar" />

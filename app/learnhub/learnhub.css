@@ -318,36 +318,198 @@
   }
 }
 
-.lh-bottom-nav-item {
-  display: flex; flex-direction: column; align-items: center;
-  gap: 3px;
-  padding: 8px 12px;
-  border-radius: var(--lh-r-md);
+/* Bottom-nav item styles live near the Facebook-style mobile block below
+   (search for "Mobile bottom nav") — kept in one place to avoid drift. */
+
+/* ── Watch (Facebook-Watch-style video feed) ─────────────────────── */
+.lh-watch {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 4px 0 12px;
+}
+.lh-watch-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 4px 2px;
+}
+.lh-watch-title {
+  margin: 0;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 800;
+  font-size: 24px;
+  color: var(--lh-text);
+  letter-spacing: -0.4px;
+}
+.lh-watch-sub {
+  margin: 2px 0 0;
+  font-size: 12.5px;
   color: var(--lh-text-3);
-  font-size: 10px;
-  font-weight: 500;
+}
+.lh-watch-sound {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--lh-surface-2);
+  border: 1px solid var(--lh-surface-3);
+  color: var(--lh-text-2);
   cursor: pointer;
-  transition: all 0.15s;
-  text-decoration: none;
-  min-height: 44px;
-  min-width: 44px;
-  justify-content: center;
-  border: none;
-  background: transparent;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: 'DM Sans', sans-serif;
+  transition: background 0.15s, color 0.15s;
+}
+.lh-watch-sound:hover { background: var(--lh-surface-3); color: var(--lh-text); }
+
+.lh-watch-feed,
+.lh-watch-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.lh-bottom-nav-item.active { color: var(--lh-accent); }
+.lh-watch-card {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.035), transparent 80px),
+    var(--lh-surface-2);
+  border: 1px solid var(--lh-surface-3);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.22);
+}
 
-.lh-bottom-nav-create {
-  width: 48px; height: 48px;
-  background: linear-gradient(135deg, var(--lh-accent), var(--lh-accent-2));
-  border-radius: var(--lh-r-full);
-  display: flex; align-items: center; justify-content: center;
-  color: white;
-  font-size: 24px;
-  box-shadow: var(--lh-shadow-accent);
-  border: none;
+.lh-watch-author {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.lh-watch-author-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--lh-surface-3);
+  flex-shrink: 0;
+}
+.lh-watch-author-name {
+  margin: 0;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--lh-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lh-watch-author-meta {
+  margin: 1px 0 0;
+  font-size: 11.5px;
+  color: var(--lh-text-3);
+  text-transform: capitalize;
+}
+
+.lh-watch-caption {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--lh-text);
+  white-space: pre-wrap;
+}
+
+.lh-watch-player {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+}
+.lh-watch-player video,
+.lh-watch-player iframe,
+.lh-watch-player img {
+  width: 100%;
+  display: block;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+}
+.lh-watch-play-badge {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.lh-watch-play-badge svg {
+  width: 56px;
+  height: 56px;
+  padding: 14px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+
+.lh-watch-actions {
+  display: flex;
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--lh-surface-3);
+}
+.lh-watch-action {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--lh-text-2);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'DM Sans', sans-serif;
   cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.lh-watch-action:hover { background: var(--lh-surface-3); color: var(--lh-text); }
+
+.lh-watch-empty {
+  text-align: center;
+  padding: 48px 20px;
+  border-radius: 14px;
+  background: var(--lh-surface-2);
+  border: 1px dashed var(--lh-surface-3);
+  color: var(--lh-text-2);
+}
+.lh-watch-cta {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: var(--lh-accent);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+  font-size: 13.5px;
+}
+
+@media (max-width: 768px) {
+  .lh-watch { gap: 10px; padding: 2px 0 8px; }
+  .lh-watch-header { padding: 2px 2px 0; }
+  .lh-watch-title { font-size: 22px; }
+  .lh-watch-card { padding: 12px; border-radius: 12px; gap: 9px; }
+  .lh-watch-feed,
+  .lh-watch-skeleton { gap: 10px; }
+  .lh-watch-play-badge svg { width: 52px; height: 52px; padding: 12px; }
 }
 
 /* ── Card component ───────────────────────────────────────────────── */
@@ -4874,9 +5036,308 @@ button:active { transform: scale(0.97); }
 @media (max-width: 768px) {
   .lh-root { height: auto; min-height: 100vh; overflow: visible; }
   .lh-main { height: auto; min-height: 100vh; }
-  .lh-main > main { height: auto; overflow: visible; }
+  /* Single uniform 10px gutter on every side of the feed column so the
+     greeting, composer, posts and tabs all share the same edge. Earlier
+     versions mixed full-bleed cards with 14px-indented headers, which is
+     why the feed felt "squished to one side." */
+  .lh-main > main {
+    height: auto;
+    overflow: visible;
+    padding: 0 10px calc(76px + env(safe-area-inset-bottom, 0px));
+  }
   .lh-feed-masonry { column-count: 1; }
   .lh-topnav-logo { min-width: auto; max-width: 140px; }
+  /* Reserve room for the iOS bottom safe-area on top of the bottom nav. */
+  .lh-bottom-nav {
+    height: calc(60px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+/* ── Mobile post composer (Facebook-style full-screen sheet) ──────── */
+/* The sheet header is hidden on desktop and only shown when the composer
+   is expanded below the mobile breakpoint. The expanded composer becomes
+   a fixed full-screen overlay so the user has the entire viewport for
+   typing — same pattern as Facebook / Instagram's create-post screen. */
+.lh-composer-sheet-header { display: none; }
+
+@media (max-width: 768px) {
+  .lh-composer { border-radius: 0; margin: 0 -12px 12px; border-left: none; border-right: none; }
+  .lh-composer-actions { gap: 4px; }
+  .lh-composer-action { font-size: 11.5px; padding: 10px 6px; min-height: 44px; }
+
+  /* When expanded, take over the screen. */
+  .lh-composer.is-expanded {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    margin: 0;
+    border-radius: 0;
+    border: none;
+    padding: 0;
+    background: var(--lh-surface);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    animation: lhSlideUpMobile 0.22s var(--lh-ease, ease-out);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .lh-composer.is-expanded .lh-composer-expanded {
+    padding: 0 14px calc(28px + env(safe-area-inset-bottom, 0px));
+    gap: 12px;
+  }
+  .lh-composer.is-expanded .lh-composer-sheet-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    margin: 0 -14px 4px;
+    padding: 10px 14px calc(10px + env(safe-area-inset-top, 0px));
+    background: var(--lh-surface);
+    border-bottom: 1px solid var(--lh-surface-3);
+  }
+  .lh-composer-sheet-close {
+    width: 40px; height: 40px;
+    border-radius: var(--lh-r-full);
+    background: var(--lh-surface-2);
+    border: 1px solid var(--lh-surface-3);
+    color: var(--lh-text);
+    font-size: 20px;
+    line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .lh-composer-sheet-title {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--lh-text);
+  }
+  .lh-composer-sheet-post {
+    padding: 10px 18px;
+    border-radius: var(--lh-r-full);
+    background: var(--lh-accent);
+    color: #fff;
+    border: 0;
+    font-weight: 700;
+    font-size: 13.5px;
+    min-height: 40px;
+    cursor: pointer;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+  .lh-composer-sheet-post:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  /* Make the textarea actually breathe on a phone. */
+  .lh-composer.is-expanded .lh-composer-textarea {
+    min-height: 180px;
+    font-size: 16px; /* iOS skips auto-zoom at ≥16px */
+    background: transparent;
+    border: none;
+    padding: 12px 4px;
+  }
+  .lh-composer.is-expanded .lh-composer-textarea:focus { border: none; }
+  /* Hide the desktop footer Post button — sheet header has its own. */
+  .lh-composer.is-expanded .lh-composer-footer {
+    position: sticky;
+    bottom: 0;
+    background: var(--lh-surface);
+    margin: 0 -14px;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--lh-surface-3);
+  }
+  /* All inputs comfy + 16px to dodge iOS zoom. */
+  .lh-composer.is-expanded .lh-composer-url-input { font-size: 16px; padding: 12px 14px; }
+}
+
+/* ── Mobile bottom nav (Facebook-style — 5 real nav slots, no FAB) ── */
+/* Each slot is an icon + label stack. The right-most slot is the user's
+   Google avatar with an active ring (mimics Facebook's "Menu / Me" tile). */
+
+.lh-bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 4px 4px;
+  border-radius: 8px;
+  color: var(--lh-text-3);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-decoration: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: color 0.15s var(--lh-ease, ease);
+  min-width: 0;
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+}
+.lh-bottom-nav-item:active { transform: translateY(1px); }
+.lh-bottom-nav-item.active { color: var(--lh-accent); }
+.lh-bottom-nav-item.active::before {
+  /* Facebook-style active underline. Sits flush with the top edge of the
+     nav, signalling which tab you're on without recoloring the whole row. */
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 18%;
+  right: 18%;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--lh-accent);
+}
+
+.lh-bottom-nav-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+}
+
+.lh-bottom-nav-label {
+  font-size: 10.5px;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+
+/* Unread / count badge — anchored to the top-right of the icon. */
+.lh-bottom-nav-badge {
+  position: absolute;
+  top: -4px;
+  right: -8px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--lh-surface);
+  pointer-events: none;
+}
+
+/* "Me" avatar slot — circular Gmail-style avatar with an active ring. */
+.lh-bottom-nav-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: inline-flex;
+  background: var(--lh-surface-2);
+  box-shadow: 0 0 0 1.5px transparent;
+  transition: box-shadow 0.15s var(--lh-ease, ease);
+}
+.lh-bottom-nav-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.lh-bottom-nav-me.active .lh-bottom-nav-avatar,
+.lh-bottom-nav-avatar.is-active {
+  box-shadow: 0 0 0 2px var(--lh-accent);
+}
+
+/* ── Mobile feed polish — coordinated card stack ─────────────────── */
+/* Every direct child of the feed column shares the same width and edge
+   alignment. No negative margins, no full-bleed cards mixed with indented
+   headers. All inner padding stays inside the card so the column feels
+   like one coordinated stack. */
+@media (max-width: 768px) {
+  .lh-feed-col {
+    padding: 8px 0 16px;
+    gap: 10px;
+  }
+  .lh-feed-col > * { width: 100%; }
+
+  .lh-feed-greeting {
+    margin: 0;
+    padding: 4px 4px 0;
+  }
+  .lh-feed-greeting-title { font-size: 21px; }
+  .lh-feed-greeting-sub  { font-size: 12.5px; }
+
+  .lh-feed-control-card {
+    margin: 0;
+    padding: 10px;
+    border-radius: 12px;
+    background: var(--lh-surface-2);
+    border: 1px solid var(--lh-surface-3);
+  }
+  .lh-feed-search input { font-size: 16px; }
+
+  .lh-feed-tabs {
+    margin: 0;
+    align-self: stretch;
+  }
+  .lh-feed-tab { font-size: 13px; padding: 8px 14px; flex: 1; text-align: center; }
+
+  /* Composer matches post cards — same width, same radius, same border. */
+  .lh-composer {
+    margin: 0;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--lh-surface-3);
+    box-shadow: none;
+  }
+
+  /* Feed list — single column, each post is a card the same width as
+     everything else above it. No edge-to-edge stretching, no broken
+     alignment. */
+  .lh-feed-masonry {
+    column-count: 1;
+    gap: 10px;
+    margin: 0;
+  }
+  .lh-feed-masonry > .lh-post {
+    margin: 0;
+    border-radius: 12px;
+    border: 1px solid var(--lh-surface-3);
+  }
+  .lh-post:hover { transform: none; }
+
+  .lh-feed-empty { margin: 0; border-radius: 12px; }
+  .lh-saved-group-title { padding: 6px 4px; margin: 4px 0 -2px; }
+}
+
+/* ── Mobile topnav (Facebook/Meta look — stays visible, not hidden) ── */
+@media (max-width: 768px) {
+  .lh-topnav {
+    height: 56px;
+    padding: 0 10px;
+    gap: 6px;
+    background: var(--lh-surface);
+    backdrop-filter: none;
+    border-bottom: 1px solid var(--lh-surface-3);
+  }
+  .lh-topnav-logo { gap: 8px; }
+  .lh-topnav-logo .lh-brand-tile { width: 34px; height: 34px; }
+  .lh-topnav-logo .lh-logo-sub { display: none; }
+  .lh-topnav-logo .lh-logo-text { font-size: 17px; letter-spacing: -0.4px; }
+  .lh-topnav-actions { gap: 4px; margin-left: auto; }
+  .lh-topnav-icon {
+    width: 38px; height: 38px;
+    background: var(--lh-surface-2);
+    border-radius: 50%;
+  }
+  .lh-topnav-divider { display: none; }
+  .lh-topnav-avatar img { width: 34px; height: 34px; }
+  /* Push page content below the new shorter topnav. */
+  .lh-main { padding-top: 56px; }
+  /* Trim redundant icons on mobile (handled inline via this class). */
+  .lh-topnav-mobile-hide { display: none !important; }
 }
 .lh-page,
 .lh-settings-page,

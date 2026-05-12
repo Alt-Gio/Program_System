@@ -146,6 +146,21 @@ export async function GET(request: Request) {
     });
 
     if (result) {
+      // Role strictness — once a DICT account exists, the user must come in
+      // through the matching portal. An intern can't sign in via the
+      // supervisor carousel slide (or vice versa).
+      if (
+        result.user.role !== "admin" &&
+        result.user.role !== role
+      ) {
+        return errorRedirect(
+          request,
+          role,
+          "role_mismatch",
+          `existing:${result.user.role}`,
+        );
+      }
+
       // Existing DICT account — set session and check for cross-system match
       const identities = await convex.query(api.identities.findByGoogleId, { googleId });
       const hasLearnHub = !!identities.lhUser;

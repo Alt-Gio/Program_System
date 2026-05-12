@@ -28,11 +28,12 @@ import { NotificationBell } from "@/components/learnhub/notifications/Notificati
 import { useLearnhubSession } from "@/lib/learnhub/hooks";
 import { CalendarPopover } from "./popovers/CalendarPopover";
 import { MessagesPopover } from "./popovers/MessagesPopover";
+import { AvatarMenu } from "./AvatarMenu";
 
 type Panel = "cal" | "msg" | null;
 
 export function TopNav() {
-  const { session, userId } = useLearnhubSession();
+  const { userId } = useLearnhubSession();
   const router = useRouter();
   const pathname = usePathname();
   const [panel, setPanel] = useState<Panel>(null);
@@ -92,11 +93,9 @@ export function TopNav() {
     router.push(`/learnhub/feed?q=${encodeURIComponent(search.trim())}`);
   };
 
-  const avatarSrc = session?.avatarUrl
-    ?? `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(session?.name ?? "U")}&backgroundColor=FF6B35&textColor=ffffff`;
-
   const tabs = [
     { href: "/learnhub/feed", label: "Feed" },
+    { href: "/learnhub/watch", label: "Watch" },
     { href: "/learnhub/learning-path", label: "My Trainings" },
     { href: "/learnhub/calendar", label: "Calendar" },
     { href: "/learnhub/work", label: "Opportunities" },
@@ -171,40 +170,33 @@ export function TopNav() {
         </div>
       </form>
 
-      {/* Right cluster */}
+      {/* Right cluster. Messages + Calendar popovers live in the bottom nav
+          on mobile, so we hide them from the topnav below 768px to keep the
+          chrome focused on Search / Notifications / Avatar — same trio
+          Facebook shows in its mobile header. */}
       <div className="lh-topnav-actions">
-        <IconBtn
-          label="Calendar"
-          icon={<Calendar size={18} />}
-          badge={upcomingEvents}
-          active={panel === "cal"}
-          onClick={() => togglePanel("cal")}
-        />
-        <IconBtn
-          label="Messages"
-          icon={<MessageSquare size={18} />}
-          badge={unreadMsgs}
-          active={panel === "msg"}
-          onClick={() => togglePanel("msg")}
-        />
-        <NotificationBell />
-        <ThemeToggle />
-        <span className="lh-topnav-divider" aria-hidden />
-        <Link
-          href="/learnhub/profile"
-          className="lh-topnav-avatar"
-          title={session?.name ?? "My Profile"}
-          aria-label={session?.name ?? "My Profile"}
-        >
-          <img
-            src={avatarSrc}
-            alt=""
-            onError={(e) => {
-              (e.currentTarget as HTMLImageElement).src =
-                `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(session?.name ?? "U")}`;
-            }}
+        <span className="lh-topnav-mobile-hide">
+          <IconBtn
+            label="Calendar"
+            icon={<Calendar size={18} />}
+            badge={upcomingEvents}
+            active={panel === "cal"}
+            onClick={() => togglePanel("cal")}
           />
-        </Link>
+        </span>
+        <span className="lh-topnav-mobile-hide">
+          <IconBtn
+            label="Messages"
+            icon={<MessageSquare size={18} />}
+            badge={unreadMsgs}
+            active={panel === "msg"}
+            onClick={() => togglePanel("msg")}
+          />
+        </span>
+        <NotificationBell />
+        <span className="lh-topnav-mobile-hide"><ThemeToggle /></span>
+        <span className="lh-topnav-divider" aria-hidden />
+        <AvatarMenu />
       </div>
 
       {/* Popovers — anchored to the topnav, controlled by `panel` */}

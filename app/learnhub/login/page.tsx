@@ -32,7 +32,7 @@ function LoginContent() {
 
         {error && (
           <div className="w-full rounded-lg px-4 py-3 text-sm text-center" style={{ background: "rgba(255,95,109,0.1)", border: "1px solid rgba(255,95,109,0.3)", color: "#ff5f6d" }}>
-            {error === "oauth_failed" ? "Google sign-in was cancelled or failed. Please try again." : "Something went wrong. Please try again."}
+            {errorMessage(error)}
           </div>
         )}
 
@@ -54,6 +54,27 @@ function LoginContent() {
       <p className="mt-6 text-xs" style={{ color: "#5c6490" }}>DICT Region V · ILCDB LearnHub · {new Date().getFullYear()}</p>
     </main>
   );
+}
+
+function errorMessage(code: string): string {
+  switch (code) {
+    case "oauth_failed":
+    case "oauth_denied":
+      return "Google sign-in was cancelled or failed. Please try again.";
+    case "role_mismatch":
+      return "This account is registered under a different role. Sign in through the portal that matches your account.";
+    case "config_missing":
+      return "The server is missing OAuth configuration. Please contact support.";
+    case "token_exchange":
+    case "profile_fetch":
+      return "We couldn't complete the Google handshake. Try signing in again.";
+    case "convex_query":
+      return "We couldn't reach the database to verify your account. Please retry.";
+    case "session_create":
+      return "Sign-in succeeded but we couldn't create your session. Please retry.";
+    default:
+      return "Something went wrong. Please try again.";
+  }
 }
 
 function GoogleIcon() {

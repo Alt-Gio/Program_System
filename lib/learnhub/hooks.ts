@@ -24,6 +24,13 @@ interface UseLearnhubSessionResult {
 let cachedSession: LearnhubSession | null = null;
 let cachePromise: Promise<LearnhubSession | null> | null = null;
 
+// Called by the sign-out flow so the next mount/fetch sees the cleared state
+// instead of replaying the stale in-memory copy.
+export function clearLearnhubSessionCache() {
+  cachedSession = null;
+  cachePromise = null;
+}
+
 async function fetchSession(): Promise<LearnhubSession | null> {
   if (cachedSession) return cachedSession;
   if (cachePromise) return cachePromise;

@@ -55,7 +55,29 @@ export const createUser = mutation({
       .query("learnhub_users")
       .withIndex("by_googleId", (q) => q.eq("googleId", args.googleId))
       .unique();
-    if (existing) return existing._id;
+    if (existing) {
+      // Role strictness — once an account is established, the role is sticky.
+      // Surface the conflict so the API layer can return a clear error instead
+      // of silently downgrading/upgrading the user.
+      if (existing.role !== "admin" && existing.role !== args.role) {
+        throw new Error(
+          `ROLE_CONFLICT: account already registered as ${existing.role}`,
+        );
+      }
+      return existing._id;
+    }
+
+    // Same-email collision (different Google account). Block to prevent one
+    // person from registering parallel mentor / student profiles.
+    const byEmail = await ctx.db
+      .query("learnhub_users")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .unique();
+    if (byEmail) {
+      throw new Error(
+        `EMAIL_TAKEN: this email is already registered as ${byEmail.role}`,
+      );
+    }
 
     return await ctx.db.insert("learnhub_users", {
       ...args,

@@ -57,27 +57,46 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { role, school, organization, interests } = body as {
+  const { role, school, organization, interests, name: rawName } = body as {
     role: "student" | "mentor" | "org_partner";
     school?: string;
     organization?: string;
     interests?: string[];
+    name?: string;
   };
 
   if (!role || !["student", "mentor", "org_partner"].includes(role)) {
     return NextResponse.json({ error: "Invalid role" }, { status: 400 });
   }
 
+  // Role strictness — if the user arrived through a specific portal
+  // (intendedRole on the pending cookie), they cannot pick a different role
+  // on the onboarding screen and bypass the gate.
+  if (profile.intendedRole && profile.intendedRole !== role) {
+    return NextResponse.json(
+      {
+        error: `This Google account was started under the ${profile.intendedRole} portal. Use that portal to continue.`,
+      },
+      { status: 409 },
+    );
+  }
+
   const cleanInterests = Array.isArray(interests)
     ? interests.filter((t) => typeof t === "string" && t.length > 0 && t.length <= 64).slice(0, 8)
     : undefined;
+
+  const trimmedName = typeof rawName === "string" ? rawName.trim().slice(0, 80) : "";
+  const displayName = trimmedName || profile.name;
+  if (!displayName) {
+    return NextResponse.json({ error: "Please enter your name." }, { status: 400 });
+  }
 
   try {
     // Create or get the Convex learnhub user
     const userId = await convex.mutation(api.learnhub_users.createUser, {
       googleId: profile.googleId,
       email: profile.email,
-      name: profile.name,
+      name: displayName,
       avatarUrl: profile.avatarUrl,
       role,
       school,
@@ -92,7 +111,7 @@ export async function POST(request: NextRequest) {
       sub: userId as string,
       googleId: profile.googleId,
       email: profile.email,
-      name: profile.name,
+      name: displayName,
       avatarUrl: profile.avatarUrl,
       role,
     });
@@ -108,7 +127,23 @@ export async function POST(request: NextRequest) {
     res.cookies.delete(PENDING_COOKIE);
     return res;
   } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
     console.error("[LearnHub] Session creation error:", err);
+    // Map the Convex role-strictness errors to a 409 with a user-readable message.
+    if (msg.includes("ROLE_CONFLICT")) {
+      const existing = msg.split("registered as ")[1] ?? "another role";
+      return NextResponse.json(
+        { error: `This Google account is already registered as ${existing}. Sign in through that portal instead.` },
+        { status: 409 },
+      );
+    }
+    if (msg.includes("EMAIL_TAKEN")) {
+      const existing = msg.split("registered as ")[1] ?? "another role";
+      return NextResponse.json(
+        { error: `This email is already registered as ${existing}. Sign in through that portal instead.` },
+        { status: 409 },
+      );
+    }
     return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
   }
 }
