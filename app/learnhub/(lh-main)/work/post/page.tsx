@@ -1,9 +1,10 @@
 "use client";
+import { Suspense } from "react";
 
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useLearnhubSession } from "@/lib/learnhub/hooks";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -12,10 +13,16 @@ const CERT_TYPES = ["Tech4ED", "SPARK", "DWIA", "Project CLICK"] as const;
 
 type WorkType = "remote" | "hybrid" | "onsite";
 type PayType = "volunteer" | "stipend" | "paid";
+type EligibilityMode = "open" | "guided" | "strict";
 
-export default function PostOpportunityPage() {
+function splitTokens(value: string) {
+  return value.split(",").map((v) => v.trim()).filter(Boolean);
+}
+
+function PostOpportunityPageInner() {
   const router = useRouter();
   const { userId, role, loading: sessionLoading } = useLearnhubSession();
+  const user = useQuery(api.learnhub_users.getUser, userId ? { id: userId as Id<"learnhub_users"> } : "skip");
   const createOpportunity = useMutation(api.learnhub_work.createOpportunity);
 
   const [title, setTitle] = useState("");
@@ -27,10 +34,15 @@ export default function PostOpportunityPage() {
   const [duration, setDuration] = useState("");
   const [deadline, setDeadline] = useState("");
   const [requiredCertTypes, setRequiredCertTypes] = useState<string[]>([]);
+  const [minXp, setMinXp] = useState(0);
+  const [requiredSkills, setRequiredSkills] = useState("");
+  const [preferredSkills, setPreferredSkills] = useState("");
+  const [eligibilityMode, setEligibilityMode] = useState<EligibilityMode>("guided");
+  const [reviewInstructions, setReviewInstructions] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  if (sessionLoading) {
+  if (sessionLoading || (userId && user === undefined)) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-10">
         <div className="h-40 rounded-2xl animate-pulse" style={{ background: "#131626" }} />
@@ -38,14 +50,14 @@ export default function PostOpportunityPage() {
     );
   }
 
-  const canPost = role === "org_partner" || role === "admin";
+  const canPost = role === "org_partner" || role === "admin" || (user?.role === "mentor" && user.mentorStatus === "verified");
   if (!canPost) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-10 text-center">
         <p className="text-4xl mb-3">🔒</p>
-        <h1 className="text-xl font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>Org Partners only</h1>
+        <h1 className="text-xl font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>Verified creators only</h1>
         <p className="text-sm mt-2 mb-4" style={{ color: "#9ba3cc" }}>
-          Posting opportunities is restricted to org_partner accounts.
+          Posting opportunities is restricted to DICT admins, verified mentors, and org partner accounts.
         </p>
         <Link href="/learnhub/work" className="text-sm font-semibold" style={{ color: "#7c8bff" }}>
           ← Back to Opportunities
@@ -70,7 +82,11 @@ export default function PostOpportunityPage() {
     if (Number.isNaN(deadlineMs)) return setError("Deadline is invalid.");
     if (deadlineMs < Date.now()) return setError("Deadline must be in the future.");
     if (slots < 1) return setError("Slots must be at least 1.");
+    if (minXp < 0) return setError("Minimum XP cannot be negative.");
     if (!userId) return setError("Session expired. Please reload.");
+
+    const requiredSkillList = splitTokens(requiredSkills);
+    const preferredSkillList = splitTokens(preferredSkills);
 
     setSubmitting(true);
     try {
@@ -85,6 +101,11 @@ export default function PostOpportunityPage() {
         slots,
         deadline: deadlineMs,
         duration: duration.trim(),
+        minXp: minXp || undefined,
+        requiredSkills: requiredSkillList.length ? requiredSkillList : undefined,
+        preferredSkills: preferredSkillList.length ? preferredSkillList : undefined,
+        eligibilityMode,
+        reviewInstructions: reviewInstructions.trim() || undefined,
       });
       router.push("/learnhub/work/manage");
     } catch (err) {
@@ -94,7 +115,7 @@ export default function PostOpportunityPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
+    <div className="max-w-2xl mx-auto px-4 py-6 lh-work-page">
       <Link href="/learnhub/work" className="text-xs font-semibold mb-3 inline-block" style={{ color: "#7c8bff" }}>
         ← Back to Opportunities
       </Link>
@@ -103,7 +124,7 @@ export default function PostOpportunityPage() {
         Post an Opportunity
       </h1>
       <p className="text-sm mb-6" style={{ color: "#9ba3cc" }}>
-        ILCDB students will see this in their Work Opportunities feed.
+        Create a matched work pathway with clear requirements, review rules, and eligibility scoring.
       </p>
 
       <div className="rounded-2xl p-5 flex flex-col gap-4" style={{ background: "#131626", border: "1px solid rgba(91,108,255,0.2)" }}>
@@ -155,8 +176,30 @@ export default function PostOpportunityPage() {
           </Field>
         </div>
 
-        <Field label="Application deadline">
-          <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} style={inputStyle} />
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Application deadline">
+            <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} style={inputStyle} />
+          </Field>
+
+          <Field label="Minimum XP">
+            <input type="number" min={0} value={minXp} onChange={(e) => setMinXp(Math.max(0, Number(e.target.value)))} style={inputStyle} />
+          </Field>
+        </div>
+
+        <Field label="Eligibility mode">
+          <select value={eligibilityMode} onChange={(e) => setEligibilityMode(e.target.value as EligibilityMode)} style={inputStyle}>
+            <option value="open">Open — accept all applications</option>
+            <option value="guided">Guided — allow borderline reasoning</option>
+            <option value="strict">Strict — block weak matches unless referred</option>
+          </select>
+        </Field>
+
+        <Field label="Required expertise tags (comma separated)">
+          <input value={requiredSkills} onChange={(e) => setRequiredSkills(e.target.value)} placeholder="IT support, troubleshooting, data entry" style={inputStyle} />
+        </Field>
+
+        <Field label="Preferred expertise tags (comma separated)">
+          <input value={preferredSkills} onChange={(e) => setPreferredSkills(e.target.value)} placeholder="Canva, facilitation, records management" style={inputStyle} />
         </Field>
 
         <Field label="Required certificates (optional)">
@@ -180,6 +223,10 @@ export default function PostOpportunityPage() {
               );
             })}
           </div>
+        </Field>
+
+        <Field label="Reviewer instructions (optional)">
+          <textarea value={reviewInstructions} onChange={(e) => setReviewInstructions(e.target.value)} rows={3} placeholder="What should reviewers look for in borderline applications?" style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit" }} />
         </Field>
 
         {error && <p className="text-sm" style={{ color: "#ff5f6d" }}>{error}</p>}
@@ -221,3 +268,11 @@ const inputStyle: React.CSSProperties = {
   fontSize: 13,
   outline: "none",
 };
+
+export default function PostOpportunityPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>}>
+      <PostOpportunityPageInner />
+    </Suspense>
+  )
+}

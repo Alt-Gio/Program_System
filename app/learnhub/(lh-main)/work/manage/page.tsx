@@ -1,6 +1,7 @@
 "use client";
+import { Suspense } from "react";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { useQuery, useMutation } from "convex/react";
@@ -14,6 +15,8 @@ type ApplicationStatus =
   | "accepted"
   | "in_progress"
   | "completed";
+
+type EligibilityStatus = "eligible" | "borderline" | "not_eligible";
 
 const STATUS_OPTIONS: ApplicationStatus[] = [
   "applied",
@@ -31,15 +34,27 @@ const STATUS_COLOR: Record<ApplicationStatus, string> = {
   completed: "#7c8bff",
 };
 
-export default function ManageOpportunitiesPage() {
-  const { userId, role, isMentor, isAdmin, loading } = useLearnhubSession();
-  const [selectedOppId, setSelectedOppId] = useState<Id<"learnhub_work_opportunities"> | null>(null);
+const ELIGIBILITY_COLOR: Record<EligibilityStatus, string> = {
+  eligible: "#22d3a0",
+  borderline: "#ff8c42",
+  not_eligible: "#ff5f6d",
+};
 
-  const canManage = role === "org_partner" || isAdmin;
+function ManageOpportunitiesPageInner() {
+  const { userId, role, isMentor, isAdmin, loading } = useLearnhubSession();
+  const user = useQuery(api.learnhub_users.getUser, userId ? { id: userId as Id<"learnhub_users"> } : "skip");
+  const users = useQuery(api.learnhub_users.listUsers, {});
+  const [selectedOppId, setSelectedOppId] = useState<Id<"learnhub_work_opportunities"> | null>(null);
+  const [referralStudentId, setReferralStudentId] = useState("");
+  const [referralNote, setReferralNote] = useState("");
+  const [notice, setNotice] = useState("");
+
+  const canManage = role === "org_partner" || isAdmin || (user?.role === "mentor" && user.mentorStatus === "verified");
+  const students = useMemo(() => (users ?? []).filter((u) => u.role === "student"), [users]);
 
   const opportunities = useQuery(
     api.learnhub_work.listOrgOpportunities,
-    canManage && userId ? { orgId: userId as Id<"learnhub_users"> } : "skip"
+    canManage && userId ? { actorId: userId as Id<"learnhub_users"> } : "skip"
   );
 
   const applications = useQuery(
@@ -50,8 +65,9 @@ export default function ManageOpportunitiesPage() {
   const updateStatus = useMutation(api.learnhub_work.updateApplicationStatus);
   const endorse = useMutation(api.learnhub_work.endorseApplication);
   const closeOpp = useMutation(api.learnhub_work.closeOpportunity);
+  const referStudent = useMutation(api.learnhub_work.referStudentToOpportunity);
 
-  if (loading) {
+  if (loading || (userId && user === undefined)) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-10">
         <div className="h-40 rounded-2xl animate-pulse" style={{ background: "#131626" }} />
@@ -63,9 +79,9 @@ export default function ManageOpportunitiesPage() {
     return (
       <div className="max-w-3xl mx-auto px-4 py-10 text-center">
         <p className="text-4xl mb-3">🔒</p>
-        <h1 className="text-xl font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>Org Partners only</h1>
+        <h1 className="text-xl font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>Verified creators only</h1>
         <p className="text-sm mt-2 mb-4" style={{ color: "#9ba3cc" }}>
-          Only org_partner accounts can manage opportunities.
+          Only DICT admins, verified mentors, and org partners can manage opportunities.
         </p>
         <Link href="/learnhub/work" className="text-sm font-semibold" style={{ color: "#7c8bff" }}>
           ← Back to Opportunities
@@ -79,6 +95,7 @@ export default function ManageOpportunitiesPage() {
     status: ApplicationStatus
   ) => {
     if (!userId) return;
+    setNotice("");
     try {
       await updateStatus({
         applicationId,
@@ -86,33 +103,53 @@ export default function ManageOpportunitiesPage() {
         actorId: userId as Id<"learnhub_users">,
       });
     } catch (err) {
-      console.error("[manage] status update failed:", err);
+      setNotice(err instanceof Error ? err.message : "Status update failed.");
     }
   };
 
   const handleEndorse = async (applicationId: Id<"learnhub_work_applications">) => {
     if (!userId) return;
+    setNotice("");
     try {
       await endorse({
         applicationId,
         mentorId: userId as Id<"learnhub_users">,
       });
     } catch (err) {
-      console.error("[manage] endorse failed:", err);
+      setNotice(err instanceof Error ? err.message : "Endorsement failed.");
     }
   };
 
   const handleClose = async (opportunityId: Id<"learnhub_work_opportunities">) => {
     if (!userId) return;
+    setNotice("");
     try {
       await closeOpp({ opportunityId, actorId: userId as Id<"learnhub_users"> });
     } catch (err) {
-      console.error("[manage] close failed:", err);
+      setNotice(err instanceof Error ? err.message : "Close failed.");
+    }
+  };
+
+  const handleRefer = async () => {
+    if (!userId || !selectedOppId || !referralStudentId) return;
+    setNotice("");
+    try {
+      await referStudent({
+        opportunityId: selectedOppId,
+        studentId: referralStudentId as Id<"learnhub_users">,
+        actorId: userId as Id<"learnhub_users">,
+        note: referralNote.trim() || undefined,
+      });
+      setReferralStudentId("");
+      setReferralNote("");
+      setNotice("Referral sent. The student can accept it from their opportunities feed.");
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Referral failed.");
     }
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
+    <div className="max-w-3xl mx-auto px-4 py-6 lh-work-page">
       <Link href="/learnhub/work" className="text-xs font-semibold mb-3 inline-block" style={{ color: "#7c8bff" }}>
         ← Back to Opportunities
       </Link>
@@ -120,7 +157,7 @@ export default function ManageOpportunitiesPage() {
       <div className="flex items-start justify-between gap-3 mt-2 mb-5">
         <div>
           <h1 className="text-xl font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>Manage Opportunities</h1>
-          <p className="text-sm mt-0.5" style={{ color: "#9ba3cc" }}>Review applicants and update their status.</p>
+          <p className="text-sm mt-0.5" style={{ color: "#9ba3cc" }}>Review matched applicants, endorse candidates, and pass opportunities to students.</p>
         </div>
         <Link
           href="/learnhub/work/post"
@@ -130,6 +167,8 @@ export default function ManageOpportunitiesPage() {
           + New
         </Link>
       </div>
+
+      {notice && <p className="text-sm mb-3 rounded-xl px-3 py-2" style={{ color: notice.includes("sent") ? "#22d3a0" : "#ff5f6d", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>{notice}</p>}
 
       {opportunities === undefined && (
         <div className="h-32 rounded-2xl animate-pulse" style={{ background: "#131626" }} />
@@ -153,15 +192,20 @@ export default function ManageOpportunitiesPage() {
           return (
             <div key={opp._id} className="rounded-2xl overflow-hidden" style={{ background: "#131626", border: "1px solid rgba(255,255,255,0.08)" }}>
               <button
-                onClick={() => setSelectedOppId(isSelected ? null : opp._id)}
+                onClick={() => {
+                  setSelectedOppId(isSelected ? null : opp._id);
+                  setReferralStudentId("");
+                  setReferralNote("");
+                }}
                 className="w-full text-left px-5 py-4 flex items-center justify-between gap-3"
               >
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>{opp.title}</p>
                     <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: isOpen ? "rgba(34,211,160,0.15)" : "rgba(255,95,109,0.15)", color: isOpen ? "#22d3a0" : "#ff5f6d" }}>
                       {opp.status}
                     </span>
+                    {opp.eligibilityMode && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(91,108,255,0.12)", color: "#7c8bff" }}>{opp.eligibilityMode}</span>}
                   </div>
                   <p className="text-xs mt-1" style={{ color: "#9ba3cc" }}>
                     {opp.workType} · {opp.payType}
@@ -187,6 +231,18 @@ export default function ManageOpportunitiesPage() {
                     )}
                   </div>
 
+                  <div className="rounded-xl p-3 mb-3" style={{ background: "rgba(91,108,255,0.06)", border: "1px solid rgba(91,108,255,0.16)" }}>
+                    <p className="text-xs font-semibold mb-2" style={{ color: "#e8eaff" }}>Pass this opportunity to a student</p>
+                    <div className="grid gap-2 md:grid-cols-[1fr_1.2fr_auto]">
+                      <select value={referralStudentId} onChange={(e) => setReferralStudentId(e.target.value)} className="text-xs rounded-lg px-2 py-2 outline-none" style={{ background: "#0d0f1a", color: "#e8eaff", border: "1px solid rgba(255,255,255,0.1)" }}>
+                        <option value="">Choose student</option>
+                        {students.map((student) => <option key={student._id} value={student._id}>{student.name}</option>)}
+                      </select>
+                      <input value={referralNote} onChange={(e) => setReferralNote(e.target.value)} placeholder="Optional referral reason" className="text-xs rounded-lg px-2 py-2 outline-none" style={{ background: "#0d0f1a", color: "#e8eaff", border: "1px solid rgba(255,255,255,0.1)" }} />
+                      <button onClick={handleRefer} disabled={!referralStudentId} className="text-xs font-semibold px-3 py-2 rounded-lg disabled:opacity-40" style={{ background: "#22d3a0", color: "#06111f" }}>Refer</button>
+                    </div>
+                  </div>
+
                   {applications === undefined && (
                     <div className="h-20 rounded-xl animate-pulse" style={{ background: "rgba(255,255,255,0.04)" }} />
                   )}
@@ -196,41 +252,57 @@ export default function ManageOpportunitiesPage() {
                   )}
 
                   <div className="flex flex-col gap-2">
-                    {(applications ?? []).map((app) => (
-                      <div key={app._id} className="rounded-xl p-3 flex items-center justify-between gap-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold truncate" style={{ color: "#e8eaff" }}>{app.student?.name ?? "Unknown student"}</p>
-                          <p className="text-xs truncate" style={{ color: "#9ba3cc" }}>{app.student?.email ?? ""}</p>
-                          {app.note && <p className="text-xs mt-1 italic" style={{ color: "#c8caf0" }}>"{app.note}"</p>}
-                          {app.mentorEndorsement && (
-                            <p className="text-[10px] mt-1 font-semibold" style={{ color: "#22d3a0" }}>★ Mentor endorsed</p>
-                          )}
-                        </div>
-                        <div className="flex flex-col items-end gap-1.5 shrink-0">
-                          <select
-                            value={app.status}
-                            onChange={(e) => handleStatus(app._id, e.target.value as ApplicationStatus)}
-                            className="text-xs px-2 py-1 rounded-lg outline-none"
-                            style={{ background: "#0d0f1a", color: STATUS_COLOR[app.status as ApplicationStatus], border: `1px solid ${STATUS_COLOR[app.status as ApplicationStatus]}40` }}
-                          >
-                            {STATUS_OPTIONS.map((s) => (
-                              <option key={s} value={s} style={{ color: "#e8eaff", background: "#0d0f1a" }}>
-                                {s.replace("_", " ")}
-                              </option>
-                            ))}
-                          </select>
-                          {isMentor && !app.mentorEndorsement && (
-                            <button
-                              onClick={() => handleEndorse(app._id)}
-                              className="text-[10px] font-semibold px-2 py-0.5 rounded-lg"
-                              style={{ background: "rgba(34,211,160,0.12)", color: "#22d3a0", border: "1px solid rgba(34,211,160,0.3)" }}
+                    {(applications ?? []).map((app) => {
+                      const eligibility = app.eligibilityStatus as EligibilityStatus | undefined;
+                      const eligibilityColor = eligibility ? ELIGIBILITY_COLOR[eligibility] : "#9ba3cc";
+                      return (
+                        <div key={app._id} className="rounded-xl p-3 flex items-start justify-between gap-3" style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${eligibilityColor}33` }}>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-sm font-semibold truncate" style={{ color: "#e8eaff" }}>{app.student?.name ?? "Unknown student"}</p>
+                              {eligibility && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: eligibilityColor + "20", color: eligibilityColor }}>{eligibility.replace("_", " ")} · {app.matchScore ?? 0}%</span>}
+                            </div>
+                            <p className="text-xs truncate" style={{ color: "#9ba3cc" }}>{app.student?.email ?? ""}</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {(app.student?.expertiseTags ?? []).slice(0, 5).map((tag) => <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full" style={{ color: "#7c8bff", background: "rgba(91,108,255,0.1)" }}>{tag}</span>)}
+                              {app.student?.xpPoints !== undefined && <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ color: "#ff8c42", background: "rgba(255,140,66,0.1)" }}>{app.student.xpPoints.toLocaleString()} XP</span>}
+                            </div>
+                            {app.note && <p className="text-xs mt-2 italic" style={{ color: "#c8caf0" }}>&quot;{app.note}&quot;</p>}
+                            {app.reasoningNote && app.reasoningNote !== app.note && <p className="text-xs mt-2" style={{ color: "#c8caf0" }}>Reasoning: {app.reasoningNote}</p>}
+                            {app.missingRequirements && app.missingRequirements.length > 0 && <p className="text-[10px] mt-2" style={{ color: "#ff8c42" }}>Missing: {app.missingRequirements.join(" · ")}</p>}
+                            {app.mentorEndorsement && (
+                              <p className="text-[10px] mt-1 font-semibold" style={{ color: "#22d3a0" }}>★ Endorsed{app.endorsedByUser?.name ? ` by ${app.endorsedByUser.name}` : ""}</p>
+                            )}
+                            {app.referral && (
+                              <p className="text-[10px] mt-1 font-semibold" style={{ color: "#7c8bff" }}>↗ Applied from referral</p>
+                            )}
+                          </div>
+                          <div className="flex flex-col items-end gap-1.5 shrink-0">
+                            <select
+                              value={app.status}
+                              onChange={(e) => handleStatus(app._id, e.target.value as ApplicationStatus)}
+                              className="text-xs px-2 py-1 rounded-lg outline-none"
+                              style={{ background: "#0d0f1a", color: STATUS_COLOR[app.status as ApplicationStatus], border: `1px solid ${STATUS_COLOR[app.status as ApplicationStatus]}40` }}
                             >
-                              Endorse
-                            </button>
-                          )}
+                              {STATUS_OPTIONS.map((s) => (
+                                <option key={s} value={s} style={{ color: "#e8eaff", background: "#0d0f1a" }}>
+                                  {s.replace("_", " ")}
+                                </option>
+                              ))}
+                            </select>
+                            {(isMentor || isAdmin) && !app.mentorEndorsement && (
+                              <button
+                                onClick={() => handleEndorse(app._id)}
+                                className="text-[10px] font-semibold px-2 py-0.5 rounded-lg"
+                                style={{ background: "rgba(34,211,160,0.12)", color: "#22d3a0", border: "1px solid rgba(34,211,160,0.3)" }}
+                              >
+                                Endorse
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -240,4 +312,12 @@ export default function ManageOpportunitiesPage() {
       </div>
     </div>
   );
+}
+
+export default function ManageOpportunitiesPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>}>
+      <ManageOpportunitiesPageInner />
+    </Suspense>
+  )
 }

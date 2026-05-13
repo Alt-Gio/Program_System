@@ -1,4 +1,5 @@
 "use client";
+import { Suspense } from "react";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -33,6 +34,7 @@ export const INTEREST_TAXONOMY = [
 const MIN_INTERESTS = 3;
 const MAX_INTERESTS = 5;
 
+<<<<<<< HEAD
 // Per-role copy for the interest picker. Mentors and partners still pick
 // interests so the feed has signal to seed against when their account is new.
 const INTEREST_COPY: Record<Role, { title: string; helper: string }> = {
@@ -51,6 +53,9 @@ const INTEREST_COPY: Record<Role, { title: string; helper: string }> = {
 };
 
 export default function OnboardingPage() {
+=======
+function OnboardingPageInner() {
+>>>>>>> 4c2f85a6bf0daf8f765c2b138dda1dce96ed4d1c
   const router = useRouter();
   const [profile, setProfile] = useState<PendingProfile | null>(null);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
@@ -276,4 +281,12 @@ export default function OnboardingPage() {
       </div>
     </main>
   );
+}
+
+export default function OnboardingPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>}>
+      <OnboardingPageInner />
+    </Suspense>
+  )
 }

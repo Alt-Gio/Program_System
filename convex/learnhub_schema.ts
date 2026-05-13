@@ -700,6 +700,20 @@ export const learnhubTables = {
     deadline: v.number(),
     duration: v.string(),
     skills: v.optional(v.array(v.string())),
+    minXp: v.optional(v.number()),
+    requiredSkills: v.optional(v.array(v.string())),
+    preferredSkills: v.optional(v.array(v.string())),
+    eligibilityMode: v.optional(v.union(
+      v.literal("open"),
+      v.literal("guided"),
+      v.literal("strict")
+    )),
+    reviewInstructions: v.optional(v.string()),
+    applicationQuestions: v.optional(v.array(v.object({
+      id: v.string(),
+      label: v.string(),
+      required: v.boolean(),
+    }))),
     applicationFormId: v.optional(v.id("learnhub_forms")),
     status: v.union(v.literal("open"), v.literal("closed")),
     createdAt: v.number(),
@@ -714,6 +728,15 @@ export const learnhubTables = {
     formSubmissionId: v.optional(v.id("learnhub_form_submissions")),
     mentorEndorsement: v.optional(v.boolean()),
     endorsedBy: v.optional(v.id("learnhub_users")),
+    eligibilityStatus: v.optional(v.union(
+      v.literal("eligible"),
+      v.literal("borderline"),
+      v.literal("not_eligible")
+    )),
+    matchScore: v.optional(v.number()),
+    missingRequirements: v.optional(v.array(v.string())),
+    reasoningNote: v.optional(v.string()),
+    referralId: v.optional(v.id("learnhub_work_referrals")),
     status: v.union(
       v.literal("applied"),
       v.literal("under_review"),
@@ -727,6 +750,23 @@ export const learnhubTables = {
   })
     .index("by_opportunity", ["opportunityId"])
     .index("by_student", ["studentId"]),
+
+  learnhub_work_referrals: defineTable({
+    opportunityId: v.id("learnhub_work_opportunities"),
+    studentId: v.id("learnhub_users"),
+    referredBy: v.id("learnhub_users"),
+    note: v.optional(v.string()),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("accepted"),
+      v.literal("declined")
+    ),
+    createdAt: v.number(),
+    acceptedAt: v.optional(v.number()),
+  })
+    .index("by_opportunity", ["opportunityId"])
+    .index("by_student", ["studentId"])
+    .index("by_referredBy", ["referredBy"]),
 
   // ── Org Partners ─────────────────────────────────────────
   learnhub_org_profiles: defineTable({

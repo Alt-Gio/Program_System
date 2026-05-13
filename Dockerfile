@@ -23,7 +23,7 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat
 
 COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund
+RUN npm ci --no-audit --no-fund && npm install sharp
 
 
 # ── Stage 2: build ───────────────────────────────────────────
