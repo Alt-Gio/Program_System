@@ -34,28 +34,7 @@ export const INTEREST_TAXONOMY = [
 const MIN_INTERESTS = 3;
 const MAX_INTERESTS = 5;
 
-<<<<<<< HEAD
-// Per-role copy for the interest picker. Mentors and partners still pick
-// interests so the feed has signal to seed against when their account is new.
-const INTEREST_COPY: Record<Role, { title: string; helper: string }> = {
-  student: {
-    title: "What do you want to learn?",
-    helper: "We'll use these to surface the most relevant posts in your feed.",
-  },
-  mentor: {
-    title: "What do you teach or coach on?",
-    helper: "We'll match you with mentees and content that fit these topics.",
-  },
-  org_partner: {
-    title: "What roles or skills do you hire for?",
-    helper: "We'll surface graduates and posts that match your hiring focus.",
-  },
-};
-
-export default function OnboardingPage() {
-=======
 function OnboardingPageInner() {
->>>>>>> 4c2f85a6bf0daf8f765c2b138dda1dce96ed4d1c
   const router = useRouter();
   const [profile, setProfile] = useState<PendingProfile | null>(null);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
