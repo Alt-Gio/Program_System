@@ -22,6 +22,7 @@ import { TopNav } from "@/components/learnhub/layout/TopNav";
 import { MobileBottomNav } from "@/components/learnhub/layout/MobileBottomNav";
 import { LeftRail } from "@/components/learnhub/layout/LeftRail";
 import { RightPanel } from "@/components/learnhub/panels/RightPanel";
+import { StreakCheckIn } from "@/components/learnhub/streaks/StreakCheckIn";
 
 const LS_KEY_LEFT  = "lh-panel-left-mode";
 const LS_KEY_RIGHT = "lh-panel-right-collapsed";
@@ -117,6 +118,7 @@ export default function LhMainLayout({ children }: { children: React.ReactNode }
         </button>
 
         <MobileBottomNav />
+        <StreakCheckIn />
       </div>
     </NotificationProvider>
   );

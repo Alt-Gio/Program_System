@@ -235,6 +235,8 @@ function SettingsPageInner() {
       )}
 
       <div className="flex flex-col gap-4">
+        {userId && <StreakCard userId={userId as Id<"learnhub_users">} />}
+
         <Section title="Your Preferences">
           <p className="text-xs" style={{ color: "#9ba3cc" }}>
             These shape what surfaces first in your feed. Update them anytime.
@@ -471,4 +473,103 @@ export default function SettingsPage() {
       <SettingsPageInner />
     </Suspense>
   )
+}
+
+function StreakCard({ userId }: { userId: Id<"learnhub_users"> }) {
+  const streak = useQuery(api.learnhub_streaks.getStreak, { userId });
+  const buyFreeze = useMutation(api.learnhub_streaks.buyStreakFreeze);
+  const [buying, setBuying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const handleBuy = async () => {
+    setError(null);
+    setSuccess(null);
+    setBuying(true);
+    try {
+      const res = await buyFreeze({ userId });
+      setSuccess(`Freeze added. You now have ${res.freezesLeft} stashed.`);
+      setTimeout(() => setSuccess(null), 3500);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg.replace(/^[A-Z_]+:\s*/, ""));
+    } finally {
+      setBuying(false);
+    }
+  };
+
+  if (streak === undefined) {
+    return (
+      <div className="rounded-2xl p-5 flex flex-col gap-3" style={{ background: "#131626", border: "1px solid rgba(255,255,255,0.06)" }}>
+        <p className="text-sm font-semibold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>🔥 Streak</p>
+        <div className="h-16 rounded-xl animate-pulse" style={{ background: "#1a1d30" }} />
+      </div>
+    );
+  }
+  if (streak === null) return null;
+
+  const canBuy = streak.streakFreezesAvailable < streak.maxFreezes && streak.xpPoints >= streak.freezeCostXp;
+  const atMax = streak.streakFreezesAvailable >= streak.maxFreezes;
+  const notEnoughXp = streak.xpPoints < streak.freezeCostXp;
+
+  return (
+    <div className="rounded-2xl p-5 flex flex-col gap-4" style={{ background: "#131626", border: "1px solid rgba(249,115,22,0.18)" }}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>🔥 Streak</p>
+          <p className="text-xs mt-0.5" style={{ color: "#9ba3cc" }}>
+            Visit LearnHub daily to keep your streak going. Missed days burn through your freezes first.
+          </p>
+        </div>
+        {streak.activeToday && (
+          <span className="text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e" }}>
+            CHECKED IN TODAY
+          </span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-xl p-3" style={{ background: "#1a1d30", border: "1px solid rgba(255,255,255,0.05)" }}>
+          <p className="text-[10px] uppercase tracking-wider" style={{ color: "#9ba3cc" }}>Current</p>
+          <p className="mt-0.5 text-2xl font-bold" style={{ color: "#f97316", fontFamily: "var(--font-sora)" }}>
+            {streak.currentStreak}
+            <span className="text-xs ml-1" style={{ color: "#9ba3cc" }}>day{streak.currentStreak === 1 ? "" : "s"}</span>
+          </p>
+        </div>
+        <div className="rounded-xl p-3" style={{ background: "#1a1d30", border: "1px solid rgba(255,255,255,0.05)" }}>
+          <p className="text-[10px] uppercase tracking-wider" style={{ color: "#9ba3cc" }}>Longest</p>
+          <p className="mt-0.5 text-2xl font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>
+            {streak.longestStreak}
+          </p>
+        </div>
+        <div className="rounded-xl p-3" style={{ background: "#1a1d30", border: "1px solid rgba(56,189,248,0.18)" }}>
+          <p className="text-[10px] uppercase tracking-wider" style={{ color: "#9ba3cc" }}>Freezes 🧊</p>
+          <p className="mt-0.5 text-2xl font-bold" style={{ color: "#38bdf8", fontFamily: "var(--font-sora)" }}>
+            {streak.streakFreezesAvailable}
+            <span className="text-xs ml-1" style={{ color: "#9ba3cc" }}>/ {streak.maxFreezes}</span>
+          </p>
+        </div>
+      </div>
+
+      <div className="rounded-xl p-3 flex items-center justify-between gap-3 flex-wrap" style={{ background: "#1a1d30", border: "1px solid rgba(255,255,255,0.05)" }}>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold" style={{ color: "#e8eaff" }}>Streak Freeze</p>
+          <p className="text-xs mt-0.5" style={{ color: "#9ba3cc" }}>
+            Spend {streak.freezeCostXp} XP to protect one missed day. You have {streak.xpPoints} XP.
+          </p>
+        </div>
+        <button
+          onClick={handleBuy}
+          disabled={buying || !canBuy}
+          className="px-4 py-2 rounded-lg text-xs font-semibold disabled:opacity-40 shrink-0"
+          style={{ background: canBuy && !buying ? "linear-gradient(135deg, #38bdf8, #6366f1)" : "rgba(255,255,255,0.05)", color: canBuy && !buying ? "#fff" : "#9ba3cc", border: "none" }}
+        >
+          {buying ? "Buying…" : atMax ? "Max stashed" : notEnoughXp ? `Need ${streak.freezeCostXp - streak.xpPoints} more XP` : `Buy for ${streak.freezeCostXp} XP`}
+        </button>
+      </div>
+
+      {error && <p className="text-xs" style={{ color: "#ff5f6d" }}>{error}</p>}
+      {success && <p className="text-xs" style={{ color: "#22c55e" }}>{success}</p>}
+    </div>
+  );
 }

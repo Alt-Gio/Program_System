@@ -114,6 +114,32 @@ export function LeftRail({ expanded = false }: LeftRailProps) {
                 <div className="lh-rail-profile-xp-fill" style={{ width: `${xpPercent}%` }} />
               </div>
             </div>
+            {(user?.currentStreak ?? 0) > 0 && (
+              <div
+                style={{
+                  marginTop: 6,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 6,
+                  fontSize: 11,
+                  color: "rgba(220,225,240,0.85)",
+                }}
+              >
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  🔥 <strong style={{ color: "#f97316" }}>{user?.currentStreak}</strong>{" "}
+                  day{(user?.currentStreak ?? 0) === 1 ? "" : "s"}
+                </span>
+                {(user?.streakFreezesAvailable ?? 0) > 0 && (
+                  <span
+                    title={`${user?.streakFreezesAvailable} streak freeze${(user?.streakFreezesAvailable ?? 0) === 1 ? "" : "s"} stashed`}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "#38bdf8" }}
+                  >
+                    🧊 {user?.streakFreezesAvailable}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

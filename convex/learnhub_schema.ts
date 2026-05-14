@@ -82,6 +82,7 @@ export const learnhubTables = {
     currentStreak: v.number(),
     longestStreak: v.number(),
     lastActiveDate: v.string(),
+    streakFreezesAvailable: v.optional(v.number()),
     followingIds: v.array(v.id("learnhub_users")),
     followerCount: v.number(),
     connectionCount: v.optional(v.number()),

@@ -48,6 +48,7 @@ import type * as learnhub_notifications from "../learnhub_notifications.js";
 import type * as learnhub_posts from "../learnhub_posts.js";
 import type * as learnhub_reports from "../learnhub_reports.js";
 import type * as learnhub_schema from "../learnhub_schema.js";
+import type * as learnhub_streaks from "../learnhub_streaks.js";
 import type * as learnhub_users from "../learnhub_users.js";
 import type * as learnhub_video_collab from "../learnhub_video_collab.js";
 import type * as learnhub_video_courses from "../learnhub_video_courses.js";
@@ -118,6 +119,7 @@ declare const fullApi: ApiFromModules<{
   learnhub_posts: typeof learnhub_posts;
   learnhub_reports: typeof learnhub_reports;
   learnhub_schema: typeof learnhub_schema;
+  learnhub_streaks: typeof learnhub_streaks;
   learnhub_users: typeof learnhub_users;
   learnhub_video_collab: typeof learnhub_video_collab;
   learnhub_video_courses: typeof learnhub_video_courses;
