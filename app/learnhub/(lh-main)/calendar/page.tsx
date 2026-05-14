@@ -47,13 +47,8 @@ function toLocalInput(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-<<<<<<< HEAD
-export default function CalendarPage() {
-  const [cursor, setCursor] = useState<Date>(() => new Date());
-=======
 function CalendarPageInner() {
   const [cursor, setCursor] = useState<Date>(new Date());
->>>>>>> 4c2f85a6bf0daf8f765c2b138dda1dce96ed4d1c
   const [state, setState] = useState<ApiState>({ kind: "loading" });
   const [refreshing, setRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
