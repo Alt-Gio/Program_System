@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import { Sora, DM_Sans, Plus_Jakarta_Sans } from "next/font/google";
+import { DM_Sans, DM_Serif_Display, Plus_Jakarta_Sans } from "next/font/google";
 import "./learnhub.css";
 
-const sora = Sora({ subsets: ["latin"], variable: "--font-sora" });
 const dmSans = DM_Sans({ subsets: ["latin"], variable: "--font-dm-sans" });
+const dmSerif = DM_Serif_Display({ subsets: ["latin"], variable: "--font-dm-serif", style: ["normal", "italic"], weight: "400" });
 const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-jakarta", weight: ["400", "500", "600", "700", "800"] });
 
 export const metadata: Metadata = {
@@ -20,7 +20,7 @@ export default function LearnHubRootLayout({ children }: { children: React.React
         }}
       />
       <div
-        className={`${sora.variable} ${dmSans.variable} ${jakarta.variable}`}
+        className={`${dmSans.variable} ${dmSerif.variable} ${jakarta.variable}`}
         style={{ fontFamily: "'DM Sans', var(--font-dm-sans), sans-serif" }}
       >
         {children}

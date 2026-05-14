@@ -21,7 +21,6 @@ import { NotificationProvider } from "@/components/learnhub/notifications/Notifi
 import { TopNav } from "@/components/learnhub/layout/TopNav";
 import { MobileBottomNav } from "@/components/learnhub/layout/MobileBottomNav";
 import { LeftRail } from "@/components/learnhub/layout/LeftRail";
-import { LeftPanel } from "@/components/learnhub/panels/LeftPanel";
 import { RightPanel } from "@/components/learnhub/panels/RightPanel";
 
 const LS_KEY_LEFT  = "lh-panel-left-mode";
@@ -82,7 +81,7 @@ export default function LhMainLayout({ children }: { children: React.ReactNode }
 
         <div className={mainClass}>
           <aside className="lh-left-panel">
-            {isFull ? <LeftPanel /> : <LeftRail />}
+            <LeftRail expanded={isFull} />
           </aside>
 
           <main style={{ minWidth: 0 }}>{children}</main>
