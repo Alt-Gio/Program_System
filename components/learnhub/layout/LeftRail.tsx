@@ -14,7 +14,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Home, LayoutGrid, Plus, Zap, Briefcase,
-  Trophy, Settings, Youtube, Calendar, PlaySquare,
+  Trophy, Settings, Youtube, Calendar, PlaySquare, Users,
 } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -36,6 +36,7 @@ const ITEMS: RailItem[] = [
   { id: "calendar",    href: "/learnhub/calendar",      icon: <Calendar size={20} />,    label: "Calendar" },
   { id: "flow",        href: "/learnhub/journal",       icon: <Zap size={20} />,         label: "Flow State" },
   { id: "work",        href: "/learnhub/work",          icon: <Briefcase size={20} />,   label: "Opportunities" },
+  { id: "mentors",     href: "/learnhub/mentors",       icon: <Users size={20} />,       label: "Mentors" },
   { id: "leaderboard", href: "/learnhub/leaderboard",   icon: <Trophy size={20} />,      label: "Leaderboard" },
 ];
 

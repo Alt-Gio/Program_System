@@ -138,6 +138,8 @@ export default function MentorDashboard() {
         ))}
       </div>
 
+      <MentorshipInbox mentorId={userId as ConvexUserId} />
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Top learners */}
         <div className="rounded-2xl p-5" style={{ background: "#131626", border: "1px solid rgba(255,255,255,0.06)" }}>
@@ -202,6 +204,177 @@ export default function MentorDashboard() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function MentorshipInbox({ mentorId }: { mentorId: ConvexUserId }) {
+  const requests = useQuery(api.learnhub_mentors.listIncomingRequests, { mentorId });
+  const respond = useMutation(api.learnhub_mentors.respondToMentorshipRequest);
+  const complete = useMutation(api.learnhub_mentors.completeMentorship);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const pending = (requests ?? []).filter((r) => r.status === "requested");
+  const active = (requests ?? []).filter((r) => r.status === "active");
+
+  const handleRespond = async (relId: Id<"learnhub_mentoring_relationships">, decision: "accept" | "decline") => {
+    setBusyId(relId);
+    setError(null);
+    try {
+      await respond({ relationshipId: relId, mentorId, decision });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg.replace(/^[A-Z_]+:\s*/, ""));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleComplete = async (relId: Id<"learnhub_mentoring_relationships">) => {
+    setBusyId(relId);
+    setError(null);
+    try {
+      await complete({ relationshipId: relId, callerId: mentorId });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg.replace(/^[A-Z_]+:\s*/, ""));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl p-5 mb-4" style={{ background: "#131626", border: "1px solid rgba(255,255,255,0.06)" }}>
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm font-semibold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>
+          🤝 Mentorship Requests
+          {pending.length > 0 && (
+            <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(249,115,22,0.18)", color: "#f97316" }}>
+              {pending.length} new
+            </span>
+          )}
+        </p>
+        <a href="/learnhub/mentors" className="text-xs" style={{ color: "#5b6cff" }}>View marketplace →</a>
+      </div>
+
+      {error && (
+        <div className="text-xs mb-3 px-3 py-2 rounded-lg" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.35)", color: "#fca5a5" }}>
+          {error}
+        </div>
+      )}
+
+      {requests === undefined && (
+        <div className="h-20 rounded-xl animate-pulse" style={{ background: "#1a1d30" }} />
+      )}
+
+      {requests && pending.length === 0 && active.length === 0 && (
+        <p className="text-xs text-center py-4" style={{ color: "#5c6490" }}>
+          No pending requests. Once learners send a request, it'll show up here.
+        </p>
+      )}
+
+      {pending.length > 0 && (
+        <div className="flex flex-col gap-2 mb-3">
+          {pending.map((r) => (
+            <div key={r._id} className="rounded-xl p-3" style={{ background: "#1a1d30", border: "1px solid rgba(249,115,22,0.18)" }}>
+              <div className="flex items-start gap-3">
+                {r.mentee?.avatarUrl && (
+                  <img
+                    src={r.mentee.avatarUrl}
+                    alt={r.mentee.name}
+                    width={36}
+                    height={36}
+                    className="rounded-full object-cover shrink-0"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(r.mentee?.name ?? "U")}`;
+                    }}
+                  />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-semibold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>
+                      {r.mentee?.name ?? "Unknown"}
+                    </p>
+                    <span className="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded" style={{ background: "rgba(249,115,22,0.18)", color: "#f97316" }}>
+                      Pending
+                    </span>
+                  </div>
+                  {r.mentee?.school && (
+                    <p className="text-xs mt-0.5" style={{ color: "#5c6490" }}>{r.mentee.school}</p>
+                  )}
+                  <p className="text-sm mt-2" style={{ color: "#c8caf0", lineHeight: 1.5 }}>{r.requestNote}</p>
+                  {r.goals.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {r.goals.map((g) => (
+                        <span key={g} className="text-[10.5px] px-2 py-0.5 rounded-full" style={{ background: "rgba(99,102,241,0.12)", border: "1px solid rgba(99,102,241,0.3)", color: "#6366f1" }}>
+                          {g}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={() => handleRespond(r._id, "accept")}
+                  disabled={busyId === r._id}
+                  className="flex-1 py-2 rounded-lg text-xs font-semibold disabled:opacity-50"
+                  style={{ background: "rgba(34,197,94,0.18)", border: "1px solid rgba(34,197,94,0.4)", color: "#22c55e" }}
+                >
+                  {busyId === r._id ? "…" : "Accept"}
+                </button>
+                <button
+                  onClick={() => handleRespond(r._id, "decline")}
+                  disabled={busyId === r._id}
+                  className="flex-1 py-2 rounded-lg text-xs font-semibold disabled:opacity-50"
+                  style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.35)", color: "#fca5a5" }}
+                >
+                  {busyId === r._id ? "…" : "Decline"}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {active.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold mb-2" style={{ color: "#9ba3cc" }}>Active mentees</p>
+          <div className="flex flex-col gap-2">
+            {active.map((r) => (
+              <div key={r._id} className="rounded-xl p-3 flex items-center gap-3" style={{ background: "#1a1d30", border: "1px solid rgba(34,197,94,0.18)" }}>
+                {r.mentee?.avatarUrl && (
+                  <img
+                    src={r.mentee.avatarUrl}
+                    alt={r.mentee.name}
+                    width={32}
+                    height={32}
+                    className="rounded-full object-cover"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(r.mentee?.name ?? "U")}`;
+                    }}
+                  />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold" style={{ color: "#e8eaff" }}>{r.mentee?.name ?? "Unknown"}</p>
+                  <p className="text-[11px]" style={{ color: "#5c6490" }}>
+                    Active since {format(r.updatedAt, "MMM d, yyyy")}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleComplete(r._id)}
+                  disabled={busyId === r._id}
+                  className="text-xs px-3 py-1.5 rounded-lg disabled:opacity-50"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "#9ba3cc" }}
+                >
+                  {busyId === r._id ? "…" : "Mark complete"}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
