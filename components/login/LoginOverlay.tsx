@@ -48,7 +48,8 @@ export function LoginOverlay({ role, callbackUrl, oauthError, oauthErrorDetail, 
         background: "rgba(5, 6, 15, 0.75)",
         backdropFilter: "blur(20px)",
         WebkitBackdropFilter: "blur(20px)",
-        padding: 24,
+        padding: "max(16px, env(safe-area-inset-bottom)) 16px",
+        overflowY: "auto",
       }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -62,7 +63,7 @@ export function LoginOverlay({ role, callbackUrl, oauthError, oauthErrorDetail, 
           background: "linear-gradient(180deg, rgba(20, 22, 40, 0.95), rgba(10, 12, 25, 0.95))",
           border: "1px solid rgba(255, 255, 255, 0.08)",
           borderRadius: 20,
-          padding: 32,
+          padding: "clamp(20px, 5vw, 32px)",
           position: "relative",
           boxShadow: "0 40px 80px rgba(0,0,0,0.5)",
           ["--login-accent" as any]: roleAccent(role),
@@ -108,9 +109,8 @@ export function LoginOverlay({ role, callbackUrl, oauthError, oauthErrorDetail, 
         {oauthError && (
           <div
             style={{
-              padding: "10px 14px",
+              padding: "12px 14px",
               borderRadius: 10,
-              fontSize: 12,
               color: "#fca5a5",
               background: "rgba(244, 63, 94, 0.10)",
               border: "1px solid rgba(244, 63, 94, 0.3)",
@@ -120,12 +120,13 @@ export function LoginOverlay({ role, callbackUrl, oauthError, oauthErrorDetail, 
               gap: 6,
             }}
           >
-            <span>{ERROR_MESSAGES[oauthError] ?? "Something went wrong. Please try again."}</span>
+            <span className="lh-oauth-error-msg">
+              {ERROR_MESSAGES[oauthError] ?? "Something went wrong. Please try again."}
+            </span>
             {oauthErrorDetail && (
               <span
-                className="mono"
+                className="mono lh-oauth-error-detail"
                 style={{
-                  fontSize: 10,
                   letterSpacing: "0.04em",
                   color: "rgba(252, 165, 165, 0.7)",
                   wordBreak: "break-word",
@@ -134,6 +135,21 @@ export function LoginOverlay({ role, callbackUrl, oauthError, oauthErrorDetail, 
                 {oauthError}: {oauthErrorDetail}
               </span>
             )}
+            <button
+              type="button"
+              className="lh-oauth-error-action"
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  const u = new URL(window.location.href);
+                  u.searchParams.delete("error");
+                  u.searchParams.delete("detail");
+                  u.searchParams.delete("role");
+                  window.location.replace(u.toString());
+                }
+              }}
+            >
+              Try again
+            </button>
           </div>
         )}
 

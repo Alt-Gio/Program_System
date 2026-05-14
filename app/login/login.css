@@ -163,3 +163,25 @@
     padding-top: 12px !important;
   }
 }
+
+/* ── OAuth error block: readable typography on small screens ── */
+.lh-oauth-error-msg { font-size: 12px; }
+.lh-oauth-error-detail { font-size: 10px; }
+.lh-oauth-error-action {
+  align-self: flex-start;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin-top: 4px;
+  color: #fca5a5;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+.lh-oauth-error-action:hover { color: #fecaca; }
+@media (max-width: 640px) {
+  .lh-oauth-error-msg { font-size: 13px; line-height: 1.4; }
+  .lh-oauth-error-detail { font-size: 11px; }
+  .lh-oauth-error-action { font-size: 13px; }
+}

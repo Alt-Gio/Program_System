@@ -49,6 +49,27 @@ export const createUser = mutation({
     organization: v.optional(v.string()),
     school: v.optional(v.string()),
     interests: v.optional(v.array(v.string())),
+    skillLevels: v.optional(v.record(v.string(), v.union(
+      v.literal("beginner"),
+      v.literal("intermediate"),
+      v.literal("advanced")
+    ))),
+    goals: v.optional(v.array(v.union(
+      v.literal("find_work"),
+      v.literal("learn"),
+      v.literal("build_portfolio"),
+      v.literal("mentor"),
+      v.literal("network")
+    ))),
+    hoursPerWeek: v.optional(v.union(
+      v.literal("<5"),
+      v.literal("5-10"),
+      v.literal("10-20"),
+      v.literal("20+")
+    )),
+    region: v.optional(v.string()),
+    province: v.optional(v.string()),
+    municipality: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -91,6 +112,7 @@ export const createUser = mutation({
       followerCount: 0,
       fcmTokens: [],
       unreadNotifCount: 0,
+      onboardingCompletedAt: Date.now(),
       notifPrefs: {
         pushEnabled: false,
         emailDigest: "weekly",
@@ -119,6 +141,28 @@ export const updateProfile = mutation({
     bio: v.optional(v.string()),
     school: v.optional(v.string()),
     organization: v.optional(v.string()),
+    interests: v.optional(v.array(v.string())),
+    skillLevels: v.optional(v.record(v.string(), v.union(
+      v.literal("beginner"),
+      v.literal("intermediate"),
+      v.literal("advanced")
+    ))),
+    goals: v.optional(v.array(v.union(
+      v.literal("find_work"),
+      v.literal("learn"),
+      v.literal("build_portfolio"),
+      v.literal("mentor"),
+      v.literal("network")
+    ))),
+    hoursPerWeek: v.optional(v.union(
+      v.literal("<5"),
+      v.literal("5-10"),
+      v.literal("10-20"),
+      v.literal("20+")
+    )),
+    region: v.optional(v.string()),
+    province: v.optional(v.string()),
+    municipality: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { id, ...fields } = args;

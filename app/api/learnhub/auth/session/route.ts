@@ -57,11 +57,29 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { role, school, organization, interests, name: rawName } = body as {
+  const {
+    role,
+    school,
+    organization,
+    interests,
+    skillLevels: rawSkillLevels,
+    goals: rawGoals,
+    hoursPerWeek: rawHoursPerWeek,
+    region: rawRegion,
+    province: rawProvince,
+    municipality: rawMunicipality,
+    name: rawName,
+  } = body as {
     role: "student" | "mentor" | "org_partner";
     school?: string;
     organization?: string;
     interests?: string[];
+    skillLevels?: Record<string, string>;
+    goals?: string[];
+    hoursPerWeek?: string;
+    region?: string;
+    province?: string;
+    municipality?: string;
     name?: string;
   };
 
@@ -85,6 +103,43 @@ export async function POST(request: NextRequest) {
     ? interests.filter((t) => typeof t === "string" && t.length > 0 && t.length <= 64).slice(0, 8)
     : undefined;
 
+  const ALLOWED_LEVELS = new Set(["beginner", "intermediate", "advanced"]);
+  const cleanSkillLevels = rawSkillLevels && typeof rawSkillLevels === "object"
+    ? Object.fromEntries(
+        Object.entries(rawSkillLevels)
+          .filter(([k, v]) =>
+            typeof k === "string" &&
+            k.length > 0 &&
+            k.length <= 64 &&
+            typeof v === "string" &&
+            ALLOWED_LEVELS.has(v),
+          )
+          .slice(0, 8),
+      ) as Record<string, "beginner" | "intermediate" | "advanced">
+    : undefined;
+
+  const ALLOWED_GOALS = new Set(["find_work", "learn", "build_portfolio", "mentor", "network"]);
+  const cleanGoals = Array.isArray(rawGoals)
+    ? (rawGoals.filter((g) => typeof g === "string" && ALLOWED_GOALS.has(g)).slice(0, 5) as Array<
+        "find_work" | "learn" | "build_portfolio" | "mentor" | "network"
+      >)
+    : undefined;
+
+  const ALLOWED_HOURS = new Set(["<5", "5-10", "10-20", "20+"]);
+  const cleanHoursPerWeek =
+    typeof rawHoursPerWeek === "string" && ALLOWED_HOURS.has(rawHoursPerWeek)
+      ? (rawHoursPerWeek as "<5" | "5-10" | "10-20" | "20+")
+      : undefined;
+
+  const clampText = (s: unknown, max: number): string | undefined => {
+    if (typeof s !== "string") return undefined;
+    const t = s.trim().slice(0, max);
+    return t.length > 0 ? t : undefined;
+  };
+  const cleanRegion = clampText(rawRegion, 64);
+  const cleanProvince = clampText(rawProvince, 64);
+  const cleanMunicipality = clampText(rawMunicipality, 80);
+
   const trimmedName = typeof rawName === "string" ? rawName.trim().slice(0, 80) : "";
   const displayName = trimmedName || profile.name;
   if (!displayName) {
@@ -102,6 +157,12 @@ export async function POST(request: NextRequest) {
       school,
       organization,
       interests: cleanInterests,
+      skillLevels: cleanSkillLevels,
+      goals: cleanGoals,
+      hoursPerWeek: cleanHoursPerWeek,
+      region: cleanRegion,
+      province: cleanProvince,
+      municipality: cleanMunicipality,
     });
 
     // Check for pending certificates matching this email

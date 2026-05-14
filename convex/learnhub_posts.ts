@@ -2,24 +2,55 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 
-// Stable re-rank: posts whose `tags` overlap the viewer's `interests` float
-// to the top while preserving the underlying createdAt-desc order within
-// each bucket. Only the first `limit` posts are considered — older highly
-// relevant posts will not be pulled forward. Accepted breadth-first trade-off.
-function reRankByInterests<T extends { tags?: string[] }>(
-  posts: T[],
-  interests: string[] | undefined
-): T[] {
-  if (!interests || interests.length === 0) return posts;
-  const interestSet = new Set(interests);
-  const matched: T[] = [];
-  const rest: T[] = [];
-  for (const post of posts) {
-    const hit = post.tags?.some((t) => interestSet.has(t));
-    if (hit) matched.push(post);
-    else rest.push(post);
+// Pure scoring pass over the latest N posts. Higher score floats up; ties break
+// on createdAt-desc (stable sort because we use a stable sort fn). Not ML — a
+// small, transparent function that's easy to tune. Keep it pure.
+type ScorablePost = {
+  tags?: string[];
+  type?: string;
+  authorId?: unknown;
+  createdAt?: number;
+};
+
+type ScorableViewer = {
+  interests?: string[];
+  skillLevels?: Record<string, string>;
+  goals?: string[];
+  province?: string;
+} | null;
+
+function scorePostForViewer(
+  post: ScorablePost,
+  viewer: ScorableViewer,
+  authorProvince: string | null,
+): number {
+  if (!viewer) return 0;
+  let score = 0;
+
+  const interestSet = viewer.interests ? new Set(viewer.interests) : null;
+  if (interestSet && post.tags && post.tags.length > 0) {
+    for (const t of post.tags) {
+      if (!interestSet.has(t)) continue;
+      score += 3;
+      // Extra weight for areas the viewer is growing in — surface learning
+      // content for beginner/intermediate over content they've already
+      // mastered.
+      const level = viewer.skillLevels?.[t];
+      if (level === "beginner" || level === "intermediate") score += 1;
+    }
   }
-  return [...matched, ...rest];
+
+  const goalSet = viewer.goals ? new Set(viewer.goals) : null;
+  if (goalSet) {
+    if (post.type === "opportunity" && goalSet.has("find_work")) score += 2;
+    if (post.type === "certificate" && goalSet.has("build_portfolio")) score += 2;
+  }
+
+  if (viewer.province && authorProvince && viewer.province === authorProvince) {
+    score += 1;
+  }
+
+  return score;
 }
 
 export const listFeedWithAuthors = query({
@@ -34,13 +65,25 @@ export const listFeedWithAuthors = query({
       .order("desc")
       .take(args.limit ?? 30);
     const viewer = args.userId ? await ctx.db.get(args.userId) : null;
-    const ranked = reRankByInterests(posts, viewer?.interests);
-    return Promise.all(
-      ranked.map(async (p) => ({
+
+    // Resolve authors once, then score posts using author province for the
+    // local-bonus rule. We need this lookup anyway to attach `.author` below.
+    const withAuthors = await Promise.all(
+      posts.map(async (p) => ({
         ...p,
         author: await ctx.db.get(p.authorId),
-      }))
+      })),
     );
+
+    if (!viewer) return withAuthors;
+
+    const scored = withAuthors.map((p, idx) => ({
+      p,
+      idx,
+      s: scorePostForViewer(p, viewer, p.author?.province ?? null),
+    }));
+    scored.sort((a, b) => (b.s - a.s) || (a.idx - b.idx));
+    return scored.map(({ p }) => p);
   },
 });
 
@@ -56,7 +99,22 @@ export const listFeedPosts = query({
       .order("desc")
       .take(args.limit ?? 30);
     const viewer = args.userId ? await ctx.db.get(args.userId) : null;
-    return reRankByInterests(posts, viewer?.interests);
+    if (!viewer) return posts;
+
+    // Resolve author province only for posts that need it (province set on
+    // viewer). For the common case where viewer has no province, skip the
+    // per-post author fetch.
+    const needAuthorProvince = Boolean(viewer.province);
+    const scored = await Promise.all(
+      posts.map(async (p, idx) => {
+        const authorProvince = needAuthorProvince
+          ? (await ctx.db.get(p.authorId))?.province ?? null
+          : null;
+        return { p, idx, s: scorePostForViewer(p, viewer, authorProvince) };
+      }),
+    );
+    scored.sort((a, b) => (b.s - a.s) || (a.idx - b.idx));
+    return scored.map(({ p }) => p);
   },
 });
 

@@ -55,6 +55,25 @@ export const learnhubTables = {
     isWillingToHelp: v.optional(v.boolean()),
     expertiseTags: v.optional(v.array(v.string())),
     interests: v.optional(v.array(v.string())),
+    skillLevels: v.optional(v.record(v.string(), v.union(
+      v.literal("beginner"),
+      v.literal("intermediate"),
+      v.literal("advanced")
+    ))),
+    goals: v.optional(v.array(v.union(
+      v.literal("find_work"),
+      v.literal("learn"),
+      v.literal("build_portfolio"),
+      v.literal("mentor"),
+      v.literal("network")
+    ))),
+    hoursPerWeek: v.optional(v.union(
+      v.literal("<5"),
+      v.literal("5-10"),
+      v.literal("10-20"),
+      v.literal("20+")
+    )),
+    onboardingCompletedAt: v.optional(v.number()),
     maxMentees: v.optional(v.number()),
     currentMenteeCount: v.optional(v.number()),
     availability: v.optional(v.string()),

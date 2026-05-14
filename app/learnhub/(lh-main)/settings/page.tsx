@@ -1,15 +1,40 @@
 "use client";
 import { Suspense } from "react";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { useLearnhubSession } from "@/lib/learnhub/hooks";
 import type { Id } from "@/convex/_generated/dataModel";
+import { INTEREST_TAXONOMY } from "@/app/learnhub/onboarding/page";
 
 type ConvexUserId = Parameters<ReturnType<typeof useMutation<typeof api.learnhub_users.updateNotifPrefs>>>[0]["userId"];
 type EmailDigest = "daily" | "weekly" | "never";
+type SkillLevel = "beginner" | "intermediate" | "advanced";
+type Goal = "find_work" | "learn" | "build_portfolio" | "mentor" | "network";
+type Hours = "<5" | "5-10" | "10-20" | "20+";
+
+const MIN_INTERESTS = 3;
+const MAX_INTERESTS = 5;
+const GOALS: Array<{ value: Goal; label: string; emoji: string }> = [
+  { value: "find_work", label: "Find work", emoji: "💼" },
+  { value: "learn", label: "Learn new skills", emoji: "📚" },
+  { value: "build_portfolio", label: "Build a portfolio", emoji: "🛠️" },
+  { value: "mentor", label: "Mentor others", emoji: "🤝" },
+  { value: "network", label: "Network", emoji: "🌐" },
+];
+const HOURS_OPTIONS: Array<{ value: Hours; label: string }> = [
+  { value: "<5", label: "Under 5 hrs/week" },
+  { value: "5-10", label: "5–10 hrs/week" },
+  { value: "10-20", label: "10–20 hrs/week" },
+  { value: "20+", label: "20+ hrs/week" },
+];
+const SKILL_LEVELS: Array<{ value: SkillLevel; short: string }> = [
+  { value: "beginner", short: "Beginner" },
+  { value: "intermediate", short: "Intermediate" },
+  { value: "advanced", short: "Advanced" },
+];
 
 function SettingsPageInner() {
   const { userId } = useLearnhubSession();
@@ -25,6 +50,92 @@ function SettingsPageInner() {
   const [disconnecting, setDisconnecting] = useState(false);
 
   const updatePrefs = useMutation(api.learnhub_users.updateNotifPrefs);
+  const updateProfile = useMutation(api.learnhub_users.updateProfile);
+
+  const me = useQuery(
+    api.learnhub_users.getUser,
+    userId ? { id: userId as Id<"learnhub_users"> } : "skip"
+  );
+
+  // Preferences state (hydrated from `me` once it loads)
+  const [interests, setInterests] = useState<string[]>([]);
+  const [skillLevels, setSkillLevels] = useState<Record<string, SkillLevel>>({});
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [hoursPerWeek, setHoursPerWeek] = useState<Hours | "">("");
+  const [region, setRegion] = useState("");
+  const [province, setProvince] = useState("");
+  const [municipality, setMunicipality] = useState("");
+  const [prefsHydrated, setPrefsHydrated] = useState(false);
+  const [prefsSaving, setPrefsSaving] = useState(false);
+  const [prefsSaved, setPrefsSaved] = useState(false);
+
+  useEffect(() => {
+    if (!me || prefsHydrated) return;
+    setInterests(Array.isArray(me.interests) ? me.interests : []);
+    setSkillLevels(((me.skillLevels ?? {}) as Record<string, SkillLevel>));
+    setGoals(Array.isArray(me.goals) ? (me.goals as Goal[]) : []);
+    setHoursPerWeek(((me.hoursPerWeek as Hours | undefined) ?? "") as Hours | "");
+    setRegion(me.region ?? "");
+    setProvince(me.province ?? "");
+    setMunicipality(me.municipality ?? "");
+    setPrefsHydrated(true);
+  }, [me, prefsHydrated]);
+
+  const toggleInterest = (tag: string) => {
+    setInterests((prev) => {
+      if (prev.includes(tag)) {
+        setSkillLevels((sl) => {
+          const next = { ...sl };
+          delete next[tag];
+          return next;
+        });
+        return prev.filter((t) => t !== tag);
+      }
+      if (prev.length >= MAX_INTERESTS) return prev;
+      setSkillLevels((sl) => ({ ...sl, [tag]: "beginner" }));
+      return [...prev, tag];
+    });
+  };
+  const toggleGoal = (g: Goal) => {
+    setGoals((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]));
+  };
+  const prefsValid = useMemo(
+    () =>
+      interests.length >= MIN_INTERESTS &&
+      interests.length <= MAX_INTERESTS &&
+      interests.every((t) => Boolean(skillLevels[t])),
+    [interests, skillLevels],
+  );
+
+  const handleSavePrefs = async () => {
+    if (!userId || !prefsValid) return;
+    setPrefsSaving(true);
+    try {
+      // Strip skillLevels entries for tags no longer selected (UI already
+      // does this on toggle, but be defensive on save).
+      const cleanLevels: Record<string, SkillLevel> = {};
+      for (const tag of interests) {
+        const lvl = skillLevels[tag];
+        if (lvl === "beginner" || lvl === "intermediate" || lvl === "advanced") {
+          cleanLevels[tag] = lvl;
+        }
+      }
+      await updateProfile({
+        id: userId as Id<"learnhub_users">,
+        interests,
+        skillLevels: cleanLevels,
+        goals,
+        hoursPerWeek: hoursPerWeek || undefined,
+        region: region.trim() || undefined,
+        province: province.trim() || undefined,
+        municipality: municipality.trim() || undefined,
+      });
+      setPrefsSaved(true);
+      setTimeout(() => setPrefsSaved(false), 2500);
+    } finally {
+      setPrefsSaving(false);
+    }
+  };
 
   const calCreds = useQuery(
     api.learnhub_google_credentials.getForUser,
@@ -124,6 +235,164 @@ function SettingsPageInner() {
       )}
 
       <div className="flex flex-col gap-4">
+        <Section title="Your Preferences">
+          <p className="text-xs" style={{ color: "#9ba3cc" }}>
+            These shape what surfaces first in your feed. Update them anytime.
+          </p>
+
+          <div>
+            <p className="text-xs font-medium mb-2" style={{ color: "#9ba3cc" }}>
+              Interests <span style={{ color: "#5c6490" }}>({MIN_INTERESTS}–{MAX_INTERESTS} · {interests.length} selected)</span>
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {INTEREST_TAXONOMY.map((tag) => {
+                const active = interests.includes(tag);
+                const atCap = !active && interests.length >= MAX_INTERESTS;
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => toggleInterest(tag)}
+                    disabled={atCap}
+                    className="rounded-full px-3 py-1.5 text-xs font-medium transition-all disabled:opacity-40"
+                    style={{
+                      background: active ? "rgba(91,108,255,0.18)" : "rgba(255,255,255,0.04)",
+                      border: active ? "1px solid #5b6cff" : "1px solid rgba(255,255,255,0.08)",
+                      color: active ? "#7c8bff" : "#e8eaff",
+                      cursor: atCap ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {tag}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {interests.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-medium" style={{ color: "#9ba3cc" }}>Skill level</p>
+              {interests.map((tag) => (
+                <div key={tag} className="rounded-xl p-2.5" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                  <p className="text-xs mb-1.5" style={{ color: "#e8eaff" }}>{tag}</p>
+                  <div className="flex gap-1.5">
+                    {SKILL_LEVELS.map((lvl) => {
+                      const on = skillLevels[tag] === lvl.value;
+                      return (
+                        <button
+                          key={lvl.value}
+                          type="button"
+                          onClick={() => setSkillLevels((sl) => ({ ...sl, [tag]: lvl.value }))}
+                          className="flex-1 rounded-md px-2 py-1 text-xs transition-all"
+                          style={{
+                            background: on ? "rgba(91,108,255,0.18)" : "rgba(0,0,0,0.25)",
+                            border: on ? "1px solid #5b6cff" : "1px solid rgba(255,255,255,0.06)",
+                            color: on ? "#7c8bff" : "#9ba3cc",
+                          }}
+                        >
+                          {lvl.short}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div>
+            <p className="text-xs font-medium mb-2" style={{ color: "#9ba3cc" }}>Goals</p>
+            <div className="flex flex-wrap gap-2">
+              {GOALS.map((g) => {
+                const on = goals.includes(g.value);
+                return (
+                  <button
+                    key={g.value}
+                    type="button"
+                    onClick={() => toggleGoal(g.value)}
+                    className="rounded-full px-3 py-1.5 text-xs font-medium transition-all flex items-center gap-1.5"
+                    style={{
+                      background: on ? "rgba(91,108,255,0.18)" : "rgba(255,255,255,0.04)",
+                      border: on ? "1px solid #5b6cff" : "1px solid rgba(255,255,255,0.08)",
+                      color: on ? "#7c8bff" : "#e8eaff",
+                    }}
+                  >
+                    <span>{g.emoji}</span> {g.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-medium mb-2" style={{ color: "#9ba3cc" }}>Weekly availability</p>
+            <div className="grid grid-cols-2 gap-2">
+              {HOURS_OPTIONS.map((h) => {
+                const on = hoursPerWeek === h.value;
+                return (
+                  <button
+                    key={h.value}
+                    type="button"
+                    onClick={() => setHoursPerWeek(on ? "" : h.value)}
+                    className="rounded-lg px-3 py-2 text-xs font-medium transition-all text-left"
+                    style={{
+                      background: on ? "rgba(91,108,255,0.18)" : "rgba(255,255,255,0.04)",
+                      border: on ? "1px solid #5b6cff" : "1px solid rgba(255,255,255,0.08)",
+                      color: on ? "#7c8bff" : "#e8eaff",
+                    }}
+                  >
+                    {h.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-medium mb-2" style={{ color: "#9ba3cc" }}>Location</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <input
+                type="text"
+                value={region}
+                onChange={(e) => setRegion(e.target.value)}
+                placeholder="Region"
+                className="rounded-xl px-3 py-2 text-sm outline-none"
+                style={{ background: "#0d0f1a", border: "1px solid rgba(255,255,255,0.08)", color: "#e8eaff" }}
+              />
+              <input
+                type="text"
+                value={province}
+                onChange={(e) => setProvince(e.target.value)}
+                placeholder="Province"
+                className="rounded-xl px-3 py-2 text-sm outline-none"
+                style={{ background: "#0d0f1a", border: "1px solid rgba(255,255,255,0.08)", color: "#e8eaff" }}
+              />
+              <input
+                type="text"
+                value={municipality}
+                onChange={(e) => setMunicipality(e.target.value)}
+                placeholder="Municipality / City"
+                className="rounded-xl px-3 py-2 text-sm outline-none"
+                style={{ background: "#0d0f1a", border: "1px solid rgba(255,255,255,0.08)", color: "#e8eaff" }}
+              />
+            </div>
+          </div>
+
+          <button
+            onClick={handleSavePrefs}
+            disabled={prefsSaving || !userId || !prefsValid}
+            className="w-full py-2.5 rounded-xl font-semibold text-sm transition-all disabled:opacity-40"
+            style={{ background: prefsSaved ? "#22d3a0" : "#5b6cff", color: "#fff", fontFamily: "var(--font-sora)" }}
+          >
+            {prefsSaving ? "Saving…" : prefsSaved ? "Saved ✓" : "Save Preferences"}
+          </button>
+          {!prefsValid && interests.length > 0 && (
+            <p className="text-xs" style={{ color: "#ff8c42" }}>
+              Pick {MIN_INTERESTS}–{MAX_INTERESTS} interests with a skill level on each to save.
+            </p>
+          )}
+        </Section>
+
         <Section title="Integrations">
           <div className="flex items-center justify-between gap-4">
             <div>
