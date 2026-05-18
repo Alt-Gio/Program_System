@@ -14,7 +14,14 @@
       "Bash(Select-Object Name)",
       "Bash(Head -20)",
       "Bash(grep -E \"\\(\\\\.tsx|\\\\.ts\\)$\")",
-      "Bash(xargs grep -l \"use node\\\\|internalAction\")"
+      "Bash(xargs grep -l \"use node\\\\|internalAction\")",
+      "WebFetch(domain:api.anthropic.com)",
+      "Bash(grep -E '\\\\.\\(tsx|ts|css|html\\)$')",
+      "Bash(gunzip -c \"/home/alt/.claude/projects/-home-alt-program-src/203ec317-e74e-49e1-a8d9-d4ece0b44d15/tool-results/webfetch-1778746300020-e8ezk0.bin\")",
+      "Bash(zcat \"/home/alt/.claude/projects/-home-alt-program-src/203ec317-e74e-49e1-a8d9-d4ece0b44d15/tool-results/webfetch-1778746300020-e8ezk0.bin\")",
+      "Bash(tar -x --wildcards '*/BoxMap.html' -O)",
+      "Bash(tar -t)",
+      "Bash(tar -x --wildcards '*/boxmap-app.jsx' -O)"
     ]
   }
 }
