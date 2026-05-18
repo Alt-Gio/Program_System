@@ -222,17 +222,40 @@ function OnboardingPageInner() {
     });
     if (res.ok) {
       fetch("/api/learnhub/auth/firebase-token", { method: "POST" }).catch(() => {});
+      // Hard-navigate so the new session cookie is picked up server-side and
+      // the LearnHub layout (which gates on the session) loads with a fresh
+      // request. router.push uses the SPA cache and can land on a page that
+      // hasn't seen the cookie yet, producing a confusing "no pending profile"
+      // bounce.
+      const dest = "/learnhub/feed?welcome=1";
       if (connectCalendar) {
-        const returnTo = "/learnhub/feed?welcome=1";
-        window.location.href = `/api/learnhub/calendar/connect?returnTo=${encodeURIComponent(returnTo)}`;
+        window.location.href = `/api/learnhub/calendar/connect?returnTo=${encodeURIComponent(dest)}`;
         return;
       }
-      router.push("/learnhub/feed?welcome=1");
-    } else {
-      const data = await res.json().catch(() => ({}));
-      setError(data.error ?? "Something went wrong. Please try again.");
-      setSubmitting(false);
+      window.location.assign(dest);
+      return;
     }
+
+    // Pending cookie expired or otherwise missing → re-auth instead of
+    // dead-ending on the error toast. Saves the user's role intent so they
+    // come back to the same portal after sign-in.
+    if (res.status === 401) {
+      const portalForRole: Record<typeof selectedRole & string, string> = {
+        student: "/learnhub/login",
+        mentor: "/learnhub/login/mentor",
+        org_partner: "/learnhub/login",
+      };
+      const target = portalForRole[selectedRole] ?? "/learnhub/login";
+      setError("Your sign-up session expired. Redirecting you to sign in again…");
+      setTimeout(() => {
+        window.location.href = `${target}?expired=1`;
+      }, 1400);
+      return;
+    }
+
+    const data = await res.json().catch(() => ({}));
+    setError(data.error ?? "Something went wrong. Please try again.");
+    setSubmitting(false);
   };
 
   if (loading) {

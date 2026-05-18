@@ -32,19 +32,35 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid session" }, { status: 401 });
   }
 
+  let result: { ok: boolean; userDeleted?: boolean; alreadyGone?: boolean; log?: unknown };
   try {
-    await convex.mutation(api.learnhub_users.deleteAccount, {
+    result = await convex.mutation(api.learnhub_users.deleteAccount, {
       userId: session.sub as Id<"learnhub_users">,
     });
   } catch (err) {
-    console.error("[LearnHub] deleteAccount failed:", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[LearnHub] deleteAccount failed:", msg);
+    // Surface the real cause instead of "Failed to delete account" —
+    // the generic message let users believe the account was gone when
+    // the Convex mutation had actually rolled back.
     return NextResponse.json(
-      { error: "Failed to delete account" },
+      { error: `Delete failed: ${msg}` },
       { status: 500 },
     );
   }
 
-  const res = NextResponse.json({ ok: true });
+  if (!result.ok || (result.userDeleted === false && !result.alreadyGone)) {
+    console.error("[LearnHub] deleteAccount did not remove user doc:", result);
+    return NextResponse.json(
+      { error: "Account could not be removed. Please contact support." },
+      { status: 500 },
+    );
+  }
+
+  // Only clear cookies once we know the user doc is actually gone —
+  // clearing them earlier produced the confusing "I'm signed out but
+  // still in the DB" state behind the original bug report.
+  const res = NextResponse.json(result);
   res.cookies.delete(SESSION_COOKIE);
   res.cookies.delete(PENDING_COOKIE);
   return res;

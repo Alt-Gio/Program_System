@@ -19,6 +19,7 @@ export const learnhubTables = {
       v.literal("student"),
       v.literal("mentor"),
       v.literal("org_partner"),
+      v.literal("coordinator"),
       v.literal("admin")
     ),
     mentorStatus: v.optional(v.union(

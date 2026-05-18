@@ -10,6 +10,7 @@ import {
   SESSION_COOKIE,
   PENDING_COOKIE,
   SESSION_MAX_AGE,
+  PENDING_MAX_AGE,
 } from "@/lib/learnhub/auth";
 
 const getBaseUrl = (req: Request) =>
@@ -223,7 +224,7 @@ export async function GET(request: Request) {
       httpOnly: true,
       sameSite: "lax",
       path: "/",
-      maxAge: 10 * 60,
+      maxAge: PENDING_MAX_AGE,
       secure: process.env.NODE_ENV === "production",
     });
     return res;

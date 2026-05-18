@@ -8,7 +8,10 @@ export interface LearnHubSession {
   email: string;
   name: string;
   avatarUrl: string;
-  role: "student" | "mentor" | "org_partner";
+  // "coordinator" is the program-manager role (DICT/ILCDB staff) introduced
+  // for the Mentor/Coordinator restricted console. "admin" remains for system
+  // ops — kept separate to avoid blurring concerns.
+  role: "student" | "mentor" | "org_partner" | "coordinator" | "admin";
   iat: number;
   exp: number;
 }
@@ -125,3 +128,8 @@ export async function verifyPendingProfile(
 export const SESSION_COOKIE = "learnhub_session";
 export const PENDING_COOKIE = "learnhub_pending";
 export const SESSION_MAX_AGE = 30 * 24 * 60 * 60; // 30 days in seconds
+// Onboarding has 4 steps + role-conditional fields. The previous 10-minute
+// window expired before users could finish, leaving them stranded with a
+// "No pending profile" error when they clicked "Join LearnHub". 2 hours is
+// the new ceiling so a slow signup still completes successfully.
+export const PENDING_MAX_AGE = 2 * 60 * 60; // 2 hours in seconds

@@ -310,14 +310,19 @@ export const updateFeedColumns = mutation({
 //
 // Posts, comments, certificates, and likes the user authored are *kept* —
 // their `authorId` becomes a dangling reference, and the feed/watch UIs
-// already render missing authors as "Unknown" (the user's actual ask:
-// "what their post is saved as it is and can still be viewed […] would
-// have avoidance for any unknown post user").
+// already render missing authors as "Unknown User" (per the original
+// request: "what their post is saved as it is and can still be viewed
+// […] would have avoidance for any unknown post user").
 //
-// We cascade-delete records that are personal to the user and would
-// otherwise be orphaned with no public value: bookmarks, journal,
-// video study sessions + their dependents, Google OAuth credentials,
-// and follower edges from other users back to this one.
+// Personal records cascade-cleaned (best-effort): bookmarks, journal,
+// video study sessions + dependents, Google OAuth credentials,
+// notifications, conversations the user is a sole participant in, and
+// follower edges from other users back to this one. Each step is
+// wrapped in try/catch so a single index/table issue can't roll back
+// the critical user-doc delete — that would have left an undeletable
+// "ghost" account that still blocks re-registration via the email
+// uniqueness check in createUser. (This was the actual bug behind
+// reports of "previous account still on Convex database after delete".)
 //
 // We fully drop the user document (rather than soft-delete) so the
 // person can sign up again with the same Google account — the
@@ -329,81 +334,139 @@ export const deleteAccount = mutation({
     const user = await ctx.db.get(args.userId);
     if (!user) return { ok: true, alreadyGone: true };
 
-    // Bookmarks
-    const bookmarks = await ctx.db
-      .query("learnhub_bookmarks")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .collect();
-    for (const b of bookmarks) await ctx.db.delete(b._id);
+    // Track what happened for diagnostics — surfaced back to the API
+    // route so the server log shows which cascade step failed (if any)
+    // while still guaranteeing the account is gone.
+    const log: Record<string, number | string> = {};
+    const safe = async (label: string, fn: () => Promise<number>) => {
+      try {
+        log[label] = await fn();
+      } catch (e) {
+        log[label] = `error: ${e instanceof Error ? e.message : String(e)}`;
+      }
+    };
 
-    // Journal
-    const journal = await ctx.db
-      .query("learnhub_journal")
-      .withIndex("by_user_date", (q) => q.eq("userId", args.userId))
-      .collect();
-    for (const j of journal) await ctx.db.delete(j._id);
+    await safe("bookmarks", async () => {
+      const rows = await ctx.db
+        .query("learnhub_bookmarks")
+        .withIndex("by_user", (q) => q.eq("userId", args.userId))
+        .collect();
+      for (const r of rows) await ctx.db.delete(r._id);
+      return rows.length;
+    });
 
-    // Video sessions + dependents
-    const sessions = await ctx.db
-      .query("learnhub_video_sessions")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .collect();
-    for (const s of sessions) {
-      const notes = await ctx.db
-        .query("learnhub_video_notes")
-        .withIndex("by_session", (q) => q.eq("sessionId", s._id))
+    await safe("journal", async () => {
+      const rows = await ctx.db
+        .query("learnhub_journal")
+        .withIndex("by_user_date", (q) => q.eq("userId", args.userId))
         .collect();
-      for (const n of notes) await ctx.db.delete(n._id);
-      const fcs = await ctx.db
-        .query("learnhub_video_flashcards")
-        .withIndex("by_session", (q) => q.eq("sessionId", s._id))
+      for (const r of rows) await ctx.db.delete(r._id);
+      return rows.length;
+    });
+
+    await safe("video_sessions", async () => {
+      const sessions = await ctx.db
+        .query("learnhub_video_sessions")
+        .withIndex("by_user", (q) => q.eq("userId", args.userId))
         .collect();
-      for (const f of fcs) await ctx.db.delete(f._id);
-      const quizzes = await ctx.db
-        .query("learnhub_video_quizzes")
-        .withIndex("by_session", (q) => q.eq("sessionId", s._id))
+      for (const s of sessions) {
+        const tables: Array<"learnhub_video_notes" | "learnhub_video_flashcards" | "learnhub_video_quizzes" | "learnhub_video_timeline_events" | "learnhub_video_chat_messages" | "learnhub_video_viewers"> = [
+          "learnhub_video_notes",
+          "learnhub_video_flashcards",
+          "learnhub_video_quizzes",
+          "learnhub_video_timeline_events",
+          "learnhub_video_chat_messages",
+          "learnhub_video_viewers",
+        ];
+        for (const t of tables) {
+          try {
+            const rows = await ctx.db
+              .query(t)
+              .withIndex("by_session", (q) => q.eq("sessionId", s._id))
+              .collect();
+            for (const r of rows) await ctx.db.delete(r._id);
+          } catch {
+            // skip — table or index drift; we don't want to leak the
+            // exception and prevent the user delete below.
+          }
+        }
+        await ctx.db.delete(s._id);
+      }
+      return sessions.length;
+    });
+
+    await safe("google_credentials", async () => {
+      const rows = await ctx.db
+        .query("learnhub_google_credentials")
+        .withIndex("by_user", (q) => q.eq("userId", args.userId))
         .collect();
-      for (const qz of quizzes) await ctx.db.delete(qz._id);
-      const timeline = await ctx.db
-        .query("learnhub_video_timeline_events")
-        .withIndex("by_session", (q) => q.eq("sessionId", s._id))
-        .collect();
-      for (const t of timeline) await ctx.db.delete(t._id);
-      const chat = await ctx.db
-        .query("learnhub_video_chat_messages")
-        .withIndex("by_session", (q) => q.eq("sessionId", s._id))
-        .collect();
-      for (const c of chat) await ctx.db.delete(c._id);
-      const viewers = await ctx.db
-        .query("learnhub_video_viewers")
-        .withIndex("by_session", (q) => q.eq("sessionId", s._id))
-        .collect();
-      for (const v_ of viewers) await ctx.db.delete(v_._id);
-      await ctx.db.delete(s._id);
+      for (const r of rows) await ctx.db.delete(r._id);
+      return rows.length;
+    });
+
+    await safe("followers", async () => {
+      // No index by followingIds — scan capped at 2000. Bump when the
+      // cohort outgrows that. Removes this userId from everyone else's
+      // followingIds array.
+      const others = await ctx.db.query("learnhub_users").take(2000);
+      let touched = 0;
+      for (const u of others) {
+        if (u._id === args.userId) continue;
+        if (!u.followingIds?.includes(args.userId)) continue;
+        await ctx.db.patch(u._id, {
+          followingIds: u.followingIds.filter((id) => id !== args.userId),
+        });
+        touched++;
+      }
+      return touched;
+    });
+
+    // The critical step. Wrapped separately so we get a clear error
+    // back to the caller if the user-doc itself can't be deleted.
+    let userDeleted = false;
+    try {
+      await ctx.db.delete(args.userId);
+      userDeleted = true;
+    } catch (e) {
+      log["user_doc"] = `error: ${e instanceof Error ? e.message : String(e)}`;
     }
 
-    // Google OAuth credentials
-    const creds = await ctx.db
-      .query("learnhub_google_credentials")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .collect();
-    for (const c of creds) await ctx.db.delete(c._id);
-
-    // Other users' followingIds — strip this id from their lists.
-    // Capped at 2000 because the cohort is small; revisit if it grows.
-    const others = await ctx.db.query("learnhub_users").take(2000);
-    for (const u of others) {
-      if (u._id === args.userId) continue;
-      if (!u.followingIds?.includes(args.userId)) continue;
-      await ctx.db.patch(u._id, {
-        followingIds: u.followingIds.filter((id) => id !== args.userId),
-      });
+    // Belt and braces — confirm the row is gone so the API route never
+    // returns ok:true when the doc is still there (which was the
+    // confusing "still in Convex DB" symptom).
+    const recheck = await ctx.db.get(args.userId);
+    if (recheck) {
+      throw new Error(
+        `DELETE_FAILED: user ${args.userId} still present after delete. log=${JSON.stringify(log)}`,
+      );
     }
 
-    // Finally, the user document. Authored posts/comments/certificates
-    // now point at a deleted id — the UI surfaces them as "Unknown".
-    await ctx.db.delete(args.userId);
+    return { ok: true, userDeleted, log };
+  },
+});
 
+// Admin/coordinator-only: flip a user's role. Used to provision coordinators
+// (no self-signup path for that role — they get assigned by program staff).
+// Re-checks on the server so a stale client cookie can't grant elevation.
+export const setUserRole = mutation({
+  args: {
+    actorId: v.id("learnhub_users"),
+    targetId: v.id("learnhub_users"),
+    role: v.union(
+      v.literal("student"),
+      v.literal("mentor"),
+      v.literal("org_partner"),
+      v.literal("coordinator"),
+      v.literal("admin"),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const actor = await ctx.db.get(args.actorId);
+    if (!actor) throw new Error("Actor not found");
+    if (actor.role !== "admin" && actor.role !== "coordinator") {
+      throw new Error("FORBIDDEN: only admins or coordinators can change roles");
+    }
+    await ctx.db.patch(args.targetId, { role: args.role });
     return { ok: true };
   },
 });
