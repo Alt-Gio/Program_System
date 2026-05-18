@@ -21,6 +21,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useLearnhubSession } from "@/lib/learnhub/hooks";
+import { initialsAvatar } from "@/lib/learnhub/avatar";
 
 interface RailItem {
   id: string;
@@ -82,9 +83,7 @@ export function LeftRail({ expanded = false }: LeftRailProps) {
     }
   };
 
-  const avatarSrc =
-    session?.avatarUrl ??
-    `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(session?.name ?? "U")}&backgroundColor=FF6B35&textColor=ffffff`;
+  const avatarSrc = session?.avatarUrl ?? initialsAvatar(session?.name);
 
   const xp = user?.xpPoints ?? 0;
   const level = calculateLevel(xp);
@@ -108,8 +107,7 @@ export function LeftRail({ expanded = false }: LeftRailProps) {
                 alt={session?.name ?? ""}
                 className="lh-rail-profile-av"
                 onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).src =
-                    `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(session?.name ?? "U")}`;
+                  (e.currentTarget as HTMLImageElement).src = initialsAvatar(session?.name);
                 }}
               />
               <span className="lh-rail-profile-online-dot" aria-hidden />
@@ -221,8 +219,7 @@ export function LeftRail({ expanded = false }: LeftRailProps) {
               src={avatarSrc}
               alt=""
               onError={(e) => {
-                (e.currentTarget as HTMLImageElement).src =
-                  `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(session?.name ?? "U")}`;
+                (e.currentTarget as HTMLImageElement).src = initialsAvatar(session?.name);
               }}
             />
             <span className="lh-rail-tip">{session?.name ?? "My Profile"}</span>

@@ -11,6 +11,7 @@ import { useState } from "react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useLearnhubSession } from "@/lib/learnhub/hooks";
+import { initialsAvatar } from "@/lib/learnhub/avatar";
 import { CheckCircle2, XCircle, ArrowLeft } from "lucide-react";
 
 const GREEN = "#10b981";
@@ -63,11 +64,11 @@ export default function OrgMentorsPage() {
               background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)",
               opacity: status ? 0.7 : 1,
             }}>
-              <img src={mentor.avatarUrl} alt="" style={{
+              <img src={mentor.avatarUrl || initialsAvatar(mentor.name)} alt="" style={{
                 width: 50, height: 50, borderRadius: "50%", objectFit: "cover",
                 border: "1px solid rgba(255,255,255,0.1)", flexShrink: 0,
               }} onError={(e) => {
-                (e.currentTarget as HTMLImageElement).src = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(mentor.name)}`;
+                (e.currentTarget as HTMLImageElement).src = initialsAvatar(mentor.name);
               }} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 15, fontWeight: 700 }}>{mentor.name}</div>

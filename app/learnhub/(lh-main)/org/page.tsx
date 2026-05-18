@@ -15,6 +15,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useLearnhubSession } from "@/lib/learnhub/hooks";
+import { initialsAvatar } from "@/lib/learnhub/avatar";
 import { Briefcase, Users, ShieldCheck, Layers, CheckCircle2, XCircle, Plus, ExternalLink } from "lucide-react";
 
 const ORANGE = "#f97316";
@@ -299,11 +300,11 @@ function MentorRow({ pending, actorId }: {
       border: done === "approved" ? `1px solid ${GREEN}55` : done === "rejected" ? "1px solid rgba(239,68,68,0.45)" : "1px solid rgba(255,255,255,0.06)",
       opacity: done ? 0.85 : 1,
     }}>
-      <img src={mentor.avatarUrl} alt="" style={{
+      <img src={mentor.avatarUrl || initialsAvatar(mentor.name)} alt="" style={{
         width: 42, height: 42, borderRadius: "50%", objectFit: "cover", flexShrink: 0,
         border: "1px solid rgba(255,255,255,0.1)",
       }} onError={(e) => {
-        (e.currentTarget as HTMLImageElement).src = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(mentor.name)}`;
+        (e.currentTarget as HTMLImageElement).src = initialsAvatar(mentor.name);
       }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13.5, fontWeight: 700, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{mentor.name}</div>
