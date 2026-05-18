@@ -31,6 +31,21 @@ function isVideoPost(p: PostDoc): boolean {
 export default function WatchPage() {
   const { userId } = useLearnhubSession();
   const [muted, setMuted] = useState(true);
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  // Tracks whether we're in the mobile reels layout (≤768px). The page
+  // works in both modes — the CSS does the heavy visual lifting — but
+  // the IntersectionObserver inside each card needs to know which
+  // scroll container to observe (the snap rail on mobile, the viewport
+  // on desktop).
+  const [isReelsMode, setIsReelsMode] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mql = window.matchMedia("(max-width: 768px)");
+    const apply = () => setIsReelsMode(mql.matches);
+    apply();
+    mql.addEventListener("change", apply);
+    return () => mql.removeEventListener("change", apply);
+  }, []);
 
   const feed = useQuery(
     api.learnhub_posts.listFeedWithAuthors,
@@ -45,7 +60,7 @@ export default function WatchPage() {
   }, [feed]);
 
   return (
-    <div className="lh-watch">
+    <div className={`lh-watch${isReelsMode ? " lh-watch--reels" : ""}`}>
       <header className="lh-watch-header">
         <div>
           <h1 className="lh-watch-title">Watch</h1>
@@ -89,9 +104,14 @@ export default function WatchPage() {
       )}
 
       {feed !== undefined && videoPosts.length > 0 && (
-        <div className="lh-watch-feed">
+        <div className="lh-watch-feed" ref={scrollerRef}>
           {videoPosts.map((post) => (
-            <WatchCard key={post._id} post={post} muted={muted} />
+            <WatchCard
+              key={post._id}
+              post={post}
+              muted={muted}
+              scrollRoot={isReelsMode ? scrollerRef.current : null}
+            />
           ))}
         </div>
       )}
@@ -99,7 +119,15 @@ export default function WatchPage() {
   );
 }
 
-function WatchCard({ post, muted }: { post: FeedPostWithAuthor; muted: boolean }) {
+function WatchCard({
+  post,
+  muted,
+  scrollRoot,
+}: {
+  post: FeedPostWithAuthor;
+  muted: boolean;
+  scrollRoot: Element | null;
+}) {
   const author = post.author;
   const authorName = author?.name ?? "Unknown";
   const avatar =
@@ -122,7 +150,7 @@ function WatchCard({ post, muted }: { post: FeedPostWithAuthor; muted: boolean }
       {post.content && <p className="lh-watch-caption">{post.content}</p>}
 
       {post.type === "video" ? (
-        <UploadedVideoPlayer post={post} muted={muted} />
+        <UploadedVideoPlayer post={post} muted={muted} scrollRoot={scrollRoot} />
       ) : (
         <YouTubePreview post={post} />
       )}
@@ -158,7 +186,15 @@ function WatchCard({ post, muted }: { post: FeedPostWithAuthor; muted: boolean }
   );
 }
 
-function UploadedVideoPlayer({ post, muted }: { post: FeedPostWithAuthor; muted: boolean }) {
+function UploadedVideoPlayer({
+  post,
+  muted,
+  scrollRoot,
+}: {
+  post: FeedPostWithAuthor;
+  muted: boolean;
+  scrollRoot: Element | null;
+}) {
   const m = (post.metadata ?? {}) as { storageId?: string; posterUrl?: string };
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [hasPlayed, setHasPlayed] = useState(false);
@@ -170,14 +206,21 @@ function UploadedVideoPlayer({ post, muted }: { post: FeedPostWithAuthor; muted:
   );
   const src = storageUrl ?? null;
 
-  // Autoplay (muted) when the card is ≥60% in view; pause when it leaves.
+  // Autoplay (muted) when the card is sufficiently in view; pause when
+  // it leaves. In reels mode (scrollRoot set) we observe relative to the
+  // scrolling snap container and use a higher threshold so only the
+  // *snapped* card plays — the next card down the rail stays paused.
+  // On desktop (scrollRoot=null) we keep the original 0.6 threshold
+  // tracked against the viewport.
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
+    const isReels = Boolean(scrollRoot);
+    const threshold = isReels ? 0.75 : 0.6;
     const obs = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+          if (entry.isIntersecting && entry.intersectionRatio >= threshold) {
             setVisible(true);
             el.play().then(() => setHasPlayed(true)).catch(() => {});
           } else {
@@ -186,11 +229,11 @@ function UploadedVideoPlayer({ post, muted }: { post: FeedPostWithAuthor; muted:
           }
         }
       },
-      { threshold: [0, 0.6, 1] },
+      { root: scrollRoot, threshold: [0, threshold, 1] },
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, [src]);
+  }, [src, scrollRoot]);
 
   // Reflect the global mute toggle on every player without re-attaching it.
   useEffect(() => {

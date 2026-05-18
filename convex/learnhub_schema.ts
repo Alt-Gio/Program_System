@@ -74,6 +74,8 @@ export const learnhubTables = {
       v.literal("20+")
     )),
     onboardingCompletedAt: v.optional(v.number()),
+    feedColumns: v.optional(v.number()),
+    isDeleted: v.optional(v.boolean()),
     maxMentees: v.optional(v.number()),
     currentMenteeCount: v.optional(v.number()),
     availability: v.optional(v.string()),

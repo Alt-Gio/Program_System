@@ -98,6 +98,15 @@ function FeedPageInner() {
     userId ? { id: userId as Id<"learnhub_users"> } : "skip"
   );
 
+  // User-picked feed density. Clamp to the 1..4 range the settings page
+  // exposes; if absent, leave the inline style off so the CSS media-query
+  // default (2/3/4 depending on viewport) wins.
+  const userFeedColumns: number | undefined = (() => {
+    const raw = (me as { feedColumns?: number } | null | undefined)?.feedColumns;
+    if (typeof raw !== "number") return undefined;
+    return Math.max(1, Math.min(4, Math.round(raw)));
+  })();
+
   // Live, real-time feed query. Returns posts with their author docs joined.
   // Pass userId so the server re-ranks posts whose tags overlap the viewer's
   // interests (set during onboarding). Falls back to chronological if no userId.
@@ -293,7 +302,10 @@ function FeedPageInner() {
           )}
 
           {feed !== undefined && filteredPosts.length > 0 && (
-            <div className="lh-feed-masonry">
+            <div
+              className="lh-feed-masonry"
+              style={userFeedColumns ? { columnCount: userFeedColumns } : undefined}
+            >
               {filteredPosts.map((post) => (
                 <FeedPost key={post.id} post={post} userId={userId} />
               ))}
@@ -336,7 +348,10 @@ function FeedPageInner() {
                     <h2 className="lh-saved-group-title">
                       {g.emoji} {g.label} · {items.length}
                     </h2>
-                    <div className="lh-feed-masonry">
+                    <div
+                      className="lh-feed-masonry"
+                      style={userFeedColumns ? { columnCount: userFeedColumns } : undefined}
+                    >
                       {items.map((post) => (
                         <FeedPost key={post.id} post={post} userId={userId} />
                       ))}

@@ -163,6 +163,7 @@ export const updateProfile = mutation({
     region: v.optional(v.string()),
     province: v.optional(v.string()),
     municipality: v.optional(v.string()),
+    feedColumns: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const { id, ...fields } = args;
@@ -289,5 +290,120 @@ export const clearUnreadNotifCount = mutation({
   args: { userId: v.id("learnhub_users") },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.userId, { unreadNotifCount: 0 });
+  },
+});
+
+export const updateFeedColumns = mutation({
+  args: {
+    userId: v.id("learnhub_users"),
+    feedColumns: v.number(),
+  },
+  handler: async (ctx, args) => {
+    // Clamp 1..4 — the feed masonry has no visual room beyond that on
+    // standard desktop widths, and 0 columns would hide the feed entirely.
+    const n = Math.max(1, Math.min(4, Math.round(args.feedColumns)));
+    await ctx.db.patch(args.userId, { feedColumns: n });
+  },
+});
+
+// Permanently delete the signed-in user's account.
+//
+// Posts, comments, certificates, and likes the user authored are *kept* —
+// their `authorId` becomes a dangling reference, and the feed/watch UIs
+// already render missing authors as "Unknown" (the user's actual ask:
+// "what their post is saved as it is and can still be viewed […] would
+// have avoidance for any unknown post user").
+//
+// We cascade-delete records that are personal to the user and would
+// otherwise be orphaned with no public value: bookmarks, journal,
+// video study sessions + their dependents, Google OAuth credentials,
+// and follower edges from other users back to this one.
+//
+// We fully drop the user document (rather than soft-delete) so the
+// person can sign up again with the same Google account — the
+// googleId / email uniqueness checks in createUser would otherwise
+// block re-registration.
+export const deleteAccount = mutation({
+  args: { userId: v.id("learnhub_users") },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user) return { ok: true, alreadyGone: true };
+
+    // Bookmarks
+    const bookmarks = await ctx.db
+      .query("learnhub_bookmarks")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+    for (const b of bookmarks) await ctx.db.delete(b._id);
+
+    // Journal
+    const journal = await ctx.db
+      .query("learnhub_journal")
+      .withIndex("by_user_date", (q) => q.eq("userId", args.userId))
+      .collect();
+    for (const j of journal) await ctx.db.delete(j._id);
+
+    // Video sessions + dependents
+    const sessions = await ctx.db
+      .query("learnhub_video_sessions")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+    for (const s of sessions) {
+      const notes = await ctx.db
+        .query("learnhub_video_notes")
+        .withIndex("by_session", (q) => q.eq("sessionId", s._id))
+        .collect();
+      for (const n of notes) await ctx.db.delete(n._id);
+      const fcs = await ctx.db
+        .query("learnhub_video_flashcards")
+        .withIndex("by_session", (q) => q.eq("sessionId", s._id))
+        .collect();
+      for (const f of fcs) await ctx.db.delete(f._id);
+      const quizzes = await ctx.db
+        .query("learnhub_video_quizzes")
+        .withIndex("by_session", (q) => q.eq("sessionId", s._id))
+        .collect();
+      for (const qz of quizzes) await ctx.db.delete(qz._id);
+      const timeline = await ctx.db
+        .query("learnhub_video_timeline_events")
+        .withIndex("by_session", (q) => q.eq("sessionId", s._id))
+        .collect();
+      for (const t of timeline) await ctx.db.delete(t._id);
+      const chat = await ctx.db
+        .query("learnhub_video_chat_messages")
+        .withIndex("by_session", (q) => q.eq("sessionId", s._id))
+        .collect();
+      for (const c of chat) await ctx.db.delete(c._id);
+      const viewers = await ctx.db
+        .query("learnhub_video_viewers")
+        .withIndex("by_session", (q) => q.eq("sessionId", s._id))
+        .collect();
+      for (const v_ of viewers) await ctx.db.delete(v_._id);
+      await ctx.db.delete(s._id);
+    }
+
+    // Google OAuth credentials
+    const creds = await ctx.db
+      .query("learnhub_google_credentials")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+    for (const c of creds) await ctx.db.delete(c._id);
+
+    // Other users' followingIds — strip this id from their lists.
+    // Capped at 2000 because the cohort is small; revisit if it grows.
+    const others = await ctx.db.query("learnhub_users").take(2000);
+    for (const u of others) {
+      if (u._id === args.userId) continue;
+      if (!u.followingIds?.includes(args.userId)) continue;
+      await ctx.db.patch(u._id, {
+        followingIds: u.followingIds.filter((id) => id !== args.userId),
+      });
+    }
+
+    // Finally, the user document. Authored posts/comments/certificates
+    // now point at a deleted id — the UI surfaces them as "Unknown".
+    await ctx.db.delete(args.userId);
+
+    return { ok: true };
   },
 });

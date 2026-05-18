@@ -503,13 +503,163 @@
 }
 
 @media (max-width: 768px) {
-  .lh-watch { gap: 10px; padding: 2px 0 8px; }
-  .lh-watch-header { padding: 2px 2px 0; }
-  .lh-watch-title { font-size: 22px; }
-  .lh-watch-card { padding: 12px; border-radius: 12px; gap: 9px; }
+  /* ── Reels / Shorts mode ─────────────────────────────────────────
+     On phones, /learnhub/watch behaves like YT Shorts / IG Reels:
+     each card snaps to one viewport, the video covers the whole
+     screen, and side-rail actions (heart, comment, share) float
+     vertically on the right edge. The same React tree is reused —
+     just restyled — so post data, autoplay rules, and the mute
+     toggle keep working. Tap-to-pause is preserved on the <video>.
+     ───────────────────────────────────────────────────────────── */
+  .lh-watch {
+    gap: 0;
+    padding: 0;
+    margin: 0;
+    max-width: 100vw;
+    /* Anchor inside the (lh-main) content column so the bottom nav
+       stays visible. Falls back to the standard mobile bottom-nav
+       reserve of 70px used elsewhere in the layout. */
+    height: calc(100dvh - 70px);
+    overflow: hidden;
+    background: #000;
+    position: relative;
+  }
+
+  /* Header overlay floats on top of the first card so videos can
+     fill the screen edge-to-edge. */
+  .lh-watch-header {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    z-index: 5;
+    padding: 14px 14px 0;
+    background: linear-gradient(180deg, rgba(0,0,0,0.55), transparent);
+    pointer-events: none;
+  }
+  .lh-watch-title { color: #fff; font-size: 18px; }
+  .lh-watch-sub   { display: none; }
+  .lh-watch-sound {
+    pointer-events: auto;
+    background: rgba(0,0,0,0.45);
+    border-color: rgba(255,255,255,0.18);
+    color: #fff;
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  /* The scrolling rail — vertical mandatory snap, one card per
+     viewport. Hides the scrollbar; touch swipes drive the snap. */
   .lh-watch-feed,
-  .lh-watch-skeleton { gap: 10px; }
-  .lh-watch-play-badge svg { width: 52px; height: 52px; padding: 12px; }
+  .lh-watch-skeleton {
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scroll-snap-type: y mandatory;
+    -webkit-overflow-scrolling: touch;
+    gap: 0;
+    scrollbar-width: none;
+  }
+  .lh-watch-feed::-webkit-scrollbar,
+  .lh-watch-skeleton::-webkit-scrollbar { display: none; }
+
+  /* Each post fills the full reel viewport and is the snap target. */
+  .lh-watch-card {
+    height: calc(100dvh - 70px);
+    width: 100%;
+    padding: 0;
+    border-radius: 0;
+    border: 0;
+    background: #000;
+    gap: 0;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    box-shadow: none;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Video fills the entire reel; native controls are hidden so the
+     bottom action rail stays usable. Tap-to-pause still works
+     (the React handler is attached to the <video>). */
+  .lh-watch-player,
+  .lh-watch-player video,
+  .lh-watch-player iframe,
+  .lh-watch-player img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+    border-radius: 0;
+    object-fit: cover;
+  }
+  .lh-watch-player video::-webkit-media-controls { display: none !important; }
+
+  /* Author + caption float on the bottom-left, gradient-protected. */
+  .lh-watch-author {
+    position: absolute;
+    left: 14px;
+    right: 80px;
+    bottom: 80px;
+    z-index: 3;
+    padding: 8px;
+    border-radius: 12px;
+    background: linear-gradient(180deg, transparent, rgba(0,0,0,0.55));
+  }
+  .lh-watch-author-name { color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+  .lh-watch-author-meta { color: rgba(255,255,255,0.85); }
+  .lh-watch-caption {
+    position: absolute;
+    left: 14px;
+    right: 80px;
+    bottom: 30px;
+    z-index: 3;
+    margin: 0;
+    color: #fff;
+    font-size: 13.5px;
+    line-height: 1.4;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+    max-height: 4.2em;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+  }
+
+  /* Action rail: vertical stack on the right edge. */
+  .lh-watch-actions {
+    position: absolute;
+    right: 8px;
+    bottom: 30px;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    border: 0;
+    padding: 0;
+    background: transparent;
+  }
+  .lh-watch-action {
+    flex: 0 0 auto;
+    flex-direction: column;
+    width: 56px;
+    height: 56px;
+    padding: 0;
+    gap: 2px;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.4);
+    color: #fff;
+    font-size: 11px;
+    backdrop-filter: blur(8px);
+  }
+  .lh-watch-action:hover { background: rgba(0,0,0,0.6); color: #fff; }
+
+  .lh-watch-play-badge svg { width: 64px; height: 64px; padding: 14px; }
+
+  .lh-watch-empty {
+    margin: 30vh 16px;
+    background: rgba(255,255,255,0.04);
+    color: #fff;
+  }
 }
 
 /* ── Card component ───────────────────────────────────────────────── */
