@@ -48,7 +48,7 @@ function AdminCertIngestInner() {
   const config = useQuery(api.learnhub_cert_ingest.getConfig, {});
   const setConfig = useMutation(api.learnhub_cert_ingest.setConfig);
   const disableConfig = useMutation(api.learnhub_cert_ingest.disableConfig);
-  const trigger = useAction(api.learnhub_cert_ingest.triggerManualPoll);
+  const trigger = useAction(api.learnhub_cert_ingest_node.triggerManualPoll);
 
   const [sender, setSender] = useState("");
   const [programType, setProgramType] = useState("");

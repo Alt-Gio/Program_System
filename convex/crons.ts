@@ -78,7 +78,7 @@ crons.interval(
 crons.interval(
   "learnhub-cert-gmail-poll",
   { minutes: 15 },
-  internal.learnhub_cert_ingest.pollGmail,
+  internal.learnhub_cert_ingest_node.pollGmail,
   {}
 );
 
