@@ -53,6 +53,9 @@ export const listCuratedFeed = query({
     kind: v.optional(v.union(v.literal("channel"), v.literal("video"))),
     orgId: v.optional(v.id("learnhub_users")),
     tag: v.optional(v.string()),
+    // Optional filter on the `format` field. Only meaningful for
+    // `kind === "video"` items; ignored for channel rows.
+    format: v.optional(v.union(v.literal("video"), v.literal("short"))),
   },
   handler: async (ctx, args) => {
     const pageSize = Math.min(args.limit ?? 30, 60);
@@ -77,6 +80,19 @@ export const listCuratedFeed = query({
         (i.tags ?? []).some((t) => t.toLowerCase() === want),
       );
     }
+    if (args.format) {
+      items = items.filter(
+        (i) => i.kind !== "video" || (i.format ?? "video") === args.format,
+      );
+    }
+    // Float featured items to the top while preserving chronological
+    // ordering within each bucket.
+    items.sort((a, b) => {
+      const af = a.isFeatured ? 1 : 0;
+      const bf = b.isFeatured ? 1 : 0;
+      if (af !== bf) return bf - af;
+      return b.addedAt - a.addedAt;
+    });
 
     const page = items.slice(0, pageSize);
 
@@ -164,6 +180,9 @@ export const orgAddChannel = mutation({
     thumbnailUrl: v.optional(v.string()),
     description: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
+    channelFocus: v.optional(
+      v.union(v.literal("videos"), v.literal("shorts"), v.literal("both")),
+    ),
   },
   handler: async (ctx, args) => {
     const { actor } = await requireCurator(ctx, args.actorId);
@@ -182,6 +201,7 @@ export const orgAddChannel = mutation({
         isActive: true,
         displayName: display,
         tags: args.tags,
+        channelFocus: args.channelFocus,
       });
       return dup._id;
     }
@@ -194,6 +214,7 @@ export const orgAddChannel = mutation({
       thumbnailUrl: args.thumbnailUrl,
       description: args.description,
       tags: args.tags,
+      channelFocus: args.channelFocus ?? "videos",
       addedAt: Date.now(),
       isActive: true,
     });
@@ -209,12 +230,17 @@ export const orgAddVideo = mutation({
     description: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
     durationLabel: v.optional(v.string()),
+    // "short" stores vertical 9:16 YouTube Shorts. "video" (default) is
+    // the standard 16:9 long-form. Same table, different render path on
+    // the watch page.
+    format: v.optional(v.union(v.literal("video"), v.literal("short"))),
   },
   handler: async (ctx, args) => {
     const { actor } = await requireCurator(ctx, args.actorId);
     const id = args.youtubeVideoId.trim();
     if (!id) throw new Error("youtubeVideoId is required");
     const display = args.displayName.trim() || id;
+    const fmt = args.format ?? "video";
 
     const existing = await ctx.db
       .query("learnhub_org_curated_channels")
@@ -227,6 +253,7 @@ export const orgAddVideo = mutation({
         displayName: display,
         tags: args.tags,
         durationLabel: args.durationLabel,
+        format: fmt,
       });
       return dup._id;
     }
@@ -240,9 +267,32 @@ export const orgAddVideo = mutation({
       description: args.description,
       tags: args.tags,
       durationLabel: args.durationLabel,
+      format: fmt,
       addedAt: Date.now(),
       isActive: true,
     });
+  },
+});
+
+/**
+ * Toggle the highlight/feature flag on a curated item. Highlighted items
+ * float to the top of /learnhub/watch with a "FEATURED" badge. Honors the
+ * same actor-ownership rules as remove/set-active.
+ */
+export const orgSetFeatured = mutation({
+  args: {
+    actorId: v.id("learnhub_users"),
+    itemId: v.id("learnhub_org_curated_channels"),
+    isFeatured: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const { actor, role } = await requireCurator(ctx, args.actorId);
+    const item = await ctx.db.get(args.itemId);
+    if (!item) return;
+    if (role === "org_partner" && item.orgId !== actor._id) {
+      throw new Error("FORBIDDEN: cannot feature another org's curated item.");
+    }
+    await ctx.db.patch(args.itemId, { isFeatured: args.isFeatured });
   },
 });
 

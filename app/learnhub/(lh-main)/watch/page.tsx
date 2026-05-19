@@ -56,9 +56,16 @@ const WATCH_INTERESTS = [
   { id: "NEUROSCIENCE",  label: "Learning",      emoji: "🧠" },
 ] as const;
 
+type WatchItemKind = "video" | "short" | "channel";
+
 type WatchItem = {
   id: string;
+  kind: WatchItemKind;
+  // For video / short: YouTube video id.
+  // For channel: empty string; use `channelTarget` for the YouTube URL.
   vid: string;
+  channelTarget: string;          // Full YouTube URL for `kind === "channel"`.
+  channelFocus?: "videos" | "shorts" | "both";
   title: string;
   description: string;
   duration: string;
@@ -70,6 +77,7 @@ type WatchItem = {
   curatorIni: string;
   curatorColor: string;
   curatorIsVerified: boolean;
+  isFeatured: boolean;
 };
 
 // Pull the first two non-space characters out of a name as a fallback
@@ -94,12 +102,10 @@ type CuratedDoc = Doc<"learnhub_org_curated_channels"> & {
 };
 
 function mapCurated(doc: CuratedDoc): WatchItem | null {
-  if (doc.kind !== "video" || !doc.youtubeVideoId) return null;
   const orgName = doc.org?.name ?? "Curator";
   const color = colorFromName(orgName);
-  return {
+  const base = {
     id: doc._id as unknown as string,
-    vid: doc.youtubeVideoId,
     title: doc.displayName,
     description: doc.description ?? "",
     duration: doc.durationLabel ?? "",
@@ -111,7 +117,36 @@ function mapCurated(doc: CuratedDoc): WatchItem | null {
     curatorIni: initials(orgName),
     curatorColor: color,
     curatorIsVerified: !!doc.org?.isVerified,
+    isFeatured: !!doc.isFeatured,
   };
+  if (doc.kind === "video" && doc.youtubeVideoId) {
+    const fmt = (doc.format ?? "video") === "short" ? "short" : "video";
+    return {
+      ...base,
+      kind: fmt as WatchItemKind,
+      vid: doc.youtubeVideoId,
+      channelTarget: "",
+    };
+  }
+  if (doc.kind === "channel" && doc.youtubeChannelId) {
+    // Build the channel landing URL. @handles need a slash; UC ids go
+    // through /channel/UC.... The watch card shows a deep-link CTA.
+    const raw = doc.youtubeChannelId;
+    let base2 = raw.startsWith("@") || raw.startsWith("UC")
+      ? `https://www.youtube.com/${raw.startsWith("@") ? raw : "channel/" + raw}`
+      : `https://www.youtube.com/${raw}`;
+    const focus = doc.channelFocus ?? "videos";
+    if (focus === "shorts") base2 += "/shorts";
+    else if (focus === "videos") base2 += "/videos";
+    return {
+      ...base,
+      kind: "channel" as WatchItemKind,
+      vid: "",
+      channelTarget: base2,
+      channelFocus: focus,
+    };
+  }
+  return null;
 }
 
 export default function WatchPage() {
@@ -153,12 +188,10 @@ function WatchPageInner() {
     return () => mql.removeEventListener("change", apply);
   }, []);
 
-  // Source data from Convex. We pull a generous page (60) and let the UI
-  // filter; tiny orgs won't ever paginate beyond this.
-  const curated = useQuery(api.learnhub_curated.listCuratedFeed, {
-    limit: 60,
-    kind: "video",
-  });
+  // Source data from Convex. We pull everything (videos + shorts +
+  // channels) and let the UI filter; tiny orgs won't ever paginate beyond
+  // this. Featured items get floated to the top server-side.
+  const curated = useQuery(api.learnhub_curated.listCuratedFeed, { limit: 60 });
 
   const allVideos: WatchItem[] = useMemo(() => {
     if (!curated) return [];
@@ -520,6 +553,10 @@ function NavArrow({ dir, onClick, disabled }: { dir: "up" | "down"; onClick: () 
 function TheaterPlayer({ v, isActive }: { v: WatchItem; isActive: boolean }) {
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
+  const isShort = v.kind === "short";
+  const isChannel = v.kind === "channel";
+  const playerAspect = isShort ? "9 / 16" : "16 / 9";
+  const playerMaxWidth = isShort ? 380 : 1380;
   const thumb = `https://i.ytimg.com/vi/${v.vid}/maxresdefault.jpg`;
   const fallback = `https://i.ytimg.com/vi/${v.vid}/hqdefault.jpg`;
   const embed = `https://www.youtube.com/embed/${v.vid}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
@@ -528,58 +565,71 @@ function TheaterPlayer({ v, isActive }: { v: WatchItem; isActive: boolean }) {
     <div className={isActive ? "lh-watch-fade-in" : ""} style={{
       width: "100%", maxWidth: 1380,
       display: "flex", flexDirection: "column", gap: 16,
+      alignItems: isShort ? "center" : "stretch",
     }}>
-      <div style={{
-        position: "relative", width: "100%", aspectRatio: "16 / 9",
-        borderRadius: 20, overflow: "hidden", background: "#000",
-        boxShadow: isActive
-          ? `0 36px 100px rgba(0,0,0,0.65), 0 0 0 1px ${BORDER2}, 0 0 70px ${ORANGE}22`
-          : `0 18px 50px rgba(0,0,0,0.45), 0 0 0 1px ${BORDER}`,
-        transition: "box-shadow 0.4s",
-      }}>
-        {isActive ? (
-          <iframe
-            key={v.id}
-            src={embed}
-            title={v.title}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
-          />
-        ) : (
-          <div style={{ position: "absolute", inset: 0, background: "#10121e" }}>
-            <img src={thumb}
-              onError={(e) => { (e.currentTarget as HTMLImageElement).src = fallback; }}
-              alt=""
-              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-            <div style={{ position: "absolute", inset: 0,
-              background: "linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.55) 100%)" }} />
-            <div style={{
-              position: "absolute", inset: 0, display: "flex",
-              alignItems: "center", justifyContent: "center",
-            }}>
+      {isChannel ? (
+        <ChannelLanding v={v} isActive={isActive} />
+      ) : (
+        <div style={{
+          position: "relative", width: "100%", maxWidth: playerMaxWidth,
+          aspectRatio: playerAspect,
+          borderRadius: 20, overflow: "hidden", background: "#000",
+          boxShadow: isActive
+            ? `0 36px 100px rgba(0,0,0,0.65), 0 0 0 1px ${BORDER2}, 0 0 70px ${ORANGE}22`
+            : `0 18px 50px rgba(0,0,0,0.45), 0 0 0 1px ${BORDER}`,
+          transition: "box-shadow 0.4s",
+        }}>
+          {isActive ? (
+            <iframe
+              key={v.id}
+              src={embed}
+              title={v.title}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
+            />
+          ) : (
+            <div style={{ position: "absolute", inset: 0, background: "#10121e" }}>
+              <img src={thumb}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).src = fallback; }}
+                alt=""
+                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+              <div style={{ position: "absolute", inset: 0,
+                background: "linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.55) 100%)" }} />
               <div style={{
-                width: 84, height: 84, borderRadius: "50%",
-                background: "rgba(255,255,255,0.08)", backdropFilter: "blur(10px)",
-                border: "2px solid rgba(255,255,255,0.3)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 28, color: "white",
-              }}>▶</div>
+                position: "absolute", inset: 0, display: "flex",
+                alignItems: "center", justifyContent: "center",
+              }}>
+                <div style={{
+                  width: 84, height: 84, borderRadius: "50%",
+                  background: "rgba(255,255,255,0.08)", backdropFilter: "blur(10px)",
+                  border: "2px solid rgba(255,255,255,0.3)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 28, color: "white",
+                }}>▶</div>
+              </div>
+              {v.duration && (
+                <div style={{
+                  position: "absolute", bottom: 14, right: 14,
+                  padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700,
+                  background: "rgba(0,0,0,0.7)", color: "white",
+                }}>{v.duration}</div>
+              )}
             </div>
-            {v.duration && (
-              <div style={{
-                position: "absolute", bottom: 14, right: 14,
-                padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700,
-                background: "rgba(0,0,0,0.7)", color: "white",
-              }}>{v.duration}</div>
-            )}
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 22, alignItems: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 22, alignItems: "start", width: "100%", maxWidth: isShort ? 760 : undefined }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+            {v.isFeatured && (
+              <span style={{
+                fontSize: 9.5, fontWeight: 900, letterSpacing: 1, padding: "3px 9px",
+                borderRadius: 5, background: "#fbbf24", color: "#06070f",
+                display: "inline-flex", alignItems: "center", gap: 4,
+              }}>★ FEATURED</span>
+            )}
             {v.tags.map((c) => (
               <span key={c} style={{
                 fontSize: 9.5, fontWeight: 800, letterSpacing: 1, padding: "3px 8px",
@@ -589,9 +639,11 @@ function TheaterPlayer({ v, isActive }: { v: WatchItem; isActive: boolean }) {
             ))}
             <span style={{
               fontSize: 9.5, fontWeight: 800, letterSpacing: 1, padding: "3px 8px",
-              borderRadius: 5, background: `${ORANGE}1c`, color: ORANGE,
-              border: `1px solid ${ORANGE}33`,
-            }}>▶ YOUTUBE{v.duration ? ` · ${v.duration}` : ""}</span>
+              borderRadius: 5,
+              background: isShort ? "#fbbf241c" : isChannel ? `${SKY}1c` : `${ORANGE}1c`,
+              color: isShort ? "#fbbf24" : isChannel ? SKY : ORANGE,
+              border: `1px solid ${(isShort ? "#fbbf24" : isChannel ? SKY : ORANGE)}33`,
+            }}>{isShort ? "⚡ SHORT" : isChannel ? "📺 CHANNEL" : `▶ YOUTUBE${v.duration ? ` · ${v.duration}` : ""}`}</span>
           </div>
           <h2 style={{
             fontSize: 26, fontWeight: 700, color: TEXT, lineHeight: 1.22, margin: "0 0 10px",
@@ -636,18 +688,76 @@ function TheaterPlayer({ v, isActive }: { v: WatchItem; isActive: boolean }) {
               }
             }} hue={SKY} />
           </div>
-          <a href={`https://www.youtube.com/watch?v=${v.vid}`} target="_blank" rel="noopener noreferrer"
+          <a
+            href={isChannel ? v.channelTarget : `https://www.youtube.com/watch?v=${v.vid}`}
+            target="_blank" rel="noopener noreferrer"
             style={{
               fontSize: 11.5, color: DIM, textDecoration: "none",
               display: "flex", alignItems: "center", gap: 5,
             }}>
-            Open on YouTube
+            {isChannel ? `Browse on YouTube${v.channelFocus === "shorts" ? " · Shorts" : ""}` : "Open on YouTube"}
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M7 17L17 7M10 7h7v7" />
             </svg>
           </a>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ChannelLanding({ v, isActive }: { v: WatchItem; isActive: boolean }) {
+  // We can't iframe an entire YouTube channel — embeds are per-video. So
+  // channel entries surface as a big deep-link card that opens YouTube's
+  // /videos or /shorts page for that channel in a new tab.
+  const focus = v.channelFocus ?? "videos";
+  return (
+    <div style={{
+      width: "100%", maxWidth: 1080,
+      aspectRatio: "16 / 9",
+      borderRadius: 20,
+      background: `radial-gradient(120% 90% at 30% 0%, ${v.channelColor}33 0%, #10121e 70%)`,
+      border: `1px solid ${v.channelColor}55`,
+      boxShadow: isActive
+        ? `0 36px 100px rgba(0,0,0,0.65), 0 0 70px ${v.channelColor}22`
+        : `0 18px 50px rgba(0,0,0,0.45)`,
+      display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center",
+      padding: 40, textAlign: "center", gap: 18,
+      transition: "box-shadow 0.4s",
+    }}>
+      <span style={{
+        width: 96, height: 96, borderRadius: "50%",
+        background: `linear-gradient(135deg, ${v.channelColor}, ${v.channelColor}99)`,
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        color: "white", fontWeight: 900, fontSize: 32, letterSpacing: 1,
+        boxShadow: `0 18px 40px ${v.channelColor}55`,
+      }}>{v.channelIni}</span>
+      <div>
+        <div style={{
+          fontFamily: "'DM Serif Display', serif", fontSize: 32, color: TEXT,
+          letterSpacing: -0.6,
+        }}>{v.title}</div>
+        <div style={{ fontSize: 13, color: MUTED, marginTop: 6 }}>
+          Curated channel · focuses on {focus}
+        </div>
+      </div>
+      {v.description && (
+        <p style={{ maxWidth: 540, fontSize: 13.5, color: MUTED, lineHeight: 1.6, margin: 0 }}>
+          {v.description}
+        </p>
+      )}
+      <a
+        href={v.channelTarget}
+        target="_blank" rel="noopener noreferrer"
+        style={{
+          padding: "12px 22px", borderRadius: 999, marginTop: 6,
+          background: `linear-gradient(135deg, ${v.channelColor}, ${v.channelColor}cc)`,
+          color: "white", fontWeight: 700, fontSize: 13, textDecoration: "none",
+          boxShadow: `0 6px 20px ${v.channelColor}66`,
+          display: "inline-flex", alignItems: "center", gap: 6,
+        }}>
+        {focus === "shorts" ? "Browse Shorts on YouTube" : focus === "both" ? "Browse channel on YouTube" : "Browse videos on YouTube"} →
+      </a>
     </div>
   );
 }
@@ -792,8 +902,14 @@ function UpNextCard({
   v: WatchItem; active: boolean; onClick: () => void; order: number;
 }) {
   const [hov, setHov] = useState(false);
-  const thumb = `https://i.ytimg.com/vi/${v.vid}/mqdefault.jpg`;
-  const fallback = `https://i.ytimg.com/vi/${v.vid}/hqdefault.jpg`;
+  const isChannel = v.kind === "channel";
+  const isShort = v.kind === "short";
+  const thumb = v.vid
+    ? `https://i.ytimg.com/vi/${v.vid}/mqdefault.jpg`
+    : "";
+  const fallback = v.vid
+    ? `https://i.ytimg.com/vi/${v.vid}/hqdefault.jpg`
+    : "";
   return (
     <button onClick={onClick} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
       style={{
@@ -811,16 +927,33 @@ function UpNextCard({
         borderRadius: 8, overflow: "hidden", background: "#10121e", flexShrink: 0,
         boxShadow: active ? `0 6px 18px ${ORANGE}33` : "none",
       }}>
-        <img src={thumb}
-          onError={(e) => { (e.currentTarget as HTMLImageElement).src = fallback; }}
-          alt=""
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-        {v.duration && (
+        {isChannel ? (
+          <div style={{
+            position: "absolute", inset: 0,
+            background: `linear-gradient(135deg, ${v.channelColor}55, ${v.channelColor}18)`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: "white", fontSize: 28, fontWeight: 900, letterSpacing: 1,
+          }}>{v.channelIni}</div>
+        ) : (
+          <img src={thumb}
+            onError={(e) => { (e.currentTarget as HTMLImageElement).src = fallback; }}
+            alt=""
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+        )}
+        {v.duration && !isChannel && (
           <span style={{
             position: "absolute", bottom: 4, right: 4,
             padding: "1px 5px", borderRadius: 3, fontSize: 9.5, fontWeight: 700,
             background: "rgba(0,0,0,0.85)", color: "white",
           }}>{v.duration}</span>
+        )}
+        {(isShort || isChannel || v.isFeatured) && (
+          <span style={{
+            position: "absolute", top: 4, left: 4,
+            padding: "1px 6px", borderRadius: 3, fontSize: 9, fontWeight: 900, letterSpacing: 0.6,
+            background: v.isFeatured ? "#fbbf24" : isShort ? "#fbbf24cc" : `${SKY}cc`,
+            color: "#06070f",
+          }}>{v.isFeatured ? "★ FEATURED" : isShort ? "⚡ SHORT" : "📺 CHANNEL"}</span>
         )}
         {active && (
           <div style={{

@@ -858,6 +858,19 @@ export const learnhubTables = {
     // composer doesn't auto-derive — orgs can fill them in for richer
     // watch-page cards. Both default to undefined.
     durationLabel: v.optional(v.string()),
+    // For `kind: "video"`, distinguishes long-form videos from YouTube
+    // Shorts (vertical, <60s). The watch page renders shorts at 9:16
+    // instead of 16:9. Defaults to "video" when absent (backwards compat).
+    format: v.optional(v.union(v.literal("video"), v.literal("short"))),
+    // For `kind: "channel"`, tells the watch page whether the channel
+    // surfaces long-form videos, shorts, or both. Drives the "Browse on
+    // YouTube" deep-link target (`/videos` vs `/shorts`).
+    channelFocus: v.optional(
+      v.union(v.literal("videos"), v.literal("shorts"), v.literal("both")),
+    ),
+    // Org-pinned highlight. Floats the item to the top of the watch
+    // feed with a "FEATURED" badge.
+    isFeatured: v.optional(v.boolean()),
   })
     .index("by_org", ["orgId"])
     .index("by_active_added", ["isActive", "addedAt"]),
