@@ -503,13 +503,163 @@
 }
 
 @media (max-width: 768px) {
-  .lh-watch { gap: 10px; padding: 2px 0 8px; }
-  .lh-watch-header { padding: 2px 2px 0; }
-  .lh-watch-title { font-size: 22px; }
-  .lh-watch-card { padding: 12px; border-radius: 12px; gap: 9px; }
+  /* ── Reels / Shorts mode ─────────────────────────────────────────
+     On phones, /learnhub/watch behaves like YT Shorts / IG Reels:
+     each card snaps to one viewport, the video covers the whole
+     screen, and side-rail actions (heart, comment, share) float
+     vertically on the right edge. The same React tree is reused —
+     just restyled — so post data, autoplay rules, and the mute
+     toggle keep working. Tap-to-pause is preserved on the <video>.
+     ───────────────────────────────────────────────────────────── */
+  .lh-watch {
+    gap: 0;
+    padding: 0;
+    margin: 0;
+    max-width: 100vw;
+    /* Anchor inside the (lh-main) content column so the bottom nav
+       stays visible. Falls back to the standard mobile bottom-nav
+       reserve of 70px used elsewhere in the layout. */
+    height: calc(100dvh - 70px);
+    overflow: hidden;
+    background: #000;
+    position: relative;
+  }
+
+  /* Header overlay floats on top of the first card so videos can
+     fill the screen edge-to-edge. */
+  .lh-watch-header {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    z-index: 5;
+    padding: 14px 14px 0;
+    background: linear-gradient(180deg, rgba(0,0,0,0.55), transparent);
+    pointer-events: none;
+  }
+  .lh-watch-title { color: #fff; font-size: 18px; }
+  .lh-watch-sub   { display: none; }
+  .lh-watch-sound {
+    pointer-events: auto;
+    background: rgba(0,0,0,0.45);
+    border-color: rgba(255,255,255,0.18);
+    color: #fff;
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  /* The scrolling rail — vertical mandatory snap, one card per
+     viewport. Hides the scrollbar; touch swipes drive the snap. */
   .lh-watch-feed,
-  .lh-watch-skeleton { gap: 10px; }
-  .lh-watch-play-badge svg { width: 52px; height: 52px; padding: 12px; }
+  .lh-watch-skeleton {
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scroll-snap-type: y mandatory;
+    -webkit-overflow-scrolling: touch;
+    gap: 0;
+    scrollbar-width: none;
+  }
+  .lh-watch-feed::-webkit-scrollbar,
+  .lh-watch-skeleton::-webkit-scrollbar { display: none; }
+
+  /* Each post fills the full reel viewport and is the snap target. */
+  .lh-watch-card {
+    height: calc(100dvh - 70px);
+    width: 100%;
+    padding: 0;
+    border-radius: 0;
+    border: 0;
+    background: #000;
+    gap: 0;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    box-shadow: none;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Video fills the entire reel; native controls are hidden so the
+     bottom action rail stays usable. Tap-to-pause still works
+     (the React handler is attached to the <video>). */
+  .lh-watch-player,
+  .lh-watch-player video,
+  .lh-watch-player iframe,
+  .lh-watch-player img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+    border-radius: 0;
+    object-fit: cover;
+  }
+  .lh-watch-player video::-webkit-media-controls { display: none !important; }
+
+  /* Author + caption float on the bottom-left, gradient-protected. */
+  .lh-watch-author {
+    position: absolute;
+    left: 14px;
+    right: 80px;
+    bottom: 80px;
+    z-index: 3;
+    padding: 8px;
+    border-radius: 12px;
+    background: linear-gradient(180deg, transparent, rgba(0,0,0,0.55));
+  }
+  .lh-watch-author-name { color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+  .lh-watch-author-meta { color: rgba(255,255,255,0.85); }
+  .lh-watch-caption {
+    position: absolute;
+    left: 14px;
+    right: 80px;
+    bottom: 30px;
+    z-index: 3;
+    margin: 0;
+    color: #fff;
+    font-size: 13.5px;
+    line-height: 1.4;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+    max-height: 4.2em;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+  }
+
+  /* Action rail: vertical stack on the right edge. */
+  .lh-watch-actions {
+    position: absolute;
+    right: 8px;
+    bottom: 30px;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    border: 0;
+    padding: 0;
+    background: transparent;
+  }
+  .lh-watch-action {
+    flex: 0 0 auto;
+    flex-direction: column;
+    width: 56px;
+    height: 56px;
+    padding: 0;
+    gap: 2px;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.4);
+    color: #fff;
+    font-size: 11px;
+    backdrop-filter: blur(8px);
+  }
+  .lh-watch-action:hover { background: rgba(0,0,0,0.6); color: #fff; }
+
+  .lh-watch-play-badge svg { width: 64px; height: 64px; padding: 14px; }
+
+  .lh-watch-empty {
+    margin: 30vh 16px;
+    background: rgba(255,255,255,0.04);
+    color: #fff;
+  }
 }
 
 /* ── Card component ───────────────────────────────────────────────── */
@@ -1925,6 +2075,157 @@ button:active { transform: scale(0.97); }
   color: var(--lh-text-2);
   font-size: 14px;
   margin: 0 0 4px;
+}
+
+/* ── Active hashtag filter chip ────────────────────────────────── */
+.lh-feed-active-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--lh-accent-2) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--lh-accent-2) 35%, transparent);
+  color: var(--lh-text-2);
+  font-size: 12px;
+}
+.lh-feed-active-tag-pill {
+  font-weight: 700;
+  color: var(--lh-accent-2);
+  letter-spacing: 0.01em;
+}
+.lh-feed-active-tag button {
+  display: inline-flex; align-items: center;
+  border: 0; background: transparent; cursor: pointer;
+  color: var(--lh-text-3); padding: 2px;
+}
+.lh-feed-active-tag button:hover { color: var(--lh-text); }
+
+/* ── Boost chip on org-partner posts ───────────────────────────── */
+.lh-post-boost-row { padding: 0 16px; margin-top: 6px; }
+.lh-post-boost-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: color-mix(in srgb, var(--lh-accent) 18%, transparent);
+  color: var(--lh-accent);
+  border: 1px solid color-mix(in srgb, var(--lh-accent) 38%, transparent);
+}
+.lh-post-boost-chip.is-featured {
+  background: color-mix(in srgb, var(--lh-yellow, #f5c451) 22%, transparent);
+  color: var(--lh-yellow, #f5c451);
+  border-color: color-mix(in srgb, var(--lh-yellow, #f5c451) 50%, transparent);
+}
+.lh-post-boost-chip-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 25%, transparent);
+}
+
+/* ── Hashtag pills (post footer + inline) ──────────────────────── */
+.lh-post-hashtag-row {
+  display: flex; flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 16px 0;
+}
+.lh-post-hashtag,
+.lh-post-hashtag-inline {
+  font-family: inherit;
+  font-size: 12px;
+  border: 1px solid color-mix(in srgb, var(--lh-accent-2) 28%, transparent);
+  background: color-mix(in srgb, var(--lh-accent-2) 10%, transparent);
+  color: var(--lh-accent-2);
+  padding: 2px 9px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.lh-post-hashtag-inline {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-weight: 600;
+}
+.lh-post-hashtag:hover {
+  background: color-mix(in srgb, var(--lh-accent-2) 20%, transparent);
+  color: var(--lh-text);
+}
+.lh-post-hashtag-inline:hover {
+  text-decoration: underline;
+  color: var(--lh-text);
+}
+
+/* ── Infinite-scroll loader + end markers ──────────────────────── */
+.lh-feed-loader {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 8px;
+  padding: 26px 16px;
+  color: var(--lh-text-3);
+  font-size: 12px;
+}
+.lh-feed-end {
+  text-align: center;
+  padding: 22px 16px 30px;
+  color: var(--lh-text-3);
+  font-size: 12px;
+}
+
+/* ── Upcoming-events card injected into the feed ───────────────── */
+.lh-feed-events-card {
+  break-inside: avoid;
+  margin-bottom: 16px;
+  border-radius: var(--lh-r-lg);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--lh-accent-2) 14%, var(--lh-surface)) 0%,
+    var(--lh-surface) 70%);
+  border: 1px solid color-mix(in srgb, var(--lh-accent-2) 30%, transparent);
+  padding: 12px 14px;
+}
+.lh-feed-events-head {
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+  color: var(--lh-text);
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.lh-feed-events-list { display: flex; flex-direction: column; gap: 6px; }
+.lh-feed-event-item {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--lh-surface);
+  border: 1px solid var(--lh-surface-3);
+  color: var(--lh-text);
+  text-decoration: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.lh-feed-event-item:hover {
+  border-color: var(--lh-accent-2);
+  background: var(--lh-surface-2);
+}
+.lh-feed-event-date {
+  font-size: 11px;
+  color: var(--lh-accent-2);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.lh-feed-event-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 2px;
+  color: var(--lh-text);
+}
+.lh-feed-event-where,
+.lh-feed-event-slots {
+  font-size: 11px;
+  color: var(--lh-text-3);
+  margin-top: 1px;
 }
 
 /* DTC office widget (Right Panel) */
@@ -5628,4 +5929,903 @@ button:active { transform: scale(0.97); }
 /* Ensure the expanded left panel uses the rail's full width */
 .lh-main--left-full .lh-left-panel {
   padding: 0;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   PROGRESS CONSOLE — restricted view for mentors & coordinators
+   Uses the same token system as the rest of LearnHub so light/dark
+   themes stay consistent. The `--lh-progress-accent` var on the page
+   root selects the tier accent (indigo for mentor, orange for
+   coordinator); all internal accents inherit from it.
+   ════════════════════════════════════════════════════════════════════ */
+
+.lh-progress-page {
+  /* Default accent — overridden inline on the <main> element */
+  --lh-progress-accent: var(--lh-accent-2);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px;
+  font-family: 'Inter', 'Plus Jakarta Sans', system-ui, sans-serif;
+  color: var(--lh-text);
+  background: var(--lh-bg);
+  min-height: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+@media (max-width: 720px) {
+  .lh-progress-page { padding: 14px; gap: 16px; }
+}
+
+/* ── Eyebrow label (used many times) ── */
+.lh-progress-eyebrow {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lh-text-3);
+  margin-bottom: 8px;
+}
+
+/* ── Tier banner ── */
+.lh-progress-tier-banner {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: var(--lh-r-md);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--lh-progress-accent) 8%, transparent), transparent 80%), var(--lh-surface-2);
+  border: 1px solid var(--lh-surface-3);
+}
+.lh-progress-tier-banner-left {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 13px; color: var(--lh-text-2);
+  min-width: 0; flex: 1;
+}
+.lh-progress-tier-banner strong { color: var(--lh-text); }
+.lh-progress-tier-icon {
+  width: 30px; height: 30px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--lh-progress-accent) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--lh-progress-accent) 35%, transparent);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--lh-progress-accent);
+}
+.lh-progress-tier-sub { color: var(--lh-text-3); }
+
+/* ── Pill (small chip used in banner + live indicator) ── */
+.lh-progress-pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 5px 10px;
+  border-radius: var(--lh-r-full);
+  background: color-mix(in srgb, var(--lh-progress-accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--lh-progress-accent) 32%, transparent);
+  color: var(--lh-progress-accent);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.lh-progress-pill.is-live {
+  background: color-mix(in srgb, var(--lh-green) 10%, transparent);
+  border-color: color-mix(in srgb, var(--lh-green) 30%, transparent);
+  color: var(--lh-green);
+}
+.lh-progress-pill-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--lh-green);
+  box-shadow: 0 0 8px var(--lh-green);
+}
+
+/* ── Header ── */
+.lh-progress-header {
+  display: flex; justify-content: space-between; align-items: flex-end;
+  gap: 14px; flex-wrap: wrap;
+}
+.lh-progress-header h1 {
+  margin: 0;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: clamp(22px, 2.6vw, 28px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--lh-text);
+}
+.lh-progress-header p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--lh-text-2);
+}
+.lh-progress-header-actions {
+  display: inline-flex; align-items: center; gap: 8px;
+}
+
+/* ── Buttons ── */
+.lh-progress-primary-btn,
+.lh-progress-ghost-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 14px;
+  border-radius: var(--lh-r-md);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: filter 0.18s var(--lh-ease-out), background 0.18s, border-color 0.18s;
+  line-height: 1;
+}
+.lh-progress-primary-btn {
+  background: var(--lh-progress-accent);
+  color: #fff;
+  border: 1px solid transparent;
+}
+.lh-progress-primary-btn:hover { filter: brightness(1.08); }
+.lh-progress-ghost-btn {
+  background: var(--lh-surface-2);
+  border: 1px solid var(--lh-surface-3);
+  color: var(--lh-text);
+}
+.lh-progress-ghost-btn:hover {
+  background: var(--lh-surface-3);
+  border-color: color-mix(in srgb, var(--lh-progress-accent) 40%, var(--lh-surface-3));
+}
+.lh-progress-icon-btn { padding: 8px; }
+
+/* ── KPI grid + tile ── */
+.lh-progress-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+}
+.lh-progress-kpi {
+  position: relative;
+  overflow: hidden;
+  padding: 16px 18px;
+  border-radius: var(--lh-r-lg);
+  background: var(--lh-surface);
+  border: 1px solid var(--lh-surface-3);
+  box-shadow: var(--lh-shadow-sm);
+}
+.lh-progress-kpi-glow {
+  position: absolute; top: -28px; right: -28px;
+  width: 110px; height: 110px;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--kpi-color) 22%, transparent), transparent 70%);
+  pointer-events: none;
+}
+.lh-progress-kpi-head {
+  position: relative;
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 10px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lh-text-3);
+}
+.lh-progress-kpi-head svg { color: var(--kpi-color); }
+.lh-progress-kpi-value {
+  position: relative;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 800;
+  font-size: 26px;
+  letter-spacing: -0.03em;
+  color: var(--lh-text);
+  line-height: 1;
+}
+.lh-progress-kpi-sub {
+  position: relative;
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--kpi-color);
+  letter-spacing: 0.01em;
+}
+
+/* ── Sections (Needs attention, Mentors leaderboard, Roster) ── */
+.lh-progress-section { display: flex; flex-direction: column; gap: 10px; }
+.lh-progress-section-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 8px; flex-wrap: wrap;
+}
+.lh-progress-section-head h2 {
+  margin: 0;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--lh-text);
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.lh-progress-section-head span {
+  font-size: 11.5px;
+  color: var(--lh-text-3);
+}
+.lh-progress-section-count {
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--lh-text-3);
+  margin-left: 4px;
+}
+
+/* ── Avatar (shared) ── */
+.lh-progress-avatar {
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--lh-surface-2);
+  flex-shrink: 0;
+  border: 1px solid var(--lh-surface-3);
+}
+
+/* ── Zero state (mentor with no mentees) ── */
+.lh-progress-zero {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--lh-progress-accent) 8%, transparent), transparent);
+  border-color: color-mix(in srgb, var(--lh-progress-accent) 30%, var(--lh-surface-3));
+  padding: 20px;
+}
+.lh-progress-zero h3 {
+  margin: 0;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 16px; font-weight: 800;
+  color: var(--lh-text);
+}
+.lh-progress-zero p {
+  margin: 6px 0 12px;
+  font-size: 13px;
+  color: var(--lh-text-2);
+  line-height: 1.55;
+}
+
+/* ── Needs attention triage cards ── */
+.lh-progress-triage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+}
+.lh-progress-triage-card {
+  padding: 14px;
+  border-radius: var(--lh-r-md);
+  border: 1px solid var(--lh-surface-3);
+  background: var(--lh-surface);
+  display: flex; flex-direction: column; gap: 10px;
+  box-shadow: var(--lh-shadow-sm);
+}
+.lh-progress-triage-card.is-risk {
+  background: color-mix(in srgb, var(--lh-yellow) 6%, var(--lh-surface));
+  border-color: color-mix(in srgb, var(--lh-yellow) 28%, var(--lh-surface-3));
+}
+.lh-progress-triage-card.is-inactive {
+  background: color-mix(in srgb, var(--lh-red) 6%, var(--lh-surface));
+  border-color: color-mix(in srgb, var(--lh-red) 28%, var(--lh-surface-3));
+}
+.lh-progress-triage-top { display: flex; align-items: center; gap: 10px; }
+.lh-progress-triage-meta { min-width: 0; flex: 1; }
+.lh-progress-triage-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--lh-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.lh-progress-triage-sub {
+  font-size: 11px;
+  color: var(--lh-text-3);
+  margin-top: 2px;
+}
+.lh-progress-triage-actions { display: flex; gap: 6px; }
+.lh-progress-triage-actions > * { flex: 1; justify-content: center; padding: 7px 11px; font-size: 12px; }
+
+/* ── Coordinator mentors leaderboard ── */
+.lh-progress-mentor-list { display: flex; flex-direction: column; gap: 8px; }
+.lh-progress-mentor-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.5fr) 70px minmax(140px, 1fr) minmax(130px, 1fr) 90px;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--lh-r-md);
+  background: var(--lh-surface);
+  border: 1px solid var(--lh-surface-3);
+  text-align: left;
+  cursor: pointer;
+  color: var(--lh-text);
+  transition: background 0.18s, border-color 0.18s;
+}
+.lh-progress-mentor-row:hover {
+  background: var(--lh-surface-2);
+  border-color: color-mix(in srgb, var(--lh-accent) 30%, var(--lh-surface-3));
+}
+.lh-progress-mentor-row.is-active {
+  background: color-mix(in srgb, var(--lh-accent) 10%, var(--lh-surface));
+  border-color: color-mix(in srgb, var(--lh-accent) 45%, var(--lh-surface-3));
+}
+.lh-progress-mentor-id { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.lh-progress-mentor-name { font-size: 13.5px; font-weight: 600; color: var(--lh-text); }
+.lh-progress-mentor-sub { font-size: 11px; color: var(--lh-text-3); margin-top: 2px; }
+.lh-progress-mentor-num {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 16px; font-weight: 800; color: var(--lh-text);
+}
+.lh-progress-mentor-bar { min-width: 0; }
+.lh-progress-mentor-bar-label {
+  font-size: 10.5px;
+  color: var(--lh-text-3);
+  margin-bottom: 4px;
+}
+.lh-progress-mentor-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.lh-progress-mentor-xp {
+  text-align: right;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 12.5px; font-weight: 700;
+  color: var(--lh-accent);
+}
+
+/* ── Roster controls (search + filter pills) ── */
+.lh-progress-controls {
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+}
+.lh-progress-search {
+  position: relative;
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.lh-progress-search svg {
+  position: absolute; left: 12px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--lh-text-3);
+  pointer-events: none;
+}
+.lh-progress-search input {
+  width: 100%;
+  padding: 10px 14px 10px 34px;
+  border-radius: var(--lh-r-md);
+  border: 1px solid var(--lh-surface-3);
+  background: var(--lh-surface);
+  color: var(--lh-text);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.18s;
+}
+.lh-progress-search input:focus {
+  border-color: color-mix(in srgb, var(--lh-progress-accent) 60%, var(--lh-surface-3));
+}
+.lh-progress-filter-pill {
+  padding: 8px 12px;
+  border-radius: var(--lh-r-full);
+  background: var(--lh-surface);
+  border: 1px solid var(--lh-surface-3);
+  color: var(--lh-text-2);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, color 0.18s;
+}
+.lh-progress-filter-pill:hover { background: var(--lh-surface-2); }
+.lh-progress-filter-pill.is-active[data-color="accent"]   { background: color-mix(in srgb, var(--lh-progress-accent) 14%, transparent); border-color: color-mix(in srgb, var(--lh-progress-accent) 40%, transparent); color: var(--lh-progress-accent); }
+.lh-progress-filter-pill.is-active[data-color="on-track"] { background: color-mix(in srgb, var(--lh-green) 14%, transparent);    border-color: color-mix(in srgb, var(--lh-green) 40%, transparent);    color: var(--lh-green); }
+.lh-progress-filter-pill.is-active[data-color="risk"]     { background: color-mix(in srgb, var(--lh-yellow) 14%, transparent);   border-color: color-mix(in srgb, var(--lh-yellow) 40%, transparent);   color: var(--lh-yellow); }
+.lh-progress-filter-pill.is-active[data-color="inactive"] { background: color-mix(in srgb, var(--lh-red) 14%, transparent);      border-color: color-mix(in srgb, var(--lh-red) 40%, transparent);      color: var(--lh-red); }
+.lh-progress-filter-pill.is-active[data-color="done"]     { background: color-mix(in srgb, var(--lh-blue) 14%, transparent);     border-color: color-mix(in srgb, var(--lh-blue) 40%, transparent);     color: var(--lh-blue); }
+
+/* ── Roster rows ── */
+.lh-progress-row-list { display: flex; flex-direction: column; gap: 8px; }
+.lh-progress-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.6fr) minmax(130px, 1fr) minmax(110px, 0.9fr) 100px 110px 18px;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 16px;
+  border-radius: var(--lh-r-md);
+  background: var(--lh-surface);
+  border: 1px solid var(--lh-surface-3);
+  text-align: left;
+  cursor: pointer;
+  color: var(--lh-text);
+  transition: background 0.18s, border-color 0.18s, transform 0.18s var(--lh-ease-out);
+}
+.lh-progress-row:hover {
+  background: var(--lh-surface-2);
+  border-color: color-mix(in srgb, var(--lh-progress-accent) 30%, var(--lh-surface-3));
+  transform: translateY(-1px);
+}
+.lh-progress-row-id { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.lh-progress-row-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.lh-progress-row-sub { font-size: 11px; color: var(--lh-text-3); margin-top: 2px; }
+.lh-progress-row-bar { min-width: 0; }
+.lh-progress-row-bar-label {
+  display: flex; align-items: baseline; gap: 6px; margin-bottom: 4px;
+}
+.lh-progress-row-pct {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 15px; font-weight: 700; color: var(--lh-text);
+}
+.lh-progress-row-bar-label > span:last-child {
+  font-size: 10px; color: var(--lh-text-3);
+  letter-spacing: 0.08em; text-transform: uppercase;
+}
+.lh-progress-row-idle { font-size: 12px; }
+.lh-progress-row-idle[data-warn="high"] { color: var(--lh-red); }
+.lh-progress-row-idle[data-warn="med"]  { color: var(--lh-yellow); }
+.lh-progress-row-idle[data-warn="low"]  { color: var(--lh-text-2); }
+.lh-progress-row-xp {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 12.5px; font-weight: 700;
+  color: var(--lh-progress-accent);
+}
+.lh-progress-row-chev { color: var(--lh-text-3); }
+.lh-progress-empty {
+  padding: 32px;
+  text-align: center;
+  border-radius: var(--lh-r-md);
+  background: var(--lh-surface);
+  border: 1px dashed var(--lh-surface-3);
+  color: var(--lh-text-3);
+  font-size: 13px;
+}
+
+/* ── Progress bar (shared) ── */
+.lh-progress-bar {
+  width: 100%;
+  height: 6px;
+  border-radius: var(--lh-r-full);
+  background: var(--lh-surface-3);
+  overflow: hidden;
+}
+.lh-progress-bar-fill {
+  height: 100%;
+  border-radius: var(--lh-r-full);
+  transition: width 0.4s var(--lh-ease-out);
+}
+
+/* ── Mini pill ── */
+.lh-progress-mini-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--lh-r-full);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid var(--lh-surface-3);
+  color: var(--lh-text-2);
+  background: var(--lh-surface);
+}
+
+/* ── Status chip ── */
+.lh-progress-status-chip {
+  --chip-color: var(--lh-text-3);
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 9px;
+  border-radius: var(--lh-r-full);
+  background: color-mix(in srgb, var(--chip-color) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--chip-color) 35%, transparent);
+  color: var(--chip-color);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.lh-progress-status-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--chip-color);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--chip-color) 60%, transparent);
+}
+
+/* ── Drawer ── */
+.lh-progress-drawer-scrim {
+  position: fixed; inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex; justify-content: flex-end;
+}
+.lh-progress-drawer {
+  --lh-progress-accent: var(--lh-accent-2);
+  width: min(520px, 96vw);
+  height: 100%;
+  background: var(--lh-surface);
+  border-left: 1px solid var(--lh-surface-3);
+  box-shadow: 0 0 50px rgba(0, 0, 0, 0.3);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.lh-progress-drawer-head {
+  padding: 22px 24px;
+  border-bottom: 1px solid var(--lh-surface-3);
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 14px;
+}
+.lh-progress-drawer-id { display: flex; align-items: center; gap: 14px; }
+.lh-progress-drawer-name {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--lh-text);
+}
+.lh-progress-drawer-sub {
+  font-size: 12px;
+  color: var(--lh-text-3);
+  margin-top: 4px;
+}
+.lh-progress-drawer-actions {
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--lh-surface-3);
+  display: flex; gap: 8px; flex-wrap: wrap;
+}
+.lh-progress-drawer-body {
+  padding: 22px 24px;
+  display: flex; flex-direction: column; gap: 22px;
+}
+.lh-progress-drawer-overall {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 8px;
+}
+.lh-progress-drawer-overall-num {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--lh-text);
+}
+.lh-progress-drawer-overall-xp {
+  font-size: 11.5px;
+  color: var(--lh-text-3);
+}
+.lh-progress-stat-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+.lh-progress-stat-card {
+  padding: 12px;
+  border-radius: var(--lh-r-md);
+  border: 1px solid var(--lh-surface-3);
+  background: var(--lh-surface-2);
+}
+.lh-progress-stat-num {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  margin-top: 4px;
+}
+.lh-progress-mentor-card {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--lh-r-md);
+  background: var(--lh-surface-2);
+  border: 1px solid var(--lh-surface-3);
+}
+.lh-progress-cert-list { display: flex; flex-direction: column; gap: 6px; }
+.lh-progress-cert-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 12px;
+  border-radius: var(--lh-r-md);
+  background: color-mix(in srgb, var(--lh-green) 6%, var(--lh-surface));
+  border: 1px solid color-mix(in srgb, var(--lh-green) 28%, var(--lh-surface-3));
+  font-size: 12.5px;
+}
+.lh-progress-cert-row > span:first-child { font-weight: 600; color: var(--lh-text); }
+.lh-progress-cert-row > span:last-child {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+.lh-progress-coord-note {
+  padding: 14px 16px;
+  border-radius: var(--lh-r-md);
+  border: 1px solid color-mix(in srgb, var(--lh-accent) 35%, var(--lh-surface-3));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--lh-accent) 6%, transparent), transparent),
+    repeating-linear-gradient(135deg, color-mix(in srgb, var(--lh-accent) 8%, transparent) 0, color-mix(in srgb, var(--lh-accent) 8%, transparent) 14px, transparent 14px, transparent 28px);
+}
+.lh-progress-coord-note p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--lh-text-2);
+  line-height: 1.55;
+}
+
+/* ── Skeleton ── */
+.lh-progress-skel-head {
+  height: 26px; width: 220px;
+  background: var(--lh-surface-2);
+  border-radius: var(--lh-r-sm);
+  margin-bottom: 18px;
+}
+.lh-progress-skel-tile {
+  height: 110px;
+  border-radius: var(--lh-r-lg);
+  background: var(--lh-surface-2);
+  border: 1px solid var(--lh-surface-3);
+}
+.lh-progress-skel-rows { display: flex; flex-direction: column; gap: 8px; margin-top: 22px; }
+.lh-progress-skel-row {
+  height: 60px;
+  border-radius: var(--lh-r-md);
+  background: var(--lh-surface-2);
+  border: 1px solid var(--lh-surface-3);
+}
+
+/* ── Mobile layout adjustments ── */
+@media (max-width: 720px) {
+  .lh-progress-row {
+    grid-template-columns: 1fr auto 18px;
+    grid-template-areas:
+      "name xp chev"
+      "bar bar bar"
+      "idle status status";
+    row-gap: 8px;
+  }
+  .lh-progress-row > .lh-progress-row-id     { grid-area: name; }
+  .lh-progress-row > .lh-progress-row-bar    { grid-area: bar; }
+  .lh-progress-row > .lh-progress-row-idle   { grid-area: idle; }
+  .lh-progress-row > .lh-progress-row-xp     { grid-area: xp; justify-self: end; }
+  .lh-progress-row > .lh-progress-status-chip { grid-area: status; justify-self: end; }
+  .lh-progress-row > .lh-progress-row-chev   { grid-area: chev; }
+
+  .lh-progress-mentor-row {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "id xp"
+      "bar bar"
+      "pills num";
+    row-gap: 8px;
+  }
+  .lh-progress-mentor-row > .lh-progress-mentor-id    { grid-area: id; }
+  .lh-progress-mentor-row > .lh-progress-mentor-num   { grid-area: num; justify-self: end; }
+  .lh-progress-mentor-row > .lh-progress-mentor-bar   { grid-area: bar; }
+  .lh-progress-mentor-row > .lh-progress-mentor-pills { grid-area: pills; }
+  .lh-progress-mentor-row > .lh-progress-mentor-xp    { grid-area: xp; justify-self: end; }
+
+  .lh-progress-stat-row { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .lh-progress-stat-card { padding: 10px; }
+
+/* ─────────────────────────────────────────────────────────────────
+   Learning Path — path card + progress ring
+   Hover lifts the card and highlights the orange "Continue" pill so
+   the next-step action stays visible while scanning the list.
+   ───────────────────────────────────────────────────────────── */
+.lh-path-card {
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.lh-path-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(91,108,255,0.55);
+  box-shadow: 0 10px 28px rgba(91,108,255,0.18);
+}
+.lh-path-progress-ring {
+  width: 44px;
+  height: 44px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Watch — curated theater / reels (overrides legacy declarations)
+   The selectors below intentionally come last so they win over the
+   earlier `.lh-watch` rules that targeted the Facebook-Watch-style
+   layout. Both `--theater` and `--reels` share the same scroll-snap
+   rail; only the player aspect ratio + max-width changes.
+   ───────────────────────────────────────────────────────────── */
+
+/* Container: fills the LearnHub center column from chrome to bottom. */
+.lh-watch.lh-watch--theater,
+.lh-watch.lh-watch--reels {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  max-width: 100%;
+  height: calc(100dvh - 70px);
+  background: #04040a;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Filter chip strip — pinned at top, scrolls horizontally on overflow. */
+.lh-watch-filterbar {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  background: linear-gradient(180deg, rgba(0,0,0,0.55), transparent);
+  scrollbar-width: none;
+}
+.lh-watch-filterbar::-webkit-scrollbar { display: none; }
+.lh-watch-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.06);
+  color: #e3e6ff;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.lh-watch-chip:hover {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.32);
+}
+.lh-watch-chip.is-active {
+  background: var(--lh-accent);
+  border-color: var(--lh-accent);
+  color: #0a0a14;
+}
+.lh-watch-verified { color: var(--lh-blue, #4aa3ff); }
+.lh-watch-chip.is-active .lh-watch-verified { color: rgba(10,10,20,0.85); }
+
+/* Snap rail — vertical mandatory snap, one slide per viewport. */
+.lh-watch-rail {
+  flex: 1 1 auto;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-snap-type: y mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.lh-watch-rail::-webkit-scrollbar { display: none; }
+
+/* Each slide owns one viewport. */
+.lh-watch-slide {
+  height: 100%;
+  min-height: 100%;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background: radial-gradient(ellipse at top, rgba(91,108,255,0.10) 0%, transparent 60%), #04040a;
+  padding: 14px;
+}
+
+.lh-watch-slide-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  max-width: 780px;
+  position: relative;
+}
+
+/* Player wrapper. Theater = 16:9 (default), Reels = 9:16. */
+.lh-watch--theater .lh-watch-player {
+  width: 100%;
+  max-width: 760px;
+  aspect-ratio: 16 / 9;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+  position: relative;
+}
+.lh-watch--reels .lh-watch-player {
+  width: min(100%, 380px);
+  aspect-ratio: 9 / 16;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #000;
+  position: relative;
+}
+.lh-watch--theater .lh-watch-player iframe,
+.lh-watch--reels .lh-watch-player iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+/* Caption / curator metadata. */
+.lh-watch-meta {
+  width: 100%;
+  max-width: 760px;
+  text-align: left;
+  color: #e3e6ff;
+}
+.lh-watch-meta-title {
+  margin: 0;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.3;
+  color: #fff;
+}
+.lh-watch-meta-org {
+  margin: 4px 0 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: rgba(255,255,255,0.75);
+}
+.lh-watch-meta-desc {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: rgba(255,255,255,0.7);
+  line-height: 1.5;
+  max-height: 4.4em;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+.lh-watch-meta-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.lh-watch-meta-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: rgba(255,255,255,0.7);
+  text-decoration: none;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.16);
+}
+.lh-watch-meta-link:hover { color: #fff; background: rgba(255,255,255,0.06); }
+
+/* Inline ↑/↓ nav — right edge, vertical pair. */
+.lh-watch-nav {
+  position: absolute;
+  right: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lh-watch-nav-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.55);
+  border: 1px solid rgba(255,255,255,0.16);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+.lh-watch-nav-btn:hover { background: rgba(0,0,0,0.75); }
+.lh-watch-nav-btn:disabled { opacity: 0.32; cursor: not-allowed; }
+
+@media (max-width: 768px) {
+  /* Reels mode: hide the side nav (let the snap rail be the only nav)
+     and tighten meta padding for narrow viewports. */
+  .lh-watch.lh-watch--reels .lh-watch-nav { display: none; }
+  .lh-watch.lh-watch--reels .lh-watch-slide { padding: 10px; }
+  .lh-watch.lh-watch--reels .lh-watch-meta-title { font-size: 15px; }
+}
 }

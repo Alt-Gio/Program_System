@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { INTEREST_TAXONOMY as SHARED_TAXONOMY } from "@/lib/learnhub/interests";
 
 type Role = "student" | "mentor" | "org_partner";
 type SkillLevel = "beginner" | "intermediate" | "advanced";
@@ -23,22 +24,11 @@ const ROLES: Array<{ value: Role; label: string; desc: string; emoji: string }> 
   { value: "org_partner", label: "Org Partner", desc: "My organization posts online work opportunities for ILCDB graduates", emoji: "🏢" },
 ];
 
-// Initial taxonomy. Stored as plain strings so posts can be tagged with the
-// same vocabulary (see learnhub_posts.tags + listFeed* re-rank).
-export const INTEREST_TAXONOMY = [
-  "Digital Literacy",
-  "Python",
-  "Data Analysis",
-  "Web Dev",
-  "Cybersecurity",
-  "Project Management",
-  "Communication",
-  "Career Pivot",
-  "AI & ML",
-  "UI/UX Design",
-  "Public Speaking",
-  "Entrepreneurship",
-] as const;
+// Onboarding taxonomy is the shared one from lib/learnhub/interests so the
+// same vocabulary drives onboarding picks, feed ranking, and the composer's
+// hashtag suggestions. The const re-export keeps existing call-sites (and any
+// imports from this file) working unchanged.
+export const INTEREST_TAXONOMY = SHARED_TAXONOMY;
 
 const MIN_INTERESTS = 3;
 const MAX_INTERESTS = 5;
@@ -222,17 +212,40 @@ function OnboardingPageInner() {
     });
     if (res.ok) {
       fetch("/api/learnhub/auth/firebase-token", { method: "POST" }).catch(() => {});
+      // Hard-navigate so the new session cookie is picked up server-side and
+      // the LearnHub layout (which gates on the session) loads with a fresh
+      // request. router.push uses the SPA cache and can land on a page that
+      // hasn't seen the cookie yet, producing a confusing "no pending profile"
+      // bounce.
+      const dest = "/learnhub/feed?welcome=1";
       if (connectCalendar) {
-        const returnTo = "/learnhub/feed?welcome=1";
-        window.location.href = `/api/learnhub/calendar/connect?returnTo=${encodeURIComponent(returnTo)}`;
+        window.location.href = `/api/learnhub/calendar/connect?returnTo=${encodeURIComponent(dest)}`;
         return;
       }
-      router.push("/learnhub/feed?welcome=1");
-    } else {
-      const data = await res.json().catch(() => ({}));
-      setError(data.error ?? "Something went wrong. Please try again.");
-      setSubmitting(false);
+      window.location.assign(dest);
+      return;
     }
+
+    // Pending cookie expired or otherwise missing → re-auth instead of
+    // dead-ending on the error toast. Saves the user's role intent so they
+    // come back to the same portal after sign-in.
+    if (res.status === 401) {
+      const portalForRole: Record<typeof selectedRole & string, string> = {
+        student: "/learnhub/login",
+        mentor: "/learnhub/login/mentor",
+        org_partner: "/learnhub/login",
+      };
+      const target = portalForRole[selectedRole] ?? "/learnhub/login";
+      setError("Your sign-up session expired. Redirecting you to sign in again…");
+      setTimeout(() => {
+        window.location.href = `${target}?expired=1`;
+      }, 1400);
+      return;
+    }
+
+    const data = await res.json().catch(() => ({}));
+    setError(data.error ?? "Something went wrong. Please try again.");
+    setSubmitting(false);
   };
 
   if (loading) {

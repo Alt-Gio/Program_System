@@ -3,11 +3,18 @@ import { Suspense } from "react";
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
-import { useLearnhubSession } from "@/lib/learnhub/hooks";
+import { clearLearnhubSessionCache, useLearnhubSession } from "@/lib/learnhub/hooks";
 import type { Id } from "@/convex/_generated/dataModel";
 import { INTEREST_TAXONOMY } from "@/app/learnhub/onboarding/page";
+
+const FEED_COLUMN_OPTIONS: Array<{ value: number; label: string; sub: string }> = [
+  { value: 1, label: "1 column", sub: "Single, full-width cards" },
+  { value: 2, label: "2 columns", sub: "Default — masonry pair" },
+  { value: 3, label: "3 columns", sub: "Denser, more above the fold" },
+  { value: 4, label: "4 columns", sub: "Compact — best on wide screens" },
+];
 
 type ConvexUserId = Parameters<ReturnType<typeof useMutation<typeof api.learnhub_users.updateNotifPrefs>>>[0]["userId"];
 type EmailDigest = "daily" | "weekly" | "never";
@@ -39,6 +46,7 @@ const SKILL_LEVELS: Array<{ value: SkillLevel; short: string }> = [
 function SettingsPageInner() {
   const { userId } = useLearnhubSession();
   const sp = useSearchParams();
+  const router = useRouter();
   const [pushEnabled, setPushEnabled] = useState(false);
   const [emailDigest, setEmailDigest] = useState<EmailDigest>("weekly");
   const [quietFrom, setQuietFrom] = useState("");
@@ -51,6 +59,17 @@ function SettingsPageInner() {
 
   const updatePrefs = useMutation(api.learnhub_users.updateNotifPrefs);
   const updateProfile = useMutation(api.learnhub_users.updateProfile);
+  const updateFeedColumns = useMutation(api.learnhub_users.updateFeedColumns);
+
+  // Feed-layout preference (number of columns the masonry uses)
+  const [feedColumns, setFeedColumns] = useState<number>(2);
+  const [feedColsSavedAt, setFeedColsSavedAt] = useState(0);
+
+  // Delete-account flow
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const me = useQuery(
     api.learnhub_users.getUser,
@@ -78,8 +97,46 @@ function SettingsPageInner() {
     setRegion(me.region ?? "");
     setProvince(me.province ?? "");
     setMunicipality(me.municipality ?? "");
+    const fc = (me as { feedColumns?: number }).feedColumns;
+    if (typeof fc === "number" && fc >= 1 && fc <= 4) setFeedColumns(fc);
     setPrefsHydrated(true);
   }, [me, prefsHydrated]);
+
+  const handlePickFeedColumns = async (n: number) => {
+    setFeedColumns(n);
+    if (!userId) return;
+    try {
+      await updateFeedColumns({
+        userId: userId as Id<"learnhub_users">,
+        feedColumns: n,
+      });
+      setFeedColsSavedAt(Date.now());
+    } catch {
+      // Non-fatal — the feed simply falls back to the default column count.
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (confirmText !== "DELETE") return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch("/api/learnhub/auth/delete-account", {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? "Failed to delete account");
+      }
+      clearLearnhubSessionCache();
+      // Send the user to the login screen — their next sign-in will run
+      // through onboarding again as a fresh account.
+      router.replace("/learnhub/login?deleted=1");
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : String(e));
+      setDeleting(false);
+    }
+  };
 
   const toggleInterest = (tag: string) => {
     setInterests((prev) => {
@@ -459,9 +516,159 @@ function SettingsPageInner() {
           </div>
         </Section>
 
+        <Section title="Feed Layout">
+          <p className="text-xs" style={{ color: "#9ba3cc" }}>
+            How many columns should the For-you feed pack into? Saves
+            instantly and applies the next time the feed renders.
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {FEED_COLUMN_OPTIONS.map((opt) => {
+              const on = feedColumns === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => handlePickFeedColumns(opt.value)}
+                  className="rounded-xl px-3 py-2.5 text-left transition-all"
+                  style={{
+                    background: on ? "rgba(91,108,255,0.18)" : "rgba(255,255,255,0.04)",
+                    border: on ? "1px solid #5b6cff" : "1px solid rgba(255,255,255,0.08)",
+                    color: on ? "#7c8bff" : "#e8eaff",
+                  }}
+                  aria-pressed={on}
+                >
+                  <p className="text-sm font-semibold">{opt.label}</p>
+                  <p className="text-[11px] mt-0.5" style={{ color: on ? "#9ba9ff" : "#9ba3cc" }}>
+                    {opt.sub}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+          {/* Mini preview — pure CSS so it shows the actual column behaviour */}
+          <div
+            style={{
+              columnCount: feedColumns,
+              columnGap: 8,
+              padding: 10,
+              borderRadius: 12,
+              background: "rgba(0,0,0,0.25)",
+              border: "1px solid rgba(255,255,255,0.05)",
+            }}
+            aria-hidden
+          >
+            {[60, 90, 70, 110, 80, 100, 75, 95].map((h, i) => (
+              <div
+                key={i}
+                style={{
+                  display: "inline-block",
+                  width: "100%",
+                  height: h,
+                  marginBottom: 8,
+                  borderRadius: 8,
+                  background: "linear-gradient(135deg, rgba(91,108,255,0.25), rgba(91,108,255,0.05))",
+                  breakInside: "avoid",
+                }}
+              />
+            ))}
+          </div>
+          {feedColsSavedAt > 0 && Date.now() - feedColsSavedAt < 2500 && (
+            <p className="text-xs" style={{ color: "#22d3a0" }}>Saved ✓</p>
+          )}
+        </Section>
+
         <button onClick={handleSave} disabled={saving || !userId} className="w-full py-3 rounded-xl font-semibold text-sm transition-all disabled:opacity-40" style={{ background: saved ? "#22d3a0" : "#5b6cff", color: "#fff", fontFamily: "var(--font-sora)" }}>
           {saving ? "Saving…" : saved ? "Saved ✓" : "Save Changes"}
         </button>
+
+        {/* Danger zone — kept visually distinct so it can't be hit by accident */}
+        <div
+          className="rounded-2xl p-5 flex flex-col gap-3 mt-2"
+          style={{ background: "#1a0f12", border: "1px solid rgba(255,95,109,0.25)" }}
+        >
+          <p
+            className="text-sm font-semibold"
+            style={{ color: "#ff8a93", fontFamily: "var(--font-sora)" }}
+          >
+            Delete Account
+          </p>
+          <p className="text-xs" style={{ color: "#d9a0a6" }}>
+            Removes your profile, bookmarks, journal, video sessions and
+            connected Google credentials. <strong>Posts and comments you
+            authored stay on LearnHub</strong> but will appear as
+            &ldquo;Unknown User&rdquo;. You can sign up again with the same
+            Google account afterwards.
+          </p>
+          {!confirmDeleteOpen ? (
+            <button
+              type="button"
+              onClick={() => setConfirmDeleteOpen(true)}
+              disabled={!userId}
+              className="self-start text-xs font-semibold px-3 py-2 rounded-lg disabled:opacity-50"
+              style={{
+                background: "rgba(255,95,109,0.12)",
+                color: "#ff5f6d",
+                border: "1px solid rgba(255,95,109,0.35)",
+              }}
+            >
+              Delete my account…
+            </button>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <p className="text-xs" style={{ color: "#d9a0a6" }}>
+                Type <code style={{ color: "#ff8a93" }}>DELETE</code> to confirm. This cannot be undone.
+              </p>
+              <input
+                type="text"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                placeholder="DELETE"
+                className="rounded-xl px-3 py-2 text-sm outline-none"
+                style={{
+                  background: "#0d0f1a",
+                  border: "1px solid rgba(255,95,109,0.35)",
+                  color: "#fff",
+                  fontFamily: "var(--font-sora)",
+                  letterSpacing: 1,
+                }}
+              />
+              {deleteError && (
+                <p className="text-xs" style={{ color: "#ff5f6d" }}>{deleteError}</p>
+              )}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmDeleteOpen(false);
+                    setConfirmText("");
+                    setDeleteError(null);
+                  }}
+                  className="text-xs font-semibold px-3 py-2 rounded-lg"
+                  style={{
+                    background: "rgba(255,255,255,0.06)",
+                    color: "#e8eaff",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteAccount}
+                  disabled={confirmText !== "DELETE" || deleting}
+                  className="text-xs font-semibold px-3 py-2 rounded-lg disabled:opacity-40"
+                  style={{
+                    background: "#ff5f6d",
+                    color: "#fff",
+                    border: "1px solid #ff5f6d",
+                  }}
+                >
+                  {deleting ? "Deleting…" : "Permanently delete"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

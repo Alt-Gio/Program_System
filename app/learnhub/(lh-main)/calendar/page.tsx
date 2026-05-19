@@ -14,6 +14,10 @@ import {
   startOfWeek,
 } from "date-fns";
 import { ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
+import { useLearnhubSession } from "@/lib/learnhub/hooks";
 
 interface GcalEvent {
   id?: string | null;
@@ -167,7 +171,19 @@ function CalendarPageInner() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-2 sm:px-4 py-4 sm:py-6">
+    <div
+      className="lh-cal-wrap"
+      style={{
+        maxWidth: 1340,
+        margin: "0 auto",
+        padding: "16px 12px",
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 1fr) 300px",
+        gap: 18,
+        alignItems: "flex-start",
+      }}
+    >
+      <div className="lh-cal-main" style={{ minWidth: 0 }}>
       <header className="flex items-center justify-between mb-4 sm:mb-5 gap-2">
         <div className="min-w-0">
           <h1 className="text-lg sm:text-xl font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>
@@ -402,7 +418,26 @@ function CalendarPageInner() {
           }}
         />
       )}
+      </div>
+
+      <HabitRail />
+
+      <style>{`
+        @media (max-width: 1100px) {
+          .lh-cal-wrap { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
     </div>
+  );
+}
+
+// ── Habit Tracker rail ───────────────────────────────────────────────
+
+function HabitRail() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: 200 }} />}>
+      <HabitRailInner />
+    </Suspense>
   );
 }
 
@@ -711,4 +746,244 @@ export default function CalendarPage() {
       <CalendarPageInner />
     </Suspense>
   )
+}
+
+// ────────────────────────────────────────────────────────────────────
+// HabitRailInner — pulled in by HabitRail above. Streak card + this-week
+// habit grid + per-habit list + add-habit input. Pulls only this user's
+// data, so no role checks here.
+// ────────────────────────────────────────────────────────────────────
+
+function HabitRailInner() {
+  const { userId } = useLearnhubSession();
+  const uid = userId ? (userId as Id<"learnhub_users">) : null;
+
+  const streak = useQuery(
+    api.learnhub_streaks.getStreak,
+    uid ? { userId: uid } : "skip",
+  );
+  const habits = useQuery(
+    api.learnhub_habits.listHabits,
+    uid ? { userId: uid } : "skip",
+  );
+  const seedDefaults = useMutation(api.learnhub_habits.seedDefaultsForUser);
+  const recordActivity = useMutation(api.learnhub_streaks.recordActivity);
+  const createHabit = useMutation(api.learnhub_habits.createHabit);
+  const archiveHabit = useMutation(api.learnhub_habits.archiveHabit);
+  const logHabit = useMutation(api.learnhub_habits.logHabit);
+
+  const weekStart = useMemo(() => {
+    // Manila-Monday week start for the heatmap. We compute it locally
+    // (UTC+8) so the buckets line up with the streak module's day key.
+    const today = new Date(Date.now() + 8 * 60 * 60 * 1000);
+    today.setUTCHours(0, 0, 0, 0);
+    const dow = (today.getUTCDay() + 6) % 7; // Mon=0
+    return new Date(today.getTime() - dow * 86_400_000).toISOString().split("T")[0];
+  }, []);
+
+  const weekGrid = useQuery(
+    api.learnhub_habits.getWeekGrid,
+    uid ? { userId: uid, weekStart } : "skip",
+  );
+
+  // On first load with zero habits, drop in the defaults so the user has
+  // something to interact with. Idempotent server-side — re-running is a
+  // no-op once at least one habit exists.
+  useEffect(() => {
+    if (!uid) return;
+    if (habits !== undefined && habits.length === 0) {
+      void seedDefaults({ userId: uid });
+    }
+  }, [uid, habits, seedDefaults]);
+
+  const [newLabel, setNewLabel] = useState("");
+  const [newEmoji, setNewEmoji] = useState("🌱");
+  const [creating, setCreating] = useState(false);
+  const [activityToast, setActivityToast] = useState<string | null>(null);
+
+  if (!uid) {
+    return (
+      <aside style={{ padding: 16, color: "#9ba3cc", fontSize: 13 }}>
+        Sign in to track your daily habits.
+      </aside>
+    );
+  }
+
+  const onCheckIn = async () => {
+    const out = await recordActivity({ userId: uid });
+    setActivityToast(out.message ?? "Checked in");
+    setTimeout(() => setActivityToast(null), 2600);
+  };
+
+  const onCreate = async () => {
+    if (!newLabel.trim()) return;
+    setCreating(true);
+    try {
+      await createHabit({ userId: uid, label: newLabel.trim(), emoji: newEmoji });
+      setNewLabel("");
+      setNewEmoji("🌱");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const today = (() => {
+    const shifted = new Date(Date.now() + 8 * 60 * 60 * 1000);
+    return shifted.toISOString().split("T")[0];
+  })();
+
+  return (
+    <aside className="lh-habit-rail" style={{
+      display: "flex", flexDirection: "column", gap: 14,
+      fontFamily: "var(--font-dm-sans, 'Inter', sans-serif)", color: "#e8eaff",
+    }}>
+      {/* Streak card */}
+      <section style={{
+        padding: 14, borderRadius: 14,
+        background: `linear-gradient(135deg, rgba(249,115,22,0.12), rgba(91,108,255,0.08))`,
+        border: "1px solid rgba(249,115,22,0.25)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{
+            width: 38, height: 38, borderRadius: 10,
+            background: "rgba(249,115,22,0.18)",
+            display: "inline-flex", alignItems: "center", justifyContent: "center",
+            fontSize: 20,
+          }}>🔥</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: "var(--font-sora, 'Plus Jakarta Sans', sans-serif)", fontWeight: 800, color: "#f97316", fontSize: 22, lineHeight: 1 }}>
+              {streak?.currentStreak ?? 0}
+              <span style={{ fontSize: 11, marginLeft: 5, color: "#9ba3cc", fontWeight: 600, letterSpacing: 0.8, textTransform: "uppercase" }}>day streak</span>
+            </div>
+            <div style={{ fontSize: 11, color: "#9ba3cc", marginTop: 3 }}>
+              Longest {streak?.longestStreak ?? 0} · {streak?.streakFreezesAvailable ?? 0} freezes
+            </div>
+          </div>
+        </div>
+        <button onClick={onCheckIn} disabled={!streak || streak.activeToday} style={{
+          marginTop: 12, width: "100%", padding: "9px 14px", borderRadius: 10,
+          border: 0, cursor: streak?.activeToday ? "default" : "pointer",
+          background: streak?.activeToday ? "rgba(34,211,160,0.18)" : "#f97316",
+          color: streak?.activeToday ? "#22d3a0" : "white",
+          fontWeight: 700, fontSize: 12.5,
+        }}>
+          {streak?.activeToday ? "✓ Checked in today" : "Check in today"}
+        </button>
+        {activityToast && (
+          <div style={{ marginTop: 8, fontSize: 11.5, color: "#22d3a0" }}>{activityToast}</div>
+        )}
+      </section>
+
+      {/* Habit grid */}
+      <section style={{
+        padding: 14, borderRadius: 14,
+        background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)",
+      }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10 }}>
+          <h2 style={{ margin: 0, fontSize: 11, color: "#9ba3cc", letterSpacing: 1.4, textTransform: "uppercase", fontWeight: 800 }}>
+            This week
+          </h2>
+          <span style={{ fontSize: 10.5, color: "#5c6490" }}>
+            {weekGrid?.weekDates[0]?.slice(5) ?? "…"} – {weekGrid?.weekDates[6]?.slice(5) ?? "…"}
+          </span>
+        </div>
+
+        {weekGrid === undefined && (
+          <div style={{ color: "#5c6490", fontSize: 12 }}>Loading habits…</div>
+        )}
+
+        {weekGrid && weekGrid.rows.length === 0 && (
+          <div style={{ color: "#5c6490", fontSize: 12 }}>
+            No habits yet — add one below.
+          </div>
+        )}
+
+        {weekGrid?.rows.map((row) => {
+          const weekCount = row.days.reduce((acc, d) => acc + d.count, 0);
+          return (
+            <div key={row.habit.id as unknown as string} style={{ marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <span style={{ fontSize: 14 }}>{row.habit.emoji}</span>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: "#e8eaff", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {row.habit.label}
+                </span>
+                <span style={{ fontSize: 10.5, color: weekCount >= row.habit.targetPerWeek ? "#22d3a0" : "#9ba3cc" }}>
+                  {weekCount}/{row.habit.targetPerWeek}
+                </span>
+                <button onClick={() => archiveHabit({ userId: uid, habitId: row.habit.id })} title="Remove habit" style={{
+                  fontSize: 11, padding: "2px 6px", borderRadius: 6, cursor: "pointer",
+                  background: "transparent", border: 0, color: "#5c6490",
+                }}>✕</button>
+              </div>
+              <div className="lh-habit-grid" style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+                {row.days.map((day) => {
+                  const isFuture = day.date > today;
+                  const isToday = day.date === today;
+                  const filled = day.count > 0;
+                  return (
+                    <button
+                      key={day.date}
+                      disabled={isFuture}
+                      onClick={() => logHabit({
+                        userId: uid,
+                        habitId: row.habit.id,
+                        date: day.date,
+                        delta: filled ? -1 : 1,
+                      })}
+                      title={`${day.date}${filled ? ` · ${day.count}` : ""}`}
+                      className="lh-habit-cell"
+                      style={{
+                        height: 28, padding: 0, borderRadius: 6,
+                        background: filled ? "#f97316" : "rgba(255,255,255,0.04)",
+                        border: isToday ? "1.5px solid rgba(249,115,22,0.8)" : "1px solid rgba(255,255,255,0.06)",
+                        color: filled ? "#06060f" : "#9ba3cc",
+                        cursor: isFuture ? "default" : "pointer",
+                        opacity: isFuture ? 0.35 : 1,
+                        fontSize: 10, fontWeight: 800,
+                      }}
+                    >
+                      {filled ? day.count : ""}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* New habit input */}
+        <div style={{ marginTop: 8, paddingTop: 12, borderTop: "1px dashed rgba(255,255,255,0.08)" }}>
+          <div style={{ display: "flex", gap: 6 }}>
+            <input
+              value={newEmoji}
+              onChange={(e) => setNewEmoji(e.target.value.slice(0, 2))}
+              maxLength={2}
+              style={{
+                width: 38, padding: "8px 6px", textAlign: "center", borderRadius: 8,
+                background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.08)",
+                color: "#e8eaff", fontSize: 14, outline: "none",
+              }}
+            />
+            <input
+              value={newLabel}
+              onChange={(e) => setNewLabel(e.target.value)}
+              placeholder="+ New habit"
+              onKeyDown={(e) => e.key === "Enter" && onCreate()}
+              style={{
+                flex: 1, padding: "8px 10px", borderRadius: 8,
+                background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.08)",
+                color: "#e8eaff", fontSize: 12.5, outline: "none",
+              }}
+            />
+            <button onClick={onCreate} disabled={!newLabel.trim() || creating} style={{
+              padding: "8px 12px", borderRadius: 8, border: 0, cursor: "pointer",
+              background: newLabel.trim() ? "#5b6cff" : "rgba(255,255,255,0.06)",
+              color: newLabel.trim() ? "white" : "#5c6490",
+              fontWeight: 700, fontSize: 12,
+            }}>Add</button>
+          </div>
+        </div>
+      </section>
+    </aside>
+  );
 }

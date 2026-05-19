@@ -15,11 +15,13 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   Home, LayoutGrid, Plus, Zap, Briefcase,
   Trophy, Settings, Youtube, Calendar, PlaySquare, Users,
+  ShieldCheck, BarChart3,
 } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useLearnhubSession } from "@/lib/learnhub/hooks";
+import { initialsAvatar } from "@/lib/learnhub/avatar";
 
 interface RailItem {
   id: string;
@@ -28,7 +30,15 @@ interface RailItem {
   label: string;
 }
 
-const ITEMS: RailItem[] = [
+type Role = "student" | "mentor" | "org_partner" | "coordinator" | "admin";
+interface RoleGatedItem extends RailItem {
+  // If set, the rail link only renders for these roles. Server-side queries
+  // still enforce access; this just keeps students from seeing a tantalising
+  // link they can't open.
+  roles?: Role[];
+}
+
+const ITEMS: RoleGatedItem[] = [
   { id: "feed",        href: "/learnhub/feed",          icon: <Home size={20} />,        label: "Home" },
   { id: "watch",       href: "/learnhub/watch",         icon: <PlaySquare size={20} />,  label: "Watch" },
   { id: "learning",    href: "/learnhub/learning-path", icon: <LayoutGrid size={20} />,  label: "My Learning" },
@@ -38,6 +48,9 @@ const ITEMS: RailItem[] = [
   { id: "work",        href: "/learnhub/work",          icon: <Briefcase size={20} />,   label: "Opportunities" },
   { id: "mentors",     href: "/learnhub/mentors",       icon: <Users size={20} />,       label: "Mentors" },
   { id: "leaderboard", href: "/learnhub/leaderboard",   icon: <Trophy size={20} />,      label: "Leaderboard" },
+  { id: "progress", href: "/learnhub/progress", icon: <BarChart3 size={20} />,  label: "Progress · Restricted", roles: ["mentor", "coordinator", "admin"] },
+  { id: "org",      href: "/learnhub/org",      icon: <ShieldCheck size={20} />, label: "Org Console",            roles: ["org_partner", "coordinator", "admin"] },
+  { id: "curate",   href: "/learnhub/org/curate", icon: <PlaySquare size={20} />, label: "Watch Curation",         roles: ["org_partner", "coordinator", "admin"] },
 ];
 
 function xpForLevel(level: number): number {
@@ -71,9 +84,7 @@ export function LeftRail({ expanded = false }: LeftRailProps) {
     }
   };
 
-  const avatarSrc =
-    session?.avatarUrl ??
-    `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(session?.name ?? "U")}&backgroundColor=FF6B35&textColor=ffffff`;
+  const avatarSrc = session?.avatarUrl ?? initialsAvatar(session?.name);
 
   const xp = user?.xpPoints ?? 0;
   const level = calculateLevel(xp);
@@ -97,8 +108,7 @@ export function LeftRail({ expanded = false }: LeftRailProps) {
                 alt={session?.name ?? ""}
                 className="lh-rail-profile-av"
                 onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).src =
-                    `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(session?.name ?? "U")}`;
+                  (e.currentTarget as HTMLImageElement).src = initialsAvatar(session?.name);
                 }}
               />
               <span className="lh-rail-profile-online-dot" aria-hidden />
@@ -146,29 +156,40 @@ export function LeftRail({ expanded = false }: LeftRailProps) {
 
       {/* ── Nav items ── */}
       <div className="lh-rail-items">
-        {ITEMS.slice(0, 2).map((it) => {
-          const active = pathname === it.href || pathname.startsWith(it.href + "/");
-          return <RailLink key={it.id} item={it} active={active} expanded={expanded} />;
-        })}
+        {(() => {
+          const currentRole = (session?.role ?? null) as Role | null;
+          const visible = ITEMS.filter((it) => {
+            if (!it.roles) return true;
+            return currentRole !== null && it.roles.includes(currentRole);
+          });
+          return (
+            <>
+              {visible.slice(0, 2).map((it) => {
+                const active = pathname === it.href || pathname.startsWith(it.href + "/");
+                return <RailLink key={it.id} item={it} active={active} expanded={expanded} />;
+              })}
 
-        {/* Create-post FAB */}
-        <button
-          type="button"
-          onClick={onCreatePost}
-          className={`lh-rail-btn lh-rail-fab${expanded ? " lh-rail-btn--labeled" : ""}`}
-          title="Create Post"
-          aria-label="Create Post"
-        >
-          <span className="lh-rail-btn-icon"><Plus size={20} /></span>
-          {expanded
-            ? <span className="lh-rail-btn-label">Create Post</span>
-            : <span className="lh-rail-tip">Create Post</span>}
-        </button>
+              {/* Create-post FAB */}
+              <button
+                type="button"
+                onClick={onCreatePost}
+                className={`lh-rail-btn lh-rail-fab${expanded ? " lh-rail-btn--labeled" : ""}`}
+                title="Create Post"
+                aria-label="Create Post"
+              >
+                <span className="lh-rail-btn-icon"><Plus size={20} /></span>
+                {expanded
+                  ? <span className="lh-rail-btn-label">Create Post</span>
+                  : <span className="lh-rail-tip">Create Post</span>}
+              </button>
 
-        {ITEMS.slice(2).map((it) => {
-          const active = pathname === it.href || pathname.startsWith(it.href + "/");
-          return <RailLink key={it.id} item={it} active={active} expanded={expanded} />;
-        })}
+              {visible.slice(2).map((it) => {
+                const active = pathname === it.href || pathname.startsWith(it.href + "/");
+                return <RailLink key={it.id} item={it} active={active} expanded={expanded} />;
+              })}
+            </>
+          );
+        })()}
       </div>
 
       {/* ── Footer: Settings + (collapsed) Avatar ── */}
@@ -199,8 +220,7 @@ export function LeftRail({ expanded = false }: LeftRailProps) {
               src={avatarSrc}
               alt=""
               onError={(e) => {
-                (e.currentTarget as HTMLImageElement).src =
-                  `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(session?.name ?? "U")}`;
+                (e.currentTarget as HTMLImageElement).src = initialsAvatar(session?.name);
               }}
             />
             <span className="lh-rail-tip">{session?.name ?? "My Profile"}</span>

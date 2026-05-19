@@ -87,15 +87,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid role" }, { status: 400 });
   }
 
-  // Role strictness — if the user arrived through a specific portal
-  // (intendedRole on the pending cookie), they cannot pick a different role
-  // on the onboarding screen and bypass the gate.
+  // `profile.intendedRole` is a portal hint — it pre-selects the role on the
+  // onboarding screen so users who clicked "Sign in as Mentor" don't have to
+  // re-pick it. We deliberately do NOT enforce it as a hard gate here: that
+  // produced the "This Google account was started under the mentor portal"
+  // 409 whenever a user changed their mind on the onboarding form (e.g.
+  // clicked a mentor link by mistake and wanted to sign up as student).
+  //
+  // Privilege gating still applies downstream:
+  //   • `createUser` rejects role changes for existing accounts via
+  //     ROLE_CONFLICT, so users can't quietly swap roles after the fact.
+  //   • Actual mentor capabilities require `mentorStatus === "verified"`
+  //     (set by the mentor-invite acceptance flow), not just role="mentor".
+  // The portal-mismatch block was redundant defense and is removed.
   if (profile.intendedRole && profile.intendedRole !== role) {
-    return NextResponse.json(
-      {
-        error: `This Google account was started under the ${profile.intendedRole} portal. Use that portal to continue.`,
-      },
-      { status: 409 },
+    console.warn(
+      `[LearnHub] onboarding role override: intendedRole=${profile.intendedRole} actual=${role} for ${profile.email}`,
     );
   }
 

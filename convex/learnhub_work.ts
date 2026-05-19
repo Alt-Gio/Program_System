@@ -9,7 +9,7 @@ import { internal } from "./_generated/api";
 async function requireActor(
   ctx: MutationCtx,
   actorId: Id<"learnhub_users">,
-  allowedRoles: ReadonlyArray<"student" | "mentor" | "org_partner" | "admin">
+  allowedRoles: ReadonlyArray<"student" | "mentor" | "org_partner" | "coordinator" | "admin">
 ) {
   const actor = await ctx.db.get(actorId);
   if (!actor) throw new Error("Actor not found");

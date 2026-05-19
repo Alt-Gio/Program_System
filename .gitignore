@@ -60,3 +60,4 @@ cv-station/__pycache__/
 # Packaged CV Station binary (produced by cv-station/build.bat)
 downloads/*.exe
 downloads/*.zip.claude/
+.claude/

@@ -9,7 +9,10 @@ interface LearnhubSession {
   email: string;
   name: string;
   avatarUrl: string;
-  role: "student" | "mentor" | "org_partner" | "admin";
+  // Keep this in sync with LearnHubSession.role in lib/learnhub/auth.ts.
+  // "coordinator" is the program-manager tier (DICT/ILCDB staff) introduced
+  // for the Mentor/Coordinator Progress console.
+  role: "student" | "mentor" | "org_partner" | "coordinator" | "admin";
 }
 
 interface UseLearnhubSessionResult {

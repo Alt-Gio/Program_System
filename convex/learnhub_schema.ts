@@ -19,6 +19,7 @@ export const learnhubTables = {
       v.literal("student"),
       v.literal("mentor"),
       v.literal("org_partner"),
+      v.literal("coordinator"),
       v.literal("admin")
     ),
     mentorStatus: v.optional(v.union(
@@ -74,6 +75,8 @@ export const learnhubTables = {
       v.literal("20+")
     )),
     onboardingCompletedAt: v.optional(v.number()),
+    feedColumns: v.optional(v.number()),
+    isDeleted: v.optional(v.boolean()),
     maxMentees: v.optional(v.number()),
     currentMenteeCount: v.optional(v.number()),
     availability: v.optional(v.string()),
@@ -239,7 +242,19 @@ export const learnhubTables = {
     content: v.string(),
     metadata: v.any(),
     tags: v.optional(v.array(v.string())),
+    // Free-form `#hashtags` extracted from `content` at post time. Always
+    // stored lowercased + deduped. Drives the feed-rank match against the
+    // viewer's `interests`. `tags` (above) is kept for backward compat with
+    // posts created under the old chip picker.
+    hashtags: v.optional(v.array(v.string())),
     compressed: v.optional(v.boolean()),
+    // Visibility boost. `standard` is the org_partner auto-boost (decays
+    // after `boostExpiresAt`); `featured` is a coordinator-applied pin that
+    // ranks harder. `none` (or unset) is the default for student posts.
+    boostLevel: v.optional(
+      v.union(v.literal("none"), v.literal("standard"), v.literal("featured"))
+    ),
+    boostExpiresAt: v.optional(v.number()),
     likeCount: v.number(),
     commentCount: v.number(),
     isPinned: v.boolean(),
@@ -347,10 +362,35 @@ export const learnhubTables = {
       v.literal("work_completion"),
       v.literal("event_participation")
     ),
+    // Gmail-ingest provenance fields. All optional — manually issued
+    // certs leave them undefined.
+    imageStorageId: v.optional(v.id("_storage")),
+    originalAttachmentName: v.optional(v.string()),
+    sourceEmail: v.optional(v.object({
+      messageId: v.string(),
+      senderEmail: v.string(),
+      subject: v.string(),
+      receivedAt: v.number(),
+    })),
   })
     .index("by_email", ["studentEmail"])
     .index("by_student", ["studentId"])
-    .index("by_verification", ["verificationId"]),
+    .index("by_verification", ["verificationId"])
+    .index("by_source_message", ["sourceEmail.messageId"]),
+
+  // Singleton-ish config row driving the Gmail cert-ingest cron. One
+  // active row per deployment — set by an admin/coordinator. The
+  // `enabledByUserId` is whose Gmail credentials power the poll.
+  learnhub_cert_email_config: defineTable({
+    senderEmail: v.string(),
+    programType: v.optional(v.string()),
+    enabledByUserId: v.id("learnhub_users"),
+    lastPolledAt: v.optional(v.number()),
+    historyId: v.optional(v.string()),
+    isActive: v.boolean(),
+    updatedAt: v.number(),
+  })
+    .index("by_active", ["isActive"]),
 
   // ── Learning ─────────────────────────────────────────────
   learnhub_journal: defineTable({
@@ -360,7 +400,75 @@ export const learnhubTables = {
     tags: v.array(v.string()),
     wordCount: v.number(),
     updatedAt: v.number(),
+    // Optional reflection fields. All additive; legacy entries leave them
+    // undefined and the UI falls back gracefully.
+    mood: v.optional(v.union(
+      v.literal("low"),
+      v.literal("ok"),
+      v.literal("good"),
+      v.literal("great"),
+    )),
+    energy: v.optional(v.number()),       // 1–5
+    confidence: v.optional(v.number()),   // 1–5
+    promptResponses: v.optional(v.array(v.object({
+      promptId: v.string(),
+      answer: v.string(),
+    }))),
+    linkedSessionIds: v.optional(v.array(v.id("learnhub_video_sessions"))),
+    aiSummary: v.optional(v.object({
+      text: v.string(),
+      generatedAt: v.number(),
+      model: v.string(),
+      weekStart: v.string(),
+    })),
   }).index("by_user_date", ["userId", "date"]),
+
+  // Curated prompt bank rotated into the journal editor. Small table (~12
+  // rows). Seeded once via the admin-only seedPrompts mutation.
+  learnhub_journal_prompts: defineTable({
+    slug: v.string(),
+    text: v.string(),
+    category: v.union(
+      v.literal("learning"),
+      v.literal("reflection"),
+      v.literal("goal"),
+      v.literal("mood"),
+    ),
+    weight: v.number(),
+    isActive: v.boolean(),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_category", ["category"])
+    .index("by_active", ["isActive"]),
+
+  // ── Habits ───────────────────────────────────────────────
+  // Per-user habit definitions surfaced on /learnhub/calendar. A "habit"
+  // is a learning routine the user wants to repeat — e.g., watch a
+  // video, write a journal entry, complete a module.
+  learnhub_habits: defineTable({
+    userId: v.id("learnhub_users"),
+    slug: v.string(),           // stable identifier per user, e.g. "watch_video"
+    label: v.string(),
+    emoji: v.string(),
+    targetPerWeek: v.number(),  // 1–7
+    createdAt: v.number(),
+    archivedAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_slug", ["userId", "slug"]),
+
+  // One row per (user, habit, day) — idempotent within the same Manila
+  // day. `count` accumulates if the user logs multiple times in one day.
+  learnhub_habit_logs: defineTable({
+    userId: v.id("learnhub_users"),
+    habitId: v.id("learnhub_habits"),
+    date: v.string(),           // Manila YYYY-MM-DD
+    count: v.number(),
+    loggedAt: v.number(),
+  })
+    .index("by_user_date", ["userId", "date"])
+    .index("by_habit_date", ["habitId", "date"])
+    .index("by_user_habit_date", ["userId", "habitId", "date"]),
 
   learnhub_bookmarks: defineTable({
     userId: v.id("learnhub_users"),
@@ -859,6 +967,47 @@ export const learnhubTables = {
     expiresAt: v.number(),
     createdAt: v.number(),
   }).index("by_token", ["inviteToken"]),
+
+  // Curated YouTube channels & videos picked by Org Partners. Drives the
+  // /learnhub/watch feed: viewers only see what one of the partner orgs has
+  // surfaced, so the catalog stays educational instead of doom-scrolly.
+  // `kind` decides which of the two id fields is populated; we keep both on
+  // one table so the management UI can render a single chronological list.
+  learnhub_org_curated_channels: defineTable({
+    orgId: v.id("learnhub_users"),
+    kind: v.union(v.literal("channel"), v.literal("video")),
+    youtubeChannelId: v.optional(v.string()),
+    youtubeVideoId: v.optional(v.string()),
+    displayName: v.string(),
+    thumbnailUrl: v.optional(v.string()),
+    description: v.optional(v.string()),
+    addedAt: v.number(),
+    isActive: v.boolean(),
+    // Optional interest tags so /learnhub/watch can offer the same
+    // category-driven filter as the LearnHub design (Security, Cloud,
+    // Tech4ED, …). Stored as plain strings to match the interest
+    // taxonomy. Multi-select at add time.
+    tags: v.optional(v.array(v.string())),
+    // Optional duration label (e.g., "12:34") and curator note that the
+    // composer doesn't auto-derive — orgs can fill them in for richer
+    // watch-page cards. Both default to undefined.
+    durationLabel: v.optional(v.string()),
+    // For `kind: "video"`, distinguishes long-form videos from YouTube
+    // Shorts (vertical, <60s). The watch page renders shorts at 9:16
+    // instead of 16:9. Defaults to "video" when absent (backwards compat).
+    format: v.optional(v.union(v.literal("video"), v.literal("short"))),
+    // For `kind: "channel"`, tells the watch page whether the channel
+    // surfaces long-form videos, shorts, or both. Drives the "Browse on
+    // YouTube" deep-link target (`/videos` vs `/shorts`).
+    channelFocus: v.optional(
+      v.union(v.literal("videos"), v.literal("shorts"), v.literal("both")),
+    ),
+    // Org-pinned highlight. Floats the item to the top of the watch
+    // feed with a "FEATURED" badge.
+    isFeatured: v.optional(v.boolean()),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_active_added", ["isActive", "addedAt"]),
 
   // ── Reports ──────────────────────────────────────────────
   learnhub_quarterly_reports: defineTable({

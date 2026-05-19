@@ -15,6 +15,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LogOut, User, Settings, Shield } from "lucide-react";
 import { useLearnhubSession, clearLearnhubSessionCache } from "@/lib/learnhub/hooks";
+import { initialsAvatar } from "@/lib/learnhub/avatar";
 
 const ROLE_LABEL: Record<string, string> = {
   student: "Student",
@@ -85,9 +86,7 @@ export function AvatarMenu() {
     .slice(0, 2)
     .join("")
     .toUpperCase() || "U";
-  const avatarSrc =
-    session?.avatarUrl ||
-    `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}&backgroundColor=FF6B35&textColor=ffffff`;
+  const avatarSrc = session?.avatarUrl || initialsAvatar(name);
 
   return (
     <div ref={wrapRef} style={{ position: "relative" }}>
@@ -108,8 +107,7 @@ export function AvatarMenu() {
           src={avatarSrc}
           alt=""
           onError={(e) => {
-            (e.currentTarget as HTMLImageElement).src =
-              `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`;
+            (e.currentTarget as HTMLImageElement).src = initialsAvatar(name);
           }}
         />
       </button>
