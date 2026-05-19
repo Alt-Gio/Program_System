@@ -416,6 +416,35 @@ export const learnhubTables = {
     .index("by_category", ["category"])
     .index("by_active", ["isActive"]),
 
+  // ── Habits ───────────────────────────────────────────────
+  // Per-user habit definitions surfaced on /learnhub/calendar. A "habit"
+  // is a learning routine the user wants to repeat — e.g., watch a
+  // video, write a journal entry, complete a module.
+  learnhub_habits: defineTable({
+    userId: v.id("learnhub_users"),
+    slug: v.string(),           // stable identifier per user, e.g. "watch_video"
+    label: v.string(),
+    emoji: v.string(),
+    targetPerWeek: v.number(),  // 1–7
+    createdAt: v.number(),
+    archivedAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_slug", ["userId", "slug"]),
+
+  // One row per (user, habit, day) — idempotent within the same Manila
+  // day. `count` accumulates if the user logs multiple times in one day.
+  learnhub_habit_logs: defineTable({
+    userId: v.id("learnhub_users"),
+    habitId: v.id("learnhub_habits"),
+    date: v.string(),           // Manila YYYY-MM-DD
+    count: v.number(),
+    loggedAt: v.number(),
+  })
+    .index("by_user_date", ["userId", "date"])
+    .index("by_habit_date", ["habitId", "date"])
+    .index("by_user_habit_date", ["userId", "habitId", "date"]),
+
   learnhub_bookmarks: defineTable({
     userId: v.id("learnhub_users"),
     postId: v.id("learnhub_posts"),
