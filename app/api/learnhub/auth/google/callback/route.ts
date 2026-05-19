@@ -39,6 +39,12 @@ function safeLearnhubCallback(url: string): string {
 // Build an error redirect URL. If the user started from the role carousel
 // (we have `intendedRole`), send them back there with the right portal
 // auto-opened. Otherwise fall back to the standalone /learnhub/login.
+//
+// Special-case: if a user with an existing org_partner account picked the
+// wrong portal, the role_mismatch error would land them on /login where
+// the org-partner option isn't visible — leaving them stuck. Route those
+// to /learnhub/login instead, which now auto-reveals the org-partner
+// sign-in panel when it sees this exact reason.
 function errorRedirect(
   request: Request,
   intendedRole: LhRole | null,
@@ -46,11 +52,18 @@ function errorRedirect(
   detail?: string,
 ): NextResponse {
   const base = getBaseUrl(request);
-  const target = intendedRole ? "/login" : "/learnhub/login";
+  const isOrgMismatch = code === "role_mismatch" && (detail ?? "").startsWith("existing:org_partner");
+  const target = isOrgMismatch || !intendedRole ? "/learnhub/login" : "/login";
   const url = new URL(target, base);
   url.searchParams.set("error", code);
-  if (intendedRole) url.searchParams.set("role", intendedRole);
-  if (detail) url.searchParams.set("detail", detail.slice(0, 200));
+  if (intendedRole && !isOrgMismatch) url.searchParams.set("role", intendedRole);
+  if (detail) {
+    // The /learnhub/login page reads `reason` for its auto-reveal logic,
+    // while the carousel /login reads `detail`. Send both so neither side
+    // has to guess.
+    url.searchParams.set("reason", detail.slice(0, 200));
+    url.searchParams.set("detail", detail.slice(0, 200));
+  }
   return NextResponse.redirect(url);
 }
 

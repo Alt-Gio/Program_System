@@ -1,16 +1,63 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
 function LoginContent() {
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
+  const errorReason = searchParams.get("reason") ?? "";
   const callbackUrl = searchParams.get("callbackUrl") ?? "/learnhub/feed";
+
+  // Org-partner sign-in is intentionally not surfaced as a primary button —
+  // it's an institutional role, not something a learner ever picks. The
+  // existing `intendedRole` mismatch in the callback would otherwise refuse
+  // an org_partner sign-in if it came through the default (no-role) flow
+  // when the user is mid-onboarding. We expose two discoverable ways in:
+  //   1. A small "Are you an Org Partner?" link below the main button.
+  //   2. A keyboard easter-egg: triple-click the "L" badge (or press
+  //      Shift+O three times). This is for institutional admins doing
+  //      site walkthroughs without the link being obvious to visitors.
+  const [orgRevealed, setOrgRevealed] = useState(false);
+  const badgeClicks = useRef<number[]>([]);
 
   const handleGoogleLogin = () => {
     window.location.href = `/api/learnhub/auth/google?callbackUrl=${encodeURIComponent(callbackUrl)}`;
   };
+
+  const handleOrgLogin = () => {
+    window.location.href = `/api/learnhub/auth/google?role=org_partner&callbackUrl=${encodeURIComponent(callbackUrl)}`;
+  };
+
+  const tapBadge = () => {
+    const now = Date.now();
+    badgeClicks.current = [...badgeClicks.current, now].filter((t) => now - t < 1200);
+    if (badgeClicks.current.length >= 3) {
+      setOrgRevealed(true);
+      badgeClicks.current = [];
+    }
+  };
+
+  // Auto-reveal the org option if the user got bounced here with a
+  // role_mismatch error whose existing role is org_partner — otherwise
+  // they're stuck guessing which portal to use.
+  useEffect(() => {
+    if (error === "role_mismatch" && errorReason.startsWith("existing:org_partner")) {
+      setOrgRevealed(true);
+    }
+  }, [error, errorReason]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "O" && e.shiftKey) {
+        badgeClicks.current = [...badgeClicks.current, Date.now()].filter((t) => Date.now() - t < 1200);
+        if (badgeClicks.current.length >= 3) setOrgRevealed(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center px-4" style={{ background: "#0d0f1a" }}>
@@ -18,7 +65,14 @@ function LoginContent() {
 
       <div className="relative z-10 w-full max-w-sm rounded-2xl p-8 flex flex-col items-center gap-6" style={{ background: "#131626", border: "1px solid rgba(91,108,255,0.2)", boxShadow: "0 0 40px rgba(91,108,255,0.08)" }}>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold" style={{ background: "#5b6cff", color: "#fff", fontFamily: "var(--font-sora)" }}>L</div>
+          <button
+            type="button"
+            onClick={tapBadge}
+            title=""
+            aria-label="LearnHub"
+            className="w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold"
+            style={{ background: "#5b6cff", color: "#fff", fontFamily: "var(--font-sora)", border: 0, cursor: "pointer" }}
+          >L</button>
           <div>
             <p className="text-xs font-medium tracking-widest uppercase" style={{ color: "#5b6cff", fontFamily: "var(--font-sora)" }}>ILCDB</p>
             <p className="text-lg font-bold leading-tight" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>LearnHub</p>
@@ -31,8 +85,16 @@ function LoginContent() {
         </div>
 
         {error && (
-          <div className="w-full rounded-lg px-4 py-3 text-sm text-center" style={{ background: "rgba(255,95,109,0.1)", border: "1px solid rgba(255,95,109,0.3)", color: "#ff5f6d" }}>
-            {errorMessage(error)}
+          <div
+            className="w-full rounded-lg px-4 py-3 text-sm"
+            style={{
+              background: "rgba(255,95,109,0.08)",
+              border: "1px solid rgba(255,95,109,0.28)",
+              color: "#ffb4ba",
+              lineHeight: 1.5,
+            }}
+          >
+            {errorMessage(error, errorReason)}
           </div>
         )}
 
@@ -47,6 +109,64 @@ function LoginContent() {
           Continue with Google
         </button>
 
+        {orgRevealed ? (
+          <div
+            className="w-full rounded-xl px-4 py-3"
+            style={{
+              background: "rgba(249,115,22,0.06)",
+              border: "1px solid rgba(249,115,22,0.28)",
+            }}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span
+                className="text-xs font-semibold tracking-widest uppercase"
+                style={{ color: "#f97316", fontFamily: "var(--font-sora)" }}
+              >
+                Org Partner sign-in
+              </span>
+              <button
+                type="button"
+                onClick={() => setOrgRevealed(false)}
+                aria-label="Hide org partner sign-in"
+                className="text-xs"
+                style={{ color: "#9ba3cc", background: "transparent", border: 0, cursor: "pointer" }}
+              >
+                hide
+              </button>
+            </div>
+            <p className="text-xs mb-3" style={{ color: "#9ba3cc", lineHeight: 1.5 }}>
+              Institutional accounts only. Use this to manage cohorts,
+              verify mentors, and post opportunities.
+            </p>
+            <button
+              type="button"
+              onClick={handleOrgLogin}
+              className="w-full flex items-center justify-center gap-3 rounded-lg py-2.5 px-4 text-sm font-medium transition-colors"
+              style={{
+                background: "rgba(249,115,22,0.12)",
+                border: "1px solid rgba(249,115,22,0.4)",
+                color: "#fdba74",
+              }}
+            >
+              <GoogleIcon /> Continue as Org Partner
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setOrgRevealed(true)}
+            className="text-xs underline decoration-dotted underline-offset-4"
+            style={{
+              color: "#6b7396",
+              background: "transparent",
+              border: 0,
+              cursor: "pointer",
+            }}
+          >
+            Are you an Org Partner?
+          </button>
+        )}
+
         <p className="text-xs text-center" style={{ color: "#5c6490" }}>
           By continuing, you agree to DICT Region V&apos;s platform policies.<br />For ILCDB program participants only.
         </p>
@@ -56,13 +176,23 @@ function LoginContent() {
   );
 }
 
-function errorMessage(code: string): string {
+function errorMessage(code: string, reason: string): string {
   switch (code) {
     case "oauth_failed":
     case "oauth_denied":
       return "Google sign-in was cancelled or failed. Please try again.";
-    case "role_mismatch":
-      return "This account is registered under a different role. Sign in through the portal that matches your account.";
+    case "role_mismatch": {
+      if (reason.startsWith("existing:org_partner")) {
+        return "Your account is registered as an Org Partner. Use the Org Partner sign-in below to continue.";
+      }
+      if (reason.startsWith("existing:mentor")) {
+        return "Your account is registered as a Mentor. Sign in through the Mentor portal.";
+      }
+      if (reason.startsWith("existing:student")) {
+        return "Your account is registered as a Student. Sign in through the Student portal.";
+      }
+      return "This account is registered under a different role. Sign in through the matching portal.";
+    }
     case "config_missing":
       return "The server is missing OAuth configuration. Please contact support.";
     case "token_exchange":
