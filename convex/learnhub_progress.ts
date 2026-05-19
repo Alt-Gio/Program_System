@@ -361,3 +361,139 @@ export const flagStudent = mutation({
     return { ok: true, queued: true };
   },
 });
+
+// ────────────────────────────────────────────────────────────────────────
+// Learner-facing overview for /learnhub/learning-path
+// ────────────────────────────────────────────────────────────────────────
+//
+// Replaces the previous Kanban-only experience. Pulls everything the
+// "Paths" and "Courses" tabs need in a single subscription:
+//   • enrolled learning paths + per-module completion %
+//   • active video sessions (in_progress / paused)
+//   • streak summary (re-aliased from learnhub_streaks.getStreak)
+//   • certificate count
+//   • bookmark counts by status
+//   • recent goals
+//
+// Unlike `getDashboard` this is intentionally *not* role-gated — a learner
+// asks "show me my own progress". A future mentor view will use a separate
+// query that proxies through this with a viewerId check.
+export const getLearnerOverview = query({
+  args: { userId: v.id("learnhub_users") },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user) return null;
+
+    // Path enrollments → hydrate with their parent path so we can show
+    // module titles and total module count.
+    const enrollments = await ctx.db
+      .query("learnhub_path_enrollments")
+      .withIndex("by_student", (q) => q.eq("studentId", args.userId))
+      .collect();
+    enrollments.sort((a, b) => b.enrolledAt - a.enrolledAt);
+
+    const pathRows = [];
+    for (const enr of enrollments) {
+      const path = await ctx.db.get(enr.pathId);
+      if (!path) continue;
+      const totalModules = path.modules.length;
+      const completed = enr.completedModuleIndices.length;
+      const currentIdx = Math.min(enr.currentModuleIndex, Math.max(totalModules - 1, 0));
+      const currentModule = totalModules > 0 ? path.modules[currentIdx] : null;
+      const nextPostId = currentModule?.postIds?.[0] ?? null;
+      pathRows.push({
+        enrollmentId: enr._id,
+        pathId: path._id,
+        title: path.title,
+        description: path.description,
+        programType: path.programType,
+        totalModules,
+        completedModules: completed,
+        progressPct: totalModules === 0
+          ? 0
+          : Math.round((completed / totalModules) * 100),
+        currentModuleIndex: currentIdx,
+        currentModuleTitle: currentModule?.title ?? null,
+        nextPostId,
+        completedAt: enr.completedAt ?? null,
+        enrolledAt: enr.enrolledAt,
+      });
+    }
+
+    // Active video sessions. Cap at 12 so a heavy learner doesn't push
+    // the page over the Convex 8MB query result ceiling.
+    const sessionsInProgress = await ctx.db
+      .query("learnhub_video_sessions")
+      .withIndex("by_user_status", (q) =>
+        q.eq("userId", args.userId).eq("status", "in_progress"),
+      )
+      .order("desc")
+      .take(12);
+
+    const sessionsCompleted = await ctx.db
+      .query("learnhub_video_sessions")
+      .withIndex("by_user_status", (q) =>
+        q.eq("userId", args.userId).eq("status", "completed"),
+      )
+      .order("desc")
+      .take(6);
+
+    const bookmarks = await ctx.db
+      .query("learnhub_bookmarks")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+    const bookmarkCounts = {
+      want_to_learn: 0,
+      in_progress: 0,
+      done: 0,
+    } as Record<"want_to_learn" | "in_progress" | "done", number>;
+    for (const b of bookmarks) bookmarkCounts[b.status] += 1;
+
+    const certs = await ctx.db
+      .query("learnhub_certificates")
+      .withIndex("by_student", (q) => q.eq("studentId", args.userId))
+      .collect();
+
+    const goals = await ctx.db
+      .query("learnhub_goals")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .order("desc")
+      .take(5);
+
+    return {
+      streak: {
+        currentStreak: user.currentStreak ?? 0,
+        longestStreak: user.longestStreak ?? 0,
+        lastActiveDate: user.lastActiveDate ?? null,
+        xpPoints: user.xpPoints ?? 0,
+      },
+      paths: pathRows,
+      sessionsInProgress: sessionsInProgress.map((s) => ({
+        id: s._id,
+        videoId: s.videoId,
+        title: s.title ?? s.videoId,
+        thumbnail: s.thumbnail ?? null,
+        channelName: s.channelName ?? null,
+        progressPct: s.progressPct,
+        lastPositionSec: s.lastPositionSec,
+        durationSec: s.durationSec ?? null,
+        updatedAt: s.updatedAt,
+      })),
+      sessionsCompleted: sessionsCompleted.map((s) => ({
+        id: s._id,
+        videoId: s.videoId,
+        title: s.title ?? s.videoId,
+        thumbnail: s.thumbnail ?? null,
+        completedAt: s.completedAt ?? s.updatedAt,
+      })),
+      bookmarkCounts,
+      certCount: certs.length,
+      goals: goals.map((g) => ({
+        id: g._id,
+        title: g.title,
+        deadline: g.deadline ?? null,
+        completedAt: g.completedAt ?? null,
+      })),
+    };
+  },
+});

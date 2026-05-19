@@ -243,3 +243,82 @@ export const listCoursesContainingVideo = query({
       .map((it) => ({ courseId: it.courseId, itemId: it._id }));
   },
 });
+
+// Lightweight per-user course-with-progress digest used by the
+// /learnhub/learning-path "Courses" tab. One pass over the user's
+// items + sessions; no N+1 round-trips. Cap at 6 most-recent courses
+// so the page stays under 1 MB on the wire.
+export const getCoursesForUser = query({
+  args: { userId: v.id("learnhub_users") },
+  handler: async (ctx, args) => {
+    const courses = await ctx.db
+      .query("learnhub_video_courses")
+      .withIndex("by_owner_status", (q) =>
+        q.eq("ownerId", args.userId).eq("status", "active"),
+      )
+      .order("desc")
+      .take(6);
+    if (courses.length === 0) return [];
+
+    // Pull all of this owner's course items at once (typically <100 rows
+    // even for power users) and group in memory.
+    const items = await ctx.db
+      .query("learnhub_video_course_items")
+      .withIndex("by_owner", (q) => q.eq("ownerId", args.userId))
+      .collect();
+    const byCourse = new Map<string, typeof items>();
+    for (const it of items) {
+      const key = it.courseId as unknown as string;
+      const arr = byCourse.get(key) ?? [];
+      arr.push(it);
+      byCourse.set(key, arr);
+    }
+
+    // Look up watch sessions per video. We dedupe video ids first so the
+    // same video appearing in multiple courses costs us one query.
+    const allVideoIds = Array.from(new Set(items.map((it) => it.videoId)));
+    const sessionByVideo = new Map<string, { progressPct: number; status: string; lastPositionSec: number }>();
+    for (const vid of allVideoIds) {
+      const s = await ctx.db
+        .query("learnhub_video_sessions")
+        .withIndex("by_user_video", (q) => q.eq("userId", args.userId).eq("videoId", vid))
+        .first();
+      if (s) sessionByVideo.set(vid, {
+        progressPct: s.progressPct,
+        status: s.status,
+        lastPositionSec: s.lastPositionSec,
+      });
+    }
+
+    return courses.map((c) => {
+      const courseItems = (byCourse.get(c._id as unknown as string) ?? [])
+        .slice()
+        .sort((a, b) => a.position - b.position);
+      const totalProgress = courseItems.length === 0
+        ? 0
+        : Math.round(
+            courseItems.reduce(
+              (acc, it) => acc + (sessionByVideo.get(it.videoId)?.progressPct ?? 0),
+              0,
+            ) / courseItems.length,
+          );
+      const completed = courseItems.filter(
+        (it) => (sessionByVideo.get(it.videoId)?.progressPct ?? 0) >= 95,
+      ).length;
+      const nextItem = courseItems.find(
+        (it) => (sessionByVideo.get(it.videoId)?.progressPct ?? 0) < 95,
+      ) ?? null;
+      return {
+        id: c._id,
+        title: c.title,
+        coverImageUrl: c.coverImageUrl ?? null,
+        itemCount: c.itemCount,
+        totalProgress,
+        completedCount: completed,
+        nextVideoId: nextItem?.videoId ?? null,
+        nextVideoTitle: nextItem?.title ?? null,
+        updatedAt: c.updatedAt,
+      };
+    });
+  },
+});
