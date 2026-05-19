@@ -597,6 +597,47 @@ export const learnhubTables = {
     createdAt: v.number(),
   }).index("by_user", ["userId"]),
 
+  // ── Habits & XP ──────────────────────────────────────────
+  learnhub_habits: defineTable({
+    userId: v.id("learnhub_users"),
+    title: v.string(),
+    emoji: v.string(),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_user_active", ["userId", "isActive"]),
+
+  learnhub_habit_logs: defineTable({
+    habitId: v.id("learnhub_habits"),
+    userId: v.id("learnhub_users"),
+    date: v.string(),
+    completed: v.boolean(),
+    completedAt: v.optional(v.number()),
+    xpAwarded: v.number(),
+  })
+    .index("by_habit_date", ["habitId", "date"])
+    .index("by_user_date", ["userId", "date"]),
+
+  learnhub_xp_events: defineTable({
+    userId: v.id("learnhub_users"),
+    amount: v.number(),
+    reason: v.string(),
+    sourceType: v.union(
+      v.literal("daily_login"),
+      v.literal("work_completion"),
+      v.literal("journal_habit"),
+      v.literal("flow_session"),
+      v.literal("manual")
+    ),
+    sourceId: v.optional(v.string()),
+    idempotencyKey: v.string(),
+    date: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_date", ["userId", "date"])
+    .index("by_idempotencyKey", ["idempotencyKey"]),
+
   learnhub_learning_paths: defineTable({
     createdBy: v.id("learnhub_users"),
     groupId: v.optional(v.id("learnhub_groups")),
