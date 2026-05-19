@@ -52,6 +52,7 @@ export const listCuratedFeed = query({
     cursor: v.optional(v.number()),
     kind: v.optional(v.union(v.literal("channel"), v.literal("video"))),
     orgId: v.optional(v.id("learnhub_users")),
+    tag: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const pageSize = Math.min(args.limit ?? 30, 60);
@@ -70,6 +71,12 @@ export const listCuratedFeed = query({
     }
     if (args.kind) items = items.filter((i) => i.kind === args.kind);
     if (args.orgId) items = items.filter((i) => i.orgId === args.orgId);
+    if (args.tag) {
+      const want = args.tag.toLowerCase();
+      items = items.filter((i) =>
+        (i.tags ?? []).some((t) => t.toLowerCase() === want),
+      );
+    }
 
     const page = items.slice(0, pageSize);
 
@@ -156,6 +163,7 @@ export const orgAddChannel = mutation({
     displayName: v.string(),
     thumbnailUrl: v.optional(v.string()),
     description: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const { actor } = await requireCurator(ctx, args.actorId);
@@ -164,15 +172,17 @@ export const orgAddChannel = mutation({
     const display = args.displayName.trim();
     if (!display) throw new Error("displayName is required");
 
-    // Dedupe per-org: same channel id for the same org → flip to active
-    // instead of inserting twice.
     const existing = await ctx.db
       .query("learnhub_org_curated_channels")
       .withIndex("by_org", (q) => q.eq("orgId", actor._id))
       .collect();
     const dup = existing.find((e) => e.kind === "channel" && e.youtubeChannelId === id);
     if (dup) {
-      await ctx.db.patch(dup._id, { isActive: true, displayName: display });
+      await ctx.db.patch(dup._id, {
+        isActive: true,
+        displayName: display,
+        tags: args.tags,
+      });
       return dup._id;
     }
 
@@ -183,6 +193,7 @@ export const orgAddChannel = mutation({
       displayName: display,
       thumbnailUrl: args.thumbnailUrl,
       description: args.description,
+      tags: args.tags,
       addedAt: Date.now(),
       isActive: true,
     });
@@ -196,6 +207,8 @@ export const orgAddVideo = mutation({
     displayName: v.string(),
     thumbnailUrl: v.optional(v.string()),
     description: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
+    durationLabel: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { actor } = await requireCurator(ctx, args.actorId);
@@ -209,7 +222,12 @@ export const orgAddVideo = mutation({
       .collect();
     const dup = existing.find((e) => e.kind === "video" && e.youtubeVideoId === id);
     if (dup) {
-      await ctx.db.patch(dup._id, { isActive: true, displayName: display });
+      await ctx.db.patch(dup._id, {
+        isActive: true,
+        displayName: display,
+        tags: args.tags,
+        durationLabel: args.durationLabel,
+      });
       return dup._id;
     }
 
@@ -220,8 +238,45 @@ export const orgAddVideo = mutation({
       displayName: display,
       thumbnailUrl: args.thumbnailUrl ?? `https://img.youtube.com/vi/${id}/hqdefault.jpg`,
       description: args.description,
+      tags: args.tags,
+      durationLabel: args.durationLabel,
       addedAt: Date.now(),
       isActive: true,
+    });
+  },
+});
+
+/**
+ * Convert a legacy channel entry to a video entry. Lets a curator upgrade
+ * an "informational only" channel bookmark into something that actually
+ * surfaces on the watch page once they identify a featured video. The
+ * channel id, display name, and description are preserved as metadata
+ * so the org-of-record stays intact.
+ */
+export const orgConvertChannelToVideo = mutation({
+  args: {
+    actorId: v.id("learnhub_users"),
+    itemId: v.id("learnhub_org_curated_channels"),
+    youtubeVideoId: v.string(),
+    displayName: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    const { actor, role } = await requireCurator(ctx, args.actorId);
+    const item = await ctx.db.get(args.itemId);
+    if (!item) throw new Error("Item not found");
+    if (role === "org_partner" && item.orgId !== actor._id) {
+      throw new Error("FORBIDDEN: cannot edit another org's curated item.");
+    }
+    const vid = args.youtubeVideoId.trim();
+    if (!vid) throw new Error("youtubeVideoId is required");
+    await ctx.db.patch(args.itemId, {
+      kind: "video",
+      youtubeVideoId: vid,
+      // Keep the channel id around as breadcrumb context.
+      displayName: (args.displayName?.trim() || item.displayName).trim(),
+      thumbnailUrl: `https://img.youtube.com/vi/${vid}/hqdefault.jpg`,
+      tags: args.tags ?? item.tags,
     });
   },
 });

@@ -849,6 +849,15 @@ export const learnhubTables = {
     description: v.optional(v.string()),
     addedAt: v.number(),
     isActive: v.boolean(),
+    // Optional interest tags so /learnhub/watch can offer the same
+    // category-driven filter as the LearnHub design (Security, Cloud,
+    // Tech4ED, …). Stored as plain strings to match the interest
+    // taxonomy. Multi-select at add time.
+    tags: v.optional(v.array(v.string())),
+    // Optional duration label (e.g., "12:34") and curator note that the
+    // composer doesn't auto-derive — orgs can fill them in for richer
+    // watch-page cards. Both default to undefined.
+    durationLabel: v.optional(v.string()),
   })
     .index("by_org", ["orgId"])
     .index("by_active_added", ["isActive", "addedAt"]),
