@@ -375,7 +375,46 @@ export const learnhubTables = {
     tags: v.array(v.string()),
     wordCount: v.number(),
     updatedAt: v.number(),
+    // Optional reflection fields. All additive; legacy entries leave them
+    // undefined and the UI falls back gracefully.
+    mood: v.optional(v.union(
+      v.literal("low"),
+      v.literal("ok"),
+      v.literal("good"),
+      v.literal("great"),
+    )),
+    energy: v.optional(v.number()),       // 1–5
+    confidence: v.optional(v.number()),   // 1–5
+    promptResponses: v.optional(v.array(v.object({
+      promptId: v.string(),
+      answer: v.string(),
+    }))),
+    linkedSessionIds: v.optional(v.array(v.id("learnhub_video_sessions"))),
+    aiSummary: v.optional(v.object({
+      text: v.string(),
+      generatedAt: v.number(),
+      model: v.string(),
+      weekStart: v.string(),
+    })),
   }).index("by_user_date", ["userId", "date"]),
+
+  // Curated prompt bank rotated into the journal editor. Small table (~12
+  // rows). Seeded once via the admin-only seedPrompts mutation.
+  learnhub_journal_prompts: defineTable({
+    slug: v.string(),
+    text: v.string(),
+    category: v.union(
+      v.literal("learning"),
+      v.literal("reflection"),
+      v.literal("goal"),
+      v.literal("mood"),
+    ),
+    weight: v.number(),
+    isActive: v.boolean(),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_category", ["category"])
+    .index("by_active", ["isActive"]),
 
   learnhub_bookmarks: defineTable({
     userId: v.id("learnhub_users"),
