@@ -362,10 +362,35 @@ export const learnhubTables = {
       v.literal("work_completion"),
       v.literal("event_participation")
     ),
+    // Gmail-ingest provenance fields. All optional — manually issued
+    // certs leave them undefined.
+    imageStorageId: v.optional(v.id("_storage")),
+    originalAttachmentName: v.optional(v.string()),
+    sourceEmail: v.optional(v.object({
+      messageId: v.string(),
+      senderEmail: v.string(),
+      subject: v.string(),
+      receivedAt: v.number(),
+    })),
   })
     .index("by_email", ["studentEmail"])
     .index("by_student", ["studentId"])
-    .index("by_verification", ["verificationId"]),
+    .index("by_verification", ["verificationId"])
+    .index("by_source_message", ["sourceEmail.messageId"]),
+
+  // Singleton-ish config row driving the Gmail cert-ingest cron. One
+  // active row per deployment — set by an admin/coordinator. The
+  // `enabledByUserId` is whose Gmail credentials power the poll.
+  learnhub_cert_email_config: defineTable({
+    senderEmail: v.string(),
+    programType: v.optional(v.string()),
+    enabledByUserId: v.id("learnhub_users"),
+    lastPolledAt: v.optional(v.number()),
+    historyId: v.optional(v.string()),
+    isActive: v.boolean(),
+    updatedAt: v.number(),
+  })
+    .index("by_active", ["isActive"]),
 
   // ── Learning ─────────────────────────────────────────────
   learnhub_journal: defineTable({

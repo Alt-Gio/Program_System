@@ -36,6 +36,7 @@ import type * as internTasks from "../internTasks.js";
 import type * as interns from "../interns.js";
 import type * as invites from "../invites.js";
 import type * as learnhub_bookmarks from "../learnhub_bookmarks.js";
+import type * as learnhub_cert_ingest from "../learnhub_cert_ingest.js";
 import type * as learnhub_certificates from "../learnhub_certificates.js";
 import type * as learnhub_comments from "../learnhub_comments.js";
 import type * as learnhub_conversations from "../learnhub_conversations.js";
@@ -112,6 +113,7 @@ declare const fullApi: ApiFromModules<{
   interns: typeof interns;
   invites: typeof invites;
   learnhub_bookmarks: typeof learnhub_bookmarks;
+  learnhub_cert_ingest: typeof learnhub_cert_ingest;
   learnhub_certificates: typeof learnhub_certificates;
   learnhub_comments: typeof learnhub_comments;
   learnhub_conversations: typeof learnhub_conversations;
