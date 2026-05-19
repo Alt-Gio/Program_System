@@ -55,6 +55,10 @@ export default function LearningPathPage() {
     api.learnhub_bookmarks.listBookmarks,
     uid ? { userId: uid } : "skip",
   );
+  const flashcardsDue = useQuery(
+    api.learnhub_video_flow.countMyDueFlashcards,
+    uid ? { userId: uid } : "skip",
+  );
 
   const upsertBookmark = useMutation(api.learnhub_bookmarks.upsertBookmark);
   const removeBookmark = useMutation(api.learnhub_bookmarks.removeBookmark);
@@ -97,6 +101,14 @@ export default function LearningPathPage() {
           </span>
         )}
       </div>
+
+      {/* Flashcards-due review tile */}
+      {flashcardsDue !== undefined && (
+        <FlashcardsTile
+          dueCount={flashcardsDue.dueCount}
+          firstDueSessionId={flashcardsDue.firstDueSessionId}
+        />
+      )}
 
       {/* Stat strip */}
       {overview && (
@@ -162,6 +174,74 @@ export default function LearningPathPage() {
             await removeBookmark({ bookmarkId: bookmarkId as Id<"learnhub_bookmarks"> });
           }}
         />
+      )}
+    </div>
+  );
+}
+
+function FlashcardsTile({
+  dueCount,
+  firstDueSessionId,
+}: {
+  dueCount: number;
+  firstDueSessionId: Id<"learnhub_video_sessions"> | null;
+}) {
+  const hasDue = dueCount > 0;
+  const href = hasDue && firstDueSessionId
+    ? `/learnhub/video-flow?session=${encodeURIComponent(firstDueSessionId)}&tab=flashcards`
+    : null;
+  return (
+    <div
+      style={{
+        marginBottom: 14,
+        padding: "12px 16px",
+        borderRadius: 12,
+        background: hasDue
+          ? `linear-gradient(135deg, ${AMBER}1c, ${ORANGE}14)`
+          : "rgba(34,211,160,0.06)",
+        border: `1px solid ${hasDue ? AMBER + "55" : GREEN + "44"}`,
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        flexWrap: "wrap",
+      }}
+    >
+      <span style={{ fontSize: 22, lineHeight: 1 }}>{hasDue ? "🎴" : "✅"}</span>
+      <div style={{ flex: "1 1 200px", minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: 13,
+            fontWeight: 800,
+            color: "#e8eaff",
+            fontFamily: "var(--font-sora, 'Plus Jakarta Sans', sans-serif)",
+          }}
+        >
+          {hasDue
+            ? `${dueCount} flashcard${dueCount === 1 ? "" : "s"} due for review`
+            : "All caught up on flashcards"}
+        </div>
+        <div style={{ fontSize: 11.5, color: "#9ba3cc", marginTop: 2 }}>
+          {hasDue
+            ? "Spend a few minutes to keep your spaced-repetition streak alive."
+            : "New cards become due as you space them out — check back tomorrow."}
+        </div>
+      </div>
+      {href && (
+        <Link
+          href={href}
+          style={{
+            padding: "7px 14px",
+            borderRadius: 999,
+            background: `linear-gradient(135deg, ${ORANGE}, #ef4444)`,
+            color: "#fff",
+            fontSize: 12,
+            fontWeight: 800,
+            textDecoration: "none",
+            whiteSpace: "nowrap",
+          }}
+        >
+          Review now →
+        </Link>
       )}
     </div>
   );

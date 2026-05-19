@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { ORG_CONFIG } from "@/lib/learnhub/org-config";
 
 function LoginContent() {
   const searchParams = useSearchParams();
@@ -81,7 +82,7 @@ function LoginContent() {
 
         <div className="text-center">
           <p className="text-base font-medium" style={{ color: "#e8eaff" }}>Welcome back</p>
-          <p className="text-sm mt-1" style={{ color: "#9ba3cc" }}>DICT Region V Social Learning Platform</p>
+          <p className="text-sm mt-1" style={{ color: "#9ba3cc" }}>{ORG_CONFIG.tagline}</p>
         </div>
 
         {error && (
@@ -168,10 +169,10 @@ function LoginContent() {
         )}
 
         <p className="text-xs text-center" style={{ color: "#5c6490" }}>
-          By continuing, you agree to DICT Region V&apos;s platform policies.<br />For ILCDB program participants only.
+          By continuing, you agree to {ORG_CONFIG.orgName}&apos;s platform policies.
         </p>
       </div>
-      <p className="mt-6 text-xs" style={{ color: "#5c6490" }}>DICT Region V · ILCDB LearnHub · {new Date().getFullYear()}</p>
+      <p className="mt-6 text-xs" style={{ color: "#5c6490" }}>{ORG_CONFIG.orgName} · {ORG_CONFIG.productName} · {new Date().getFullYear()}</p>
     </main>
   );
 }

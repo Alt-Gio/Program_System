@@ -1,5 +1,52 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
+import { awardLearnHubXp } from "./learnhub_xp";
+import { evaluateAndAwardForUser } from "./learnhub_badges";
+
+// Internal: count flashcards due as of a given timestamp for a user. Used by
+// the daily learnhub_notifications.notifyFlashcardsDue cron to decide who
+// gets a nudge.
+export const countDueFlashcards = internalQuery({
+  args: {
+    userId: v.id("learnhub_users"),
+    asOf: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const due = await ctx.db
+      .query("learnhub_video_flashcards")
+      .withIndex("by_user_due", (q) =>
+        q.eq("userId", args.userId).lte("dueAt", args.asOf),
+      )
+      .collect();
+    return due.length;
+  },
+});
+
+// Public companion of countDueFlashcards used by /learning-path's review
+// tile. Returns both the count and the session of the first due card so the
+// CTA can deep-link the user straight into a review surface that already
+// exists (the per-session video-flow page renders flashcards inline).
+export const countMyDueFlashcards = query({
+  args: { userId: v.id("learnhub_users") },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const due = await ctx.db
+      .query("learnhub_video_flashcards")
+      .withIndex("by_user_due", (q) =>
+        q.eq("userId", args.userId).lte("dueAt", now),
+      )
+      .collect();
+    if (due.length === 0) {
+      return { dueCount: 0, firstDueSessionId: null as null };
+    }
+    // Pick the earliest-due card's session — that's the most "behind" one.
+    due.sort((a, b) => a.dueAt - b.dueAt);
+    return {
+      dueCount: due.length,
+      firstDueSessionId: due[0].sessionId,
+    };
+  },
+});
 
 const visibility = v.union(
   v.literal("private"),
@@ -165,6 +212,17 @@ export const updateProgress = mutation({
         timestampSec: args.lastPositionSec,
         message: "Marked video as completed",
       });
+      // Award XP exactly once per session — the idempotency key contains the
+      // session id, so re-emitting updateProgress with status=completed (e.g.
+      // from a paused-and-resumed player at 100%) won't double-credit.
+      await awardLearnHubXp(ctx, {
+        userId: args.userId,
+        amount: 30,
+        reason: "Completed a learning video",
+        sourceType: "video_completion",
+        sourceId: args.sessionId,
+        idempotencyKey: `video_completion:${args.sessionId}`,
+      });
     }
     await ctx.db.patch(args.sessionId, patch);
     return { progressPct, status };
@@ -180,6 +238,7 @@ export const markCompleted = mutation({
     const session = await ctx.db.get(args.sessionId);
     if (!session || session.userId !== args.userId) return null;
     const now = Date.now();
+    const justCompleted = !session.completedAt;
     await ctx.db.patch(args.sessionId, {
       status: "completed",
       progressPct: 100,
@@ -192,6 +251,16 @@ export const markCompleted = mutation({
       type: "completed",
       message: "Completed Video Flow session",
     });
+    if (justCompleted) {
+      await awardLearnHubXp(ctx, {
+        userId: args.userId,
+        amount: 30,
+        reason: "Completed a learning video",
+        sourceType: "video_completion",
+        sourceId: args.sessionId,
+        idempotencyKey: `video_completion:${args.sessionId}`,
+      });
+    }
     return true;
   },
 });
@@ -477,6 +546,22 @@ export const reviewFlashcard = mutation({
       lastReviewedAt: now,
       updatedAt: now,
     });
+    // Award a small XP grant per review. Idempotency uses (cardId, now)
+    // bucketed to the minute so rapid-fire identical clicks within a minute
+    // (e.g. accidental double-tap) don't double-credit, but legitimate
+    // re-reviews tomorrow do.
+    const minuteBucket = Math.floor(now / 60000);
+    await awardLearnHubXp(ctx, {
+      userId: args.userId,
+      amount: 5,
+      reason: "Reviewed a flashcard",
+      sourceType: "flashcard_review",
+      sourceId: args.cardId,
+      idempotencyKey: `flashcard_review:${args.cardId}:${minuteBucket}`,
+    });
+
+    // May have just hit the Knowledge Builder threshold (50 reviews).
+    await evaluateAndAwardForUser(ctx, args.userId);
     return { interval, ease, reviewCount };
   },
 });

@@ -1,4 +1,7 @@
 import { query, mutation } from "./_generated/server";
+import { internal } from "./_generated/api";
+import { awardLearnHubXp } from "./learnhub_xp";
+import { evaluateAndAwardForUser } from "./learnhub_badges";
 import { v } from "convex/values";
 
 // ── Invite Queries ────────────────────────────────────────────────────────────
@@ -201,6 +204,15 @@ export const reviewVerification = mutation({
     await ctx.db.patch(ver.mentorId, {
       mentorStatus: args.decision === "approved" ? "verified" : "rejected",
     });
+    await ctx.scheduler.runAfter(
+      0,
+      internal.learnhub_notifications.notifyMentorVerificationResult,
+      {
+        mentorId: ver.mentorId,
+        decision: args.decision,
+        rejectionReason: args.rejectionReason,
+      },
+    );
   },
 });
 
@@ -211,6 +223,16 @@ export const reviewVerification = mutation({
 // We always derive the *live* active-mentee count from the relationships table
 // rather than trusting the stale currentMenteeCount field on the user record.
 
+// Status sort order: verified mentors first (most useful to learners), then
+// pending_verification (will be visible soon), then anything else, then
+// suspended/rejected last so they sink to the bottom of the marketplace.
+const MENTOR_STATUS_SORT: Record<string, number> = {
+  verified: 0,
+  pending_verification: 1,
+  suspended: 3,
+  rejected: 4,
+};
+
 export const listAvailableMentors = query({
   args: {},
   handler: async (ctx) => {
@@ -219,10 +241,13 @@ export const listAvailableMentors = query({
       .withIndex("by_role", (q) => q.eq("role", "mentor"))
       .collect();
 
-    const verified = mentors.filter((m) => m.mentorStatus === "verified");
-
-    return Promise.all(
-      verified.map(async (m) => {
+    // Surface ALL mentors (not just verified) so the marketplace stays
+    // populated for new deployments and so learners can see pending mentors
+    // who are awaiting review. The Request CTA is gated client-side and the
+    // server-side `requestMentorship` mutation still rejects requests to
+    // non-verified mentors, so visibility ≠ requestability.
+    const hydrated = await Promise.all(
+      mentors.map(async (m) => {
         const active = await ctx.db
           .query("learnhub_mentoring_relationships")
           .withIndex("by_mentor", (q) => q.eq("mentorId", m._id))
@@ -243,9 +268,19 @@ export const listAvailableMentors = query({
           activeMenteeCount: activeCount,
           maxMentees,
           hasCapacity,
+          mentorStatus: m.mentorStatus ?? null,
         };
       })
     );
+
+    hydrated.sort((a, b) => {
+      const sa = MENTOR_STATUS_SORT[a.mentorStatus ?? ""] ?? 2;
+      const sb = MENTOR_STATUS_SORT[b.mentorStatus ?? ""] ?? 2;
+      if (sa !== sb) return sa - sb;
+      return a.activeMenteeCount - b.activeMenteeCount;
+    });
+
+    return hydrated;
   },
 });
 
@@ -444,6 +479,21 @@ export const respondToMentorshipRequest = mutation({
       const cached = mentor.currentMenteeCount ?? 0;
       await ctx.db.patch(rel.mentorId, { currentMenteeCount: cached + 1 });
     }
+
+    // Reward the mentor for accepting a mentee. Idempotency key uses the
+    // relationship id so a re-accept (which shouldn't be possible given the
+    // BAD_STATE guard above) can never double-credit.
+    await awardLearnHubXp(ctx, {
+      userId: rel.mentorId,
+      amount: 50,
+      reason: "Accepted a mentee",
+      sourceType: "mentor_acceptance",
+      sourceId: rel._id,
+      idempotencyKey: `mentor_acceptance:${rel._id}`,
+    });
+
+    // The mentee may have just earned the Mentor Magnet badge.
+    await evaluateAndAwardForUser(ctx, rel.menteeId);
     return { ok: true };
   },
 });

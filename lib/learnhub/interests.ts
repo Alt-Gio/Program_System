@@ -7,26 +7,146 @@
  * interest is added in one place and immediately drives both onboarding
  * and feed ranking.
  *
+ * The taxonomy is intentionally broad (covering health, business, design,
+ * sciences, humanities, trades, life skills, in addition to tech) so the
+ * hub serves learners from any discipline. Users can also store custom
+ * free-form tags on `learnhub_users.interests` — these coexist with the
+ * curated taxonomy because the feed scorer matches by normalized string.
+ *
  * Hashtags are stored normalized (lowercased, no leading `#`, kebab-or-snake
  * only) so callers can use them as dictionary keys without re-normalizing.
  */
 
+/**
+ * Grouped taxonomy. The order here drives the order shown in the onboarding
+ * wizard and the settings page. Keep groups domain-coherent so users can
+ * scan quickly.
+ */
+export const INTEREST_CATEGORIES = {
+  "Tech & Digital": [
+    "Digital Literacy",
+    "Web Dev",
+    "Mobile Dev",
+    "Data Analysis",
+    "Cybersecurity",
+    "AI & ML",
+    "UI/UX Design",
+    "Cloud & DevOps",
+  ],
+  "Health & Care": [
+    "Nursing",
+    "Public Health",
+    "Mental Health",
+    "Nutrition",
+    "First Aid",
+  ],
+  "Business & Finance": [
+    "Entrepreneurship",
+    "Marketing",
+    "Accounting",
+    "Project Management",
+    "Leadership",
+  ],
+  "Arts & Design": [
+    "Graphic Design",
+    "Photography",
+    "Music",
+    "Writing",
+    "Video Production",
+  ],
+  Sciences: [
+    "Math",
+    "Physics",
+    "Chemistry",
+    "Biology",
+    "Environmental Science",
+  ],
+  Humanities: ["History", "Languages", "Public Speaking", "Philosophy"],
+  "Trades & Practical": [
+    "Carpentry",
+    "Electrical",
+    "Plumbing",
+    "Agriculture",
+    "Culinary",
+  ],
+  "Life Skills": ["Communication", "Critical Thinking", "Career Pivot"],
+} as const;
+
+export type InterestCategory = keyof typeof INTEREST_CATEGORIES;
+
+/**
+ * Flat list of every curated tag, derived from INTEREST_CATEGORIES.
+ * Kept as an explicit export (rather than computed) so TypeScript can
+ * type `Interest` as a literal union, which keeps existing consumers
+ * (feed scorer, post composer) honest at compile time.
+ */
 export const INTEREST_TAXONOMY = [
+  // Tech & Digital
   "Digital Literacy",
-  "Python",
-  "Data Analysis",
   "Web Dev",
+  "Mobile Dev",
+  "Data Analysis",
   "Cybersecurity",
-  "Project Management",
-  "Communication",
-  "Career Pivot",
   "AI & ML",
   "UI/UX Design",
-  "Public Speaking",
+  "Cloud & DevOps",
+  // Health & Care
+  "Nursing",
+  "Public Health",
+  "Mental Health",
+  "Nutrition",
+  "First Aid",
+  // Business & Finance
   "Entrepreneurship",
+  "Marketing",
+  "Accounting",
+  "Project Management",
+  "Leadership",
+  // Arts & Design
+  "Graphic Design",
+  "Photography",
+  "Music",
+  "Writing",
+  "Video Production",
+  // Sciences
+  "Math",
+  "Physics",
+  "Chemistry",
+  "Biology",
+  "Environmental Science",
+  // Humanities
+  "History",
+  "Languages",
+  "Public Speaking",
+  "Philosophy",
+  // Trades & Practical
+  "Carpentry",
+  "Electrical",
+  "Plumbing",
+  "Agriculture",
+  "Culinary",
+  // Life Skills
+  "Communication",
+  "Critical Thinking",
+  "Career Pivot",
 ] as const;
 
 export type Interest = (typeof INTEREST_TAXONOMY)[number];
+
+/**
+ * Given a tag string (from the curated taxonomy OR a user's custom tag),
+ * return the category it belongs to. Returns null for custom tags so the
+ * UI can render them under a "Custom" bucket.
+ */
+export function categoryFor(tag: string): InterestCategory | null {
+  for (const [cat, tags] of Object.entries(INTEREST_CATEGORIES) as [
+    InterestCategory,
+    readonly string[],
+  ][]) {
+    if (tags.includes(tag)) return cat;
+  }
+  return null;
+}
 
 // ASCII-only on purpose — the storage layer normalizes to [a-z0-9_] anyway
 // and the project's tsconfig target rejects the unicode regex flag.
@@ -40,6 +160,15 @@ export function normalizeHashtag(input: string): string {
   if (!input) return "";
   const stripped = input.trim().replace(/^#+/, "").toLowerCase();
   return stripped.replace(/[^a-z0-9_]/g, "");
+}
+
+/**
+ * Normalize an interest string for matching against hashtags / other
+ * interests. Same shape as `normalizeHashtag` — exposed under a clearer
+ * name for non-hashtag call sites.
+ */
+export function normalizeInterest(input: string): string {
+  return normalizeHashtag(input);
 }
 
 /**

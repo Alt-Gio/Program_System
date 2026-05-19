@@ -3,7 +3,12 @@ import { Suspense } from "react";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { INTEREST_TAXONOMY as SHARED_TAXONOMY } from "@/lib/learnhub/interests";
+import {
+  INTEREST_TAXONOMY as SHARED_TAXONOMY,
+  INTEREST_CATEGORIES,
+  normalizeInterest,
+} from "@/lib/learnhub/interests";
+import { ORG_CONFIG } from "@/lib/learnhub/org-config";
 
 type Role = "student" | "mentor" | "org_partner";
 type SkillLevel = "beginner" | "intermediate" | "advanced";
@@ -19,9 +24,24 @@ interface PendingProfile {
 }
 
 const ROLES: Array<{ value: Role; label: string; desc: string; emoji: string }> = [
-  { value: "student", label: "Student", desc: "I'm enrolled in an ILCDB program (SPARK, DWIA, Project CLICK, Tech4ED)", emoji: "🎓" },
-  { value: "mentor", label: "Mentor", desc: "I'm a DICT trainer or facilitator managing a cohort", emoji: "🏫" },
-  { value: "org_partner", label: "Org Partner", desc: "My organization posts online work opportunities for ILCDB graduates", emoji: "🏢" },
+  {
+    value: "student",
+    label: "Learner",
+    desc: "I'm here to learn — any field, any level. I want courses, mentors, and opportunities tuned to me.",
+    emoji: "🎓",
+  },
+  {
+    value: "mentor",
+    label: "Mentor",
+    desc: "I can teach or coach others. I'll be discoverable on the marketplace after a quick verification.",
+    emoji: "🏫",
+  },
+  {
+    value: "org_partner",
+    label: "Org Partner",
+    desc: "My organization posts opportunities, curates content, and supports learners on this hub.",
+    emoji: "🏢",
+  },
 ];
 
 // Onboarding taxonomy is the shared one from lib/learnhub/interests so the
@@ -89,9 +109,10 @@ function OnboardingPageInner() {
   const [province, setProvince] = useState("");
   const [municipality, setMunicipality] = useState("");
 
-  // Step 3 — interests + skill level
+  // Step 3 — interests + skill level (curated tags + user-supplied custom tags)
   const [interests, setInterests] = useState<string[]>([]);
   const [skillLevels, setSkillLevels] = useState<Record<string, SkillLevel>>({});
+  const [customDraft, setCustomDraft] = useState("");
 
   // Step 4 — goals + hours + calendar
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -137,6 +158,28 @@ function OnboardingPageInner() {
 
   const setLevelFor = (tag: string, level: SkillLevel) => {
     setSkillLevels((sl) => ({ ...sl, [tag]: level }));
+  };
+
+  // Custom user-supplied interests sit alongside the curated taxonomy.
+  // The feed scorer matches by normalised string, so a "Veterinary Medicine"
+  // entry here will boost matching #veterinarymedicine posts just like a
+  // curated pick would.
+  const addCustomInterest = () => {
+    const raw = customDraft.trim();
+    if (!raw) return;
+    if (raw.length > 48) return;
+    // Reject if it normalises to the same value as something already picked
+    // (case- and punctuation-insensitive dedupe).
+    const norm = normalizeInterest(raw);
+    if (!norm) return;
+    if (interests.some((t) => normalizeInterest(t) === norm)) {
+      setCustomDraft("");
+      return;
+    }
+    if (interests.length >= MAX_INTERESTS) return;
+    setInterests((prev) => [...prev, raw]);
+    setSkillLevels((sl) => ({ ...sl, [raw]: "beginner" }));
+    setCustomDraft("");
   };
 
   const toggleGoal = (g: Goal) => {
@@ -217,7 +260,7 @@ function OnboardingPageInner() {
       // request. router.push uses the SPA cache and can land on a page that
       // hasn't seen the cookie yet, producing a confusing "no pending profile"
       // bounce.
-      const dest = "/learnhub/feed?welcome=1";
+      const dest = "/learnhub/today?welcome=1";
       if (connectCalendar) {
         window.location.href = `/api/learnhub/calendar/connect?returnTo=${encodeURIComponent(dest)}`;
         return;
@@ -275,7 +318,7 @@ function OnboardingPageInner() {
 
         <div>
           <p className="text-xs font-medium tracking-widest uppercase mb-1" style={{ color: "#5b6cff", fontFamily: "var(--font-sora)" }}>
-            Welcome to ILCDB LearnHub
+            Welcome to {ORG_CONFIG.productName}
           </p>
           <h1 className="text-2xl font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>
             {step === 1 && "Tell us about yourself"}
@@ -361,7 +404,7 @@ function OnboardingPageInner() {
                 type="text"
                 value={extra}
                 onChange={(e) => setExtra(e.target.value)}
-                placeholder={selectedRole === "student" ? "e.g. Bicol University" : "e.g. TechCorp Philippines"}
+                placeholder={selectedRole === "student" ? "e.g. Bicol University" : "Your organization"}
                 className="w-full rounded-xl px-4 py-3 text-sm outline-none"
                 style={{ background: "#0d0f1a", border: "1px solid rgba(255,255,255,0.1)", color: "#e8eaff" }}
                 onFocus={(e) => (e.currentTarget.style.borderColor = "#5b6cff")}
@@ -418,30 +461,77 @@ function OnboardingPageInner() {
           <>
             <div>
               <p className="text-xs mb-2" style={{ color: "#5c6490" }}>
-                Pick {MIN_INTERESTS}–{MAX_INTERESTS}. Selected: {interests.length}
+                Pick {MIN_INTERESTS}–{MAX_INTERESTS} across any field. Selected: {interests.length}
               </p>
-              <div className="flex flex-wrap gap-2">
-                {INTEREST_TAXONOMY.map((tag) => {
-                  const active = interests.includes(tag);
-                  const atCap = !active && interests.length >= MAX_INTERESTS;
-                  return (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => toggleInterest(tag)}
-                      disabled={atCap}
-                      className="rounded-full px-3 py-1.5 text-xs font-medium transition-all disabled:opacity-40"
-                      style={{
-                        background: active ? "rgba(91,108,255,0.18)" : "#1a1d30",
-                        border: active ? "1px solid #5b6cff" : "1px solid rgba(255,255,255,0.08)",
-                        color: active ? "#7c8bff" : "#e8eaff",
-                        cursor: atCap ? "not-allowed" : "pointer",
-                      }}
+              <div className="flex flex-col gap-3 max-h-96 overflow-y-auto pr-1">
+                {Object.entries(INTEREST_CATEGORIES).map(([cat, tags]) => (
+                  <div key={cat}>
+                    <p
+                      className="text-[10px] uppercase tracking-widest mb-1.5"
+                      style={{ color: "#5c6490", fontFamily: "var(--font-sora)" }}
                     >
-                      {tag}
-                    </button>
-                  );
-                })}
+                      {cat}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {tags.map((tag) => {
+                        const active = interests.includes(tag);
+                        const atCap = !active && interests.length >= MAX_INTERESTS;
+                        return (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => toggleInterest(tag)}
+                            disabled={atCap}
+                            className="rounded-full px-3 py-1.5 text-xs font-medium transition-all disabled:opacity-40"
+                            style={{
+                              background: active ? "rgba(91,108,255,0.18)" : "#1a1d30",
+                              border: active ? "1px solid #5b6cff" : "1px solid rgba(255,255,255,0.08)",
+                              color: active ? "#7c8bff" : "#e8eaff",
+                              cursor: atCap ? "not-allowed" : "pointer",
+                            }}
+                          >
+                            {tag}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-3 flex gap-2">
+                <input
+                  type="text"
+                  value={customDraft}
+                  onChange={(e) => setCustomDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addCustomInterest();
+                    }
+                  }}
+                  placeholder="Don't see your field? Add your own (e.g. Veterinary Medicine)"
+                  maxLength={48}
+                  className="flex-1 rounded-xl px-3 py-2 text-xs outline-none"
+                  style={{
+                    background: "#0d0f1a",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    color: "#e8eaff",
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={addCustomInterest}
+                  disabled={!customDraft.trim() || interests.length >= MAX_INTERESTS}
+                  className="rounded-xl px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-40"
+                  style={{
+                    background: "rgba(91,108,255,0.18)",
+                    border: "1px solid rgba(91,108,255,0.5)",
+                    color: "#7c8bff",
+                  }}
+                >
+                  Add
+                </button>
               </div>
             </div>
 

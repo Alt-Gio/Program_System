@@ -88,7 +88,7 @@ export function NotificationBell() {
           </div>
 
           {/* List */}
-          <div className="overflow-y-auto max-h-80">
+          <div className="overflow-y-auto" style={{ maxHeight: 360 }}>
             {notifications.length === 0 ? (
               <p
                 className="text-sm text-center py-8"
@@ -146,6 +146,24 @@ export function NotificationBell() {
                 </div>
               ))
             )}
+          </div>
+
+          {/* Footer */}
+          <div
+            className="px-4 py-2.5 text-center"
+            style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                router.push("/learnhub/inbox");
+              }}
+              className="text-xs font-semibold"
+              style={{ color: "#7c8bff", background: "none", border: "none", cursor: "pointer" }}
+            >
+              See all notifications →
+            </button>
           </div>
         </div>
       )}

@@ -199,6 +199,74 @@ export const saveReport = mutation({
   },
 });
 
+// Surface a saved quarterly report into the feed so org partners and
+// coordinators see mentor activity summaries alongside other content. Reuses
+// `learnhub_posts` with type="text" and a metadata.kind marker — the feed
+// renderer keys off metadata.kind to show a report card layout instead of a
+// plain text body, so this doesn't require a schema literal-union widen.
+export const publishQuarterlyReport = mutation({
+  args: {
+    mentorId: v.id("learnhub_users"),
+    quarter: v.string(),
+    year: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const report = await ctx.db
+      .query("learnhub_quarterly_reports")
+      .withIndex("by_mentor", (q) => q.eq("mentorId", args.mentorId))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("quarter"), args.quarter),
+          q.eq(q.field("year"), args.year),
+        ),
+      )
+      .unique();
+    if (!report) throw new Error("NOT_FOUND: no report for that quarter");
+
+    const mentor = await ctx.db.get(args.mentorId);
+    if (!mentor) throw new Error("NOT_FOUND: mentor missing");
+
+    // Denormalise headline numbers onto post.metadata at publish-time so the
+    // feed card renders without an extra runQuery round-trip per impression.
+    // Treat reportData as Partial because saveReport accepts `v.any()`.
+    const rd = (report.reportData ?? {}) as {
+      totalTrainings?: number;
+      totalBeneficiaries?: number;
+      provinceCoverage?: number;
+      modalityBreakdown?: { online?: number; faceToFace?: number; hybrid?: number };
+    };
+
+    const now = Date.now();
+    const postId = await ctx.db.insert("learnhub_posts", {
+      authorId: args.mentorId,
+      type: "text",
+      content: `Quarterly report — ${args.quarter} ${args.year}. ${mentor.name}'s mentoring activity summary.`,
+      metadata: {
+        kind: "mentor_report",
+        reportId: report._id,
+        quarter: args.quarter,
+        year: args.year,
+        totalTrainings: rd.totalTrainings ?? 0,
+        totalBeneficiaries: rd.totalBeneficiaries ?? 0,
+        provinceCoverage: rd.provinceCoverage ?? 0,
+        modalityBreakdown: rd.modalityBreakdown ?? { online: 0, faceToFace: 0, hybrid: 0 },
+      },
+      tags: ["mentor_report", `q${args.quarter}_${args.year}`],
+      hashtags: [],
+      boostLevel: "standard",
+      boostExpiresAt: now + 7 * 24 * 60 * 60 * 1000,
+      likeCount: 0,
+      commentCount: 0,
+      isPinned: false,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await ctx.db.patch(report._id, { status: "published" });
+    return postId;
+  },
+});
+
 export const getSavedReport = query({
   args: { mentorId: v.id("learnhub_users"), quarter: v.string(), year: v.number() },
   handler: async (ctx, args) =>

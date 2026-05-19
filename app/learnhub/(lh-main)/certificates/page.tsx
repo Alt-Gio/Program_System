@@ -16,6 +16,7 @@ import { Mail, X } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useLearnhubSession } from "@/lib/learnhub/hooks";
+import { ORG_CONFIG } from "@/lib/learnhub/org-config";
 
 const CERT_TYPE_LABEL: Record<string, string> = {
   learning: "Learning Certificate",
@@ -23,11 +24,10 @@ const CERT_TYPE_LABEL: Record<string, string> = {
   event_participation: "Event Participation",
 };
 
+// Program color palette comes from org-config so deployments can recolour
+// (or extend) the chip palette without editing this file.
 const PROGRAM_COLORS: Record<string, string> = {
-  SPARK: "#5b6cff",
-  DWIA: "#22d3a0",
-  "Project CLICK": "#ff8c42",
-  Tech4ED: "#ff5f6d",
+  ...ORG_CONFIG.programColors,
   "Auto-Ingested": "#fbbf24",
 };
 

@@ -13,6 +13,7 @@ import { DrivePost } from "./post-types/DrivePost";
 import { FormPost } from "./post-types/FormPost";
 import { OpportunityPost } from "./post-types/OpportunityPost";
 import { CertificatePost } from "./post-types/CertificatePost";
+import { MentorReportPost } from "./post-types/MentorReportPost";
 
 export interface MockAuthor {
   id: string;
@@ -375,6 +376,11 @@ export function FeedPost({ post, userId, onLike, onHashtagClick }: FeedPostProps
       {post.type === "form"    && <div style={{ marginTop: 10 }}><FormPost    metadata={post.metadata} /></div>}
       {post.type === "opportunity" && <div style={{ marginTop: 10 }}><OpportunityPost metadata={post.metadata} /></div>}
       {post.type === "certificate" && <div style={{ marginTop: 10 }}><CertificatePost metadata={post.metadata} /></div>}
+      {post.type === "text" && post.metadata?.kind === "mentor_report" && (
+        <div style={{ marginTop: 10 }}>
+          <MentorReportPost metadata={post.metadata} />
+        </div>
+      )}
 
       {/* Engagement line */}
       {localLikes > 0 && (

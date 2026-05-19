@@ -15,7 +15,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   Home, LayoutGrid, Plus, Zap, Briefcase,
   Trophy, Settings, Youtube, Calendar, PlaySquare, Users,
-  ShieldCheck, BarChart3,
+  ShieldCheck, BarChart3, Sun,
 } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -39,6 +39,7 @@ interface RoleGatedItem extends RailItem {
 }
 
 const ITEMS: RoleGatedItem[] = [
+  { id: "today",       href: "/learnhub/today",         icon: <Sun size={20} />,         label: "Today" },
   { id: "feed",        href: "/learnhub/feed",          icon: <Home size={20} />,        label: "Home" },
   { id: "watch",       href: "/learnhub/watch",         icon: <PlaySquare size={20} />,  label: "Watch" },
   { id: "learning",    href: "/learnhub/learning-path", icon: <LayoutGrid size={20} />,  label: "My Learning" },

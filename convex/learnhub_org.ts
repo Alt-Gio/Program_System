@@ -7,6 +7,7 @@
 
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 
 async function requireOrgManager(
@@ -165,6 +166,11 @@ export const verifyMentorApprove = mutation({
     });
     // Flip the mentor's status so they unlock mentor-only features.
     await ctx.db.patch(verif.mentorId, { mentorStatus: "verified" });
+    await ctx.scheduler.runAfter(
+      0,
+      internal.learnhub_notifications.notifyMentorVerificationResult,
+      { mentorId: verif.mentorId, decision: "approved" },
+    );
     return { ok: true };
   },
 });
@@ -186,6 +192,15 @@ export const verifyMentorReject = mutation({
       rejectionReason: args.reason ?? "Not eligible at this time.",
     });
     await ctx.db.patch(verif.mentorId, { mentorStatus: "rejected" });
+    await ctx.scheduler.runAfter(
+      0,
+      internal.learnhub_notifications.notifyMentorVerificationResult,
+      {
+        mentorId: verif.mentorId,
+        decision: "rejected",
+        rejectionReason: args.reason,
+      },
+    );
     return { ok: true };
   },
 });

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useLearnhubSession } from "@/lib/learnhub/hooks";
+import { orgHeadlineLabel } from "@/lib/learnhub/org-config";
 import type { Id } from "@/convex/_generated/dataModel";
 
 // ── Design tokens ────────────────────────────────────────────
@@ -54,38 +55,59 @@ type Opportunity = {
 };
 
 // ── Seed fallback ─────────────────────────────────────────────
+// Domain-diverse examples shown when no real opportunities are live, so new
+// learners from any field see the platform supports them.
 const SEED_OPPORTUNITIES: Opportunity[] = [
   {
     _id: "w1", orgName: "TechCorp Philippines", title: "Remote IT Support Specialist",
     description: "Join our helpdesk team providing technical support to corporate clients across Luzon.",
     workType: "remote", payType: "paid", payAmount: "₱18,000/mo", slots: 3,
     deadline: Date.now() + 7 * 86400000, duration: "6 months",
-    requiredCertTypes: ["Tech4ED", "SPARK"], requiredSkills: ["IT support", "Troubleshooting"],
+    requiredCertTypes: [], requiredSkills: ["IT support", "Troubleshooting"],
     minXp: 500, eligibilityMode: "guided", status: "open", isSeed: true,
   },
   {
-    _id: "w2", orgName: "DILG Bicol Region", title: "Digital Records Management Assistant",
-    description: "Help digitize and manage government records as part of the eGov initiative.",
-    workType: "hybrid", payType: "stipend", payAmount: "₱8,000/mo", slots: 5,
+    _id: "w2", orgName: "Bicol Regional Hospital", title: "Community Health Volunteer",
+    description: "Support outreach clinics and health education campaigns across rural barangays.",
+    workType: "onsite", payType: "stipend", payAmount: "₱6,000/mo", slots: 8,
     deadline: Date.now() + 14 * 86400000, duration: "3 months",
-    requiredCertTypes: ["DWIA"], requiredSkills: ["Records", "Data entry"],
-    minXp: 300, eligibilityMode: "guided", status: "open", isSeed: true,
+    requiredCertTypes: [], requiredSkills: ["First Aid", "Communication"],
+    preferredSkills: ["Public Health"], minXp: 200, eligibilityMode: "open",
+    status: "open", isSeed: true,
   },
   {
-    _id: "w3", orgName: "DICT Region V", title: "Training Assistant — Tech4ED",
-    description: "Assist in delivering Tech4ED training sessions to communities in Camarines Sur.",
-    workType: "onsite", payType: "volunteer", slots: 2,
-    deadline: Date.now() + 21 * 86400000, duration: "Per session",
-    requiredCertTypes: ["Tech4ED"], preferredSkills: ["Facilitation"],
-    minXp: 200, eligibilityMode: "open", status: "open", isSeed: true,
+    _id: "w3", orgName: "Sorsogon Coop Farms", title: "Apprentice Field Technician (Agriculture)",
+    description: "Learn modern sustainable-farming practices and assist farmer cooperatives in Sorsogon.",
+    workType: "onsite", payType: "stipend", payAmount: "₱7,500/mo", slots: 4,
+    deadline: Date.now() + 21 * 86400000, duration: "6 months",
+    requiredCertTypes: [], requiredSkills: ["Agriculture"],
+    preferredSkills: ["Communication"], minXp: 100, eligibilityMode: "open",
+    status: "open", isSeed: true,
   },
   {
     _id: "w4", orgName: "Bicol E-Commerce Hub", title: "Social Media Content Creator",
-    description: "Create digital content promoting local businesses and their products online.",
+    description: "Create digital content promoting local MSMEs and their products online.",
     workType: "remote", payType: "paid", payAmount: "₱15,000/mo", slots: 1,
     deadline: Date.now() + 5 * 86400000, duration: "4 months",
-    requiredCertTypes: ["SPARK", "DWIA"], requiredSkills: ["Content creation"],
-    preferredSkills: ["Canva", "Copywriting"], minXp: 800, eligibilityMode: "guided",
+    requiredCertTypes: [], requiredSkills: ["Content creation"],
+    preferredSkills: ["Graphic Design", "Writing"], minXp: 800, eligibilityMode: "guided",
+    status: "open", isSeed: true,
+  },
+  {
+    _id: "w5", orgName: "Albay Community Library", title: "Reading Tutor (Languages)",
+    description: "Help young learners build reading fluency in English and Filipino through weekly sessions.",
+    workType: "hybrid", payType: "volunteer", slots: 6,
+    deadline: Date.now() + 30 * 86400000, duration: "Per term",
+    requiredCertTypes: [], requiredSkills: ["Languages", "Communication"],
+    minXp: 50, eligibilityMode: "open", status: "open", isSeed: true,
+  },
+  {
+    _id: "w6", orgName: "Camarines Crafts Co.", title: "Bookkeeping Assistant",
+    description: "Help local artisans track inventory, expenses, and small-business finances each week.",
+    workType: "hybrid", payType: "paid", payAmount: "₱12,000/mo", slots: 2,
+    deadline: Date.now() + 14 * 86400000, duration: "Ongoing",
+    requiredCertTypes: [], requiredSkills: ["Accounting"],
+    preferredSkills: ["Communication"], minXp: 300, eligibilityMode: "guided",
     status: "open", isSeed: true,
   },
 ];
@@ -514,14 +536,14 @@ function WorkPageInner() {
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14, marginBottom: 16 }}>
           <div>
             <div style={{ fontSize: 11, fontWeight: 700, color: ORANGE, letterSpacing: 1.4, marginBottom: 4, fontFamily: "var(--font-dm-sans, sans-serif)" }}>
-              WORK BOARD · DICT REGION V
+              WORK BOARD · {orgHeadlineLabel()}
             </div>
             <h1 style={{ fontSize: 26, fontWeight: 700, color: TEXT, lineHeight: 1.2, fontFamily: "var(--font-dm-serif, serif)", margin: 0 }}>
               Opportunities matched to your{" "}
               <em style={{ color: ORANGE }}>learning</em>
             </h1>
             <p style={{ fontSize: 13, color: MUTED, marginTop: 6, lineHeight: 1.5, maxWidth: 520 }}>
-              Real job orders posted by mentors and DICT officers — personalized to your certificates, courses and interests.
+              Real opportunities posted by mentors and partner organizations — personalized to your certificates, courses, and interests.
             </p>
           </div>
           {canPost && (

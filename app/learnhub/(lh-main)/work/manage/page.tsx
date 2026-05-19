@@ -81,7 +81,7 @@ function ManageOpportunitiesPageInner() {
         <p className="text-4xl mb-3">🔒</p>
         <h1 className="text-xl font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>Verified creators only</h1>
         <p className="text-sm mt-2 mb-4" style={{ color: "#9ba3cc" }}>
-          Only DICT admins, verified mentors, and org partners can manage opportunities.
+          Only admins, verified mentors, and org partners can manage opportunities.
         </p>
         <Link href="/learnhub/work" className="text-sm font-semibold" style={{ color: "#7c8bff" }}>
           ← Back to Opportunities

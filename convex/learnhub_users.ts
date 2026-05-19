@@ -1,5 +1,7 @@
 import { query, mutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
+import { evaluateAndAwardForUser } from "./learnhub_badges";
 
 export const getUserByGoogleId = query({
   args: { googleId: v.string() },
@@ -100,8 +102,23 @@ export const createUser = mutation({
       );
     }
 
-    return await ctx.db.insert("learnhub_users", {
+    // For mentors created via self-onboarding (i.e. not coming through an
+    // invite/acceptInvite which sets mentorStatus="verified"), we mark them
+    // as pending_verification and mirror their interests onto expertiseTags
+    // so they immediately appear in /learnhub/mentors with a "Pending" chip
+    // and learners can find them by expertise. Coordinators get a fan-out
+    // notification so review isn't backlogged.
+    const isSelfOnboardedMentor = args.role === "mentor";
+    const mentorFields = isSelfOnboardedMentor
+      ? {
+          mentorStatus: "pending_verification" as const,
+          expertiseTags: args.interests ?? [],
+        }
+      : {};
+
+    const newUserId = await ctx.db.insert("learnhub_users", {
       ...args,
+      ...mentorFields,
       bio: undefined,
       xpPoints: 100,
       badges: ["🏁 First Steps"],
@@ -118,6 +135,43 @@ export const createUser = mutation({
         emailDigest: "weekly",
       },
     });
+
+    if (isSelfOnboardedMentor) {
+      // Also create a verification record so the /org/mentors review queue
+      // (which reads learnhub_mentor_verifications by status="pending")
+      // picks this mentor up. Self-onboarded mentors have no doc URL yet —
+      // they can attach one later via submitVerification; coordinators can
+      // still approve based on the profile alone.
+      await ctx.db.insert("learnhub_mentor_verifications", {
+        mentorId: newUserId,
+        submittedAt: Date.now(),
+        status: "pending",
+      });
+      await ctx.scheduler.runAfter(
+        0,
+        internal.learnhub_notifications.notifyMentorPendingVerification,
+        { mentorId: newUserId },
+      );
+    }
+
+    return newUserId;
+  },
+});
+
+// Internal: fetch coordinator + admin user IDs for fan-out notifications.
+// Used for mentor-verification queue alerts.
+export const listVerifiersForNotification = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const coordinators = await ctx.db
+      .query("learnhub_users")
+      .withIndex("by_role", (q) => q.eq("role", "coordinator"))
+      .take(200);
+    const admins = await ctx.db
+      .query("learnhub_users")
+      .withIndex("by_role", (q) => q.eq("role", "admin"))
+      .take(200);
+    return [...coordinators, ...admins];
   },
 });
 
@@ -164,15 +218,29 @@ export const updateProfile = mutation({
     province: v.optional(v.string()),
     municipality: v.optional(v.string()),
     feedColumns: v.optional(v.number()),
+    // Mentor-only fields. The schema already permits them on every user
+    // record; the mentor profile editor at /learnhub/mentor/profile writes
+    // them and the marketplace reads them.
+    designation: v.optional(v.string()),
+    expertiseTags: v.optional(v.array(v.string())),
+    maxMentees: v.optional(v.number()),
+    availability: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { id, ...fields } = args;
+    const interestsTouched = fields.interests !== undefined;
     // Drop undefined fields so we don't overwrite with undefined
     const clean: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(fields)) {
       if (v !== undefined) clean[k] = v;
     }
     await ctx.db.patch(id, clean);
+
+    // Editing interests can flip Polymath; cheap to re-evaluate on any
+    // profile edit since most criteria are constant-time lookups.
+    if (interestsTouched) {
+      await evaluateAndAwardForUser(ctx, id);
+    }
   },
 });
 
@@ -250,6 +318,9 @@ export const markDailyLogin = mutation({
       longestStreak,
       xpPoints: user.xpPoints + 10,
     });
+
+    // Streak update may have crossed the 14-day Streak Keeper threshold.
+    await evaluateAndAwardForUser(ctx, args.userId);
   },
 });
 

@@ -4,6 +4,7 @@ import { Suspense, useMemo, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useLearnhubSession } from "@/lib/learnhub/hooks";
+import { ORG_CONFIG, orgHeadlineLabel } from "@/lib/learnhub/org-config";
 import type { Id } from "@/convex/_generated/dataModel";
 
 // Visual tokens — match the rest of LearnHub
@@ -34,6 +35,13 @@ function initials(name: string): string {
     .join("");
 }
 
+type MentorStatus =
+  | "verified"
+  | "pending_verification"
+  | "suspended"
+  | "rejected"
+  | null;
+
 type Mentor = {
   _id: Id<"learnhub_users">;
   name: string;
@@ -47,7 +55,23 @@ type Mentor = {
   activeMenteeCount: number;
   maxMentees: number | null;
   hasCapacity: boolean;
+  mentorStatus: MentorStatus;
 };
+
+function statusChip(status: MentorStatus): { label: string; bg: string; fg: string } | null {
+  switch (status) {
+    case "verified":
+      return { label: "Verified", bg: "rgba(34,197,94,0.14)", fg: "#22c55e" };
+    case "pending_verification":
+      return { label: "Pending", bg: "rgba(251,191,36,0.14)", fg: "#fbbf24" };
+    case "suspended":
+      return { label: "Suspended", bg: "rgba(239,68,68,0.14)", fg: "#fca5a5" };
+    case "rejected":
+      return { label: "Not verified", bg: "rgba(239,68,68,0.14)", fg: "#fca5a5" };
+    default:
+      return { label: "New", bg: "rgba(56,189,248,0.14)", fg: "#38bdf8" };
+  }
+}
 
 function MentorsPageInner() {
   const { userId, role } = useLearnhubSession();
@@ -56,6 +80,7 @@ function MentorsPageInner() {
   const [filterTag, setFilterTag] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [hideFull, setHideFull] = useState(true);
+  const [onlyVerified, setOnlyVerified] = useState(false);
 
   const allTags = useMemo(() => {
     if (!mentors) return [] as string[];
@@ -72,6 +97,7 @@ function MentorsPageInner() {
     const q = query.trim().toLowerCase();
     return mentors.filter((m) => {
       if (hideFull && !m.hasCapacity) return false;
+      if (onlyVerified && m.mentorStatus !== "verified") return false;
       if (filterTag) {
         const has = m.expertiseTags.includes(filterTag) || m.interests.includes(filterTag);
         if (!has) return false;
@@ -90,7 +116,7 @@ function MentorsPageInner() {
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [mentors, query, filterTag, hideFull]);
+  }, [mentors, query, filterTag, hideFull, onlyVerified]);
 
   const canRequest = role === "student" || role === "org_partner";
 
@@ -98,7 +124,7 @@ function MentorsPageInner() {
     <div className="mx-auto" style={{ maxWidth: 1100, padding: "20px 16px 40px", color: TEXT, background: BG, minHeight: "100vh" }}>
       <div style={{ marginBottom: 18 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: ORANGE, letterSpacing: 1.4 }}>
-          MENTOR MARKETPLACE · DICT REGION V
+          MENTOR MARKETPLACE · {orgHeadlineLabel()}
         </div>
         <h1
           style={{
@@ -112,7 +138,7 @@ function MentorsPageInner() {
           Find a mentor who fits your <em style={{ color: ORANGE }}>journey</em>
         </h1>
         <p style={{ color: MUTED, fontSize: 13, margin: 0 }}>
-          Browse verified DICT mentors. Pick someone aligned with your interests and send a short intro to start a mentorship.
+          Browse mentors across every discipline. Pick someone aligned with your interests and send a short intro to start a mentorship.
         </p>
       </div>
 
@@ -154,6 +180,28 @@ function MentorsPageInner() {
             style={{ accentColor: ORANGE }}
           />
           Hide mentors at capacity
+        </label>
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 12,
+            color: MUTED,
+            background: CARD,
+            border: `1px solid ${BORDER2}`,
+            borderRadius: 10,
+            padding: "9px 12px",
+            cursor: "pointer",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={onlyVerified}
+            onChange={(e) => setOnlyVerified(e.target.checked)}
+            style={{ accentColor: ORANGE }}
+          />
+          Show only verified
         </label>
       </div>
 
@@ -208,7 +256,7 @@ function MentorsPageInner() {
             mentor={m}
             accent={accentFor(i)}
             onOpen={() => setSelected(m)}
-            disabled={!canRequest}
+            disabled={!canRequest || m.mentorStatus !== "verified"}
           />
         ))}
       </div>
@@ -261,13 +309,12 @@ function MentorCard({
         display: "flex",
         flexDirection: "column",
         gap: 10,
-        cursor: disabled ? "default" : "pointer",
+        cursor: "pointer",
         transition: "transform 120ms ease, border-color 120ms ease",
         opacity: mentor.hasCapacity ? 1 : 0.7,
       }}
       onClick={onOpen}
       onMouseEnter={(e) => {
-        if (disabled) return;
         e.currentTarget.style.transform = "translateY(-1px)";
         e.currentTarget.style.borderColor = accent;
       }}
@@ -277,6 +324,28 @@ function MentorCard({
       }}
     >
       <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: 3, background: accent, borderTopLeftRadius: 14, borderBottomLeftRadius: 14 }} />
+      {(() => {
+        const chip = statusChip(mentor.mentorStatus);
+        return chip ? (
+          <span
+            style={{
+              position: "absolute",
+              top: 10,
+              right: 10,
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: 0.5,
+              padding: "3px 8px",
+              borderRadius: 999,
+              background: chip.bg,
+              color: chip.fg,
+              textTransform: "uppercase",
+            }}
+          >
+            {chip.label}
+          </span>
+        ) : null;
+      })()}
       <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
         <div
           style={{
@@ -300,7 +369,7 @@ function MentorCard({
             {mentor.name}
           </p>
           <p style={{ margin: "2px 0 0", fontSize: 11.5, color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {mentor.designation ?? "DICT Mentor"}
+            {mentor.designation ?? `${ORG_CONFIG.orgShort} Mentor`}
             {mentor.regionalOffice ? ` · ${mentor.regionalOffice}` : ""}
           </p>
         </div>
@@ -361,16 +430,17 @@ function MentorCard({
             e.stopPropagation();
             onOpen();
           }}
-          disabled={disabled}
           style={{
             fontSize: 11.5,
             fontWeight: 700,
             padding: "6px 12px",
             borderRadius: 999,
-            background: disabled ? "rgba(255,255,255,0.05)" : `linear-gradient(135deg, ${ORANGE}, #ef4444)`,
-            color: disabled ? DIM : "#fff",
-            border: "none",
-            cursor: disabled ? "not-allowed" : "pointer",
+            background: disabled
+              ? "rgba(255,255,255,0.05)"
+              : `linear-gradient(135deg, ${ORANGE}, #ef4444)`,
+            color: disabled ? MUTED : "#fff",
+            border: disabled ? `1px solid ${BORDER2}` : "none",
+            cursor: "pointer",
           }}
         >
           View profile →
@@ -499,10 +569,31 @@ function RequestModal({
           >
             {initials(mentor.name)}
           </div>
-          <div>
-            <p style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{mentor.name}</p>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <p style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{mentor.name}</p>
+              {(() => {
+                const chip = statusChip(mentor.mentorStatus);
+                return chip ? (
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      letterSpacing: 0.5,
+                      padding: "3px 8px",
+                      borderRadius: 999,
+                      background: chip.bg,
+                      color: chip.fg,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {chip.label}
+                  </span>
+                ) : null;
+              })()}
+            </div>
             <p style={{ margin: "2px 0 0", fontSize: 12, color: MUTED }}>
-              {mentor.designation ?? "DICT Mentor"}
+              {mentor.designation ?? `${ORG_CONFIG.orgShort} Mentor`}
               {mentor.regionalOffice ? ` · ${mentor.regionalOffice}` : ""}
               {mentor.province ? ` · ${mentor.province}` : ""}
             </p>
@@ -542,6 +633,23 @@ function RequestModal({
           </div>
         )}
 
+        {canRequest && mentor.mentorStatus !== "verified" && (
+          <div
+            style={{
+              padding: 12,
+              background: "rgba(251,191,36,0.08)",
+              border: `1px solid rgba(251,191,36,0.3)`,
+              borderRadius: 10,
+              fontSize: 12.5,
+              color: "#fbbf24",
+              marginBottom: 12,
+            }}
+          >
+            This mentor is awaiting verification by {ORG_CONFIG.orgName} {ORG_CONFIG.mentorAuthorityLabel}.
+            You'll be able to request mentorship once they're verified.
+          </div>
+        )}
+
         {existing && blockingState && (
           <div
             style={{
@@ -577,7 +685,7 @@ function RequestModal({
           </div>
         )}
 
-        {canRequest && !blockingState && !sent && (
+        {canRequest && mentor.mentorStatus === "verified" && !blockingState && !sent && (
           <>
             <label style={{ display: "block", marginBottom: 12 }}>
               <span style={{ display: "block", fontSize: 11, color: MUTED, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 6 }}>

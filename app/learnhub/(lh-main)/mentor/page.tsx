@@ -5,18 +5,19 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { formatDistanceToNow, format } from "date-fns";
 import { useLearnhubSession } from "@/lib/learnhub/hooks";
+import { ORG_CONFIG } from "@/lib/learnhub/org-config";
 import type { Id } from "@/convex/_generated/dataModel";
 
 type ConvexUserId = Id<"learnhub_users">;
 
 interface SessionInfo { sub: string; email: string; name: string; role: string; }
 
-const PROGRAMS = ["SPARK", "DWIA", "Project CLICK", "Tech4ED", "eGov PH"];
+const PROGRAMS = ORG_CONFIG.programs;
 
 function IssueCertModal({ mentorId, mentorName, onClose, onSuccess }: {
   mentorId: string; mentorName: string; onClose: () => void; onSuccess: () => void;
 }) {
-  const [form, setForm] = useState({ studentEmail: "", studentName: "", courseTitle: "", programType: "SPARK", certType: "learning" as "learning" | "work_completion", sendEmail: true });
+  const [form, setForm] = useState({ studentEmail: "", studentName: "", courseTitle: "", programType: PROGRAMS[0] ?? "", certType: "learning" as "learning" | "work_completion", sendEmail: true });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -102,7 +103,7 @@ export default function MentorDashboard() {
       <div className="max-w-xl mx-auto px-4 py-20 text-center">
         <p className="text-4xl mb-3">🔒</p>
         <p className="text-lg font-semibold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>Mentor Access Only</p>
-        <p className="text-sm mt-1" style={{ color: "#9ba3cc" }}>This dashboard is only accessible to DICT Region V trainers and facilitators.</p>
+        <p className="text-sm mt-1" style={{ color: "#9ba3cc" }}>This dashboard is only accessible to verified {ORG_CONFIG.orgName} mentors and facilitators.</p>
       </div>
     );
   }
@@ -115,7 +116,10 @@ export default function MentorDashboard() {
         <div>
           <p className="text-xs font-medium tracking-wider uppercase mb-1" style={{ color: "#5b6cff", fontFamily: "var(--font-sora)" }}>Mentor Dashboard</p>
           <h1 className="text-xl font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>Welcome, {session.name.split(" ")[0]}</h1>
-          <p className="text-sm mt-0.5" style={{ color: "#9ba3cc" }}>DICT Region V · ILCDB LearnHub</p>
+          <p className="text-sm mt-0.5" style={{ color: "#9ba3cc" }}>{ORG_CONFIG.orgName} · {ORG_CONFIG.productName}</p>
+          <a href="/learnhub/mentor/profile" className="text-xs font-semibold mt-1 inline-block" style={{ color: "#7c8bff" }}>
+            Edit profile →
+          </a>
         </div>
         <button onClick={() => setShowModal(true)} className="px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 shrink-0" style={{ background: "#5b6cff", color: "#fff", fontFamily: "var(--font-sora)" }}>
           <span>🎓</span> Issue Certificate

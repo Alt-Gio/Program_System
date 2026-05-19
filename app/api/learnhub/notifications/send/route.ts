@@ -20,6 +20,10 @@ const PUSH_EVENTS = new Set([
   "new_message",
   "streak_reminder",
   "cohort_announcement",
+  // LearnHub cohesion-pass events that warrant a phone push:
+  "mentor_verified",
+  "mentor_match_available",
+  "streak_at_risk",
 ]);
 
 interface SendNotifBody {

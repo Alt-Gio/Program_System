@@ -7,7 +7,10 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { clearLearnhubSessionCache, useLearnhubSession } from "@/lib/learnhub/hooks";
 import type { Id } from "@/convex/_generated/dataModel";
-import { INTEREST_TAXONOMY } from "@/app/learnhub/onboarding/page";
+import {
+  INTEREST_CATEGORIES,
+  normalizeInterest,
+} from "@/lib/learnhub/interests";
 
 const FEED_COLUMN_OPTIONS: Array<{ value: number; label: string; sub: string }> = [
   { value: 1, label: "1 column", sub: "Single, full-width cards" },
@@ -80,6 +83,7 @@ function SettingsPageInner() {
   const [interests, setInterests] = useState<string[]>([]);
   const [skillLevels, setSkillLevels] = useState<Record<string, SkillLevel>>({});
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [customDraft, setCustomDraft] = useState("");
   const [hoursPerWeek, setHoursPerWeek] = useState<Hours | "">("");
   const [region, setRegion] = useState("");
   const [province, setProvince] = useState("");
@@ -152,6 +156,20 @@ function SettingsPageInner() {
       setSkillLevels((sl) => ({ ...sl, [tag]: "beginner" }));
       return [...prev, tag];
     });
+  };
+  const addCustomInterest = () => {
+    const raw = customDraft.trim();
+    if (!raw || raw.length > 48) return;
+    const norm = normalizeInterest(raw);
+    if (!norm) return;
+    if (interests.some((t) => normalizeInterest(t) === norm)) {
+      setCustomDraft("");
+      return;
+    }
+    if (interests.length >= MAX_INTERESTS) return;
+    setInterests((prev) => [...prev, raw]);
+    setSkillLevels((sl) => ({ ...sl, [raw]: "beginner" }));
+    setCustomDraft("");
   };
   const toggleGoal = (g: Goal) => {
     setGoals((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]));
@@ -303,28 +321,75 @@ function SettingsPageInner() {
             <p className="text-xs font-medium mb-2" style={{ color: "#9ba3cc" }}>
               Interests <span style={{ color: "#5c6490" }}>({MIN_INTERESTS}–{MAX_INTERESTS} · {interests.length} selected)</span>
             </p>
-            <div className="flex flex-wrap gap-2">
-              {INTEREST_TAXONOMY.map((tag) => {
-                const active = interests.includes(tag);
-                const atCap = !active && interests.length >= MAX_INTERESTS;
-                return (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => toggleInterest(tag)}
-                    disabled={atCap}
-                    className="rounded-full px-3 py-1.5 text-xs font-medium transition-all disabled:opacity-40"
-                    style={{
-                      background: active ? "rgba(91,108,255,0.18)" : "rgba(255,255,255,0.04)",
-                      border: active ? "1px solid #5b6cff" : "1px solid rgba(255,255,255,0.08)",
-                      color: active ? "#7c8bff" : "#e8eaff",
-                      cursor: atCap ? "not-allowed" : "pointer",
-                    }}
+            <div className="flex flex-col gap-3 max-h-80 overflow-y-auto pr-1">
+              {Object.entries(INTEREST_CATEGORIES).map(([cat, tags]) => (
+                <div key={cat}>
+                  <p
+                    className="text-[10px] uppercase tracking-widest mb-1.5"
+                    style={{ color: "#5c6490" }}
                   >
-                    {tag}
-                  </button>
-                );
-              })}
+                    {cat}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {tags.map((tag) => {
+                      const active = interests.includes(tag);
+                      const atCap = !active && interests.length >= MAX_INTERESTS;
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => toggleInterest(tag)}
+                          disabled={atCap}
+                          className="rounded-full px-3 py-1.5 text-xs font-medium transition-all disabled:opacity-40"
+                          style={{
+                            background: active ? "rgba(91,108,255,0.18)" : "rgba(255,255,255,0.04)",
+                            border: active ? "1px solid #5b6cff" : "1px solid rgba(255,255,255,0.08)",
+                            color: active ? "#7c8bff" : "#e8eaff",
+                            cursor: atCap ? "not-allowed" : "pointer",
+                          }}
+                        >
+                          {tag}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-3 flex gap-2">
+              <input
+                type="text"
+                value={customDraft}
+                onChange={(e) => setCustomDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addCustomInterest();
+                  }
+                }}
+                placeholder="Add a custom interest (e.g. Veterinary Medicine)"
+                maxLength={48}
+                className="flex-1 rounded-xl px-3 py-2 text-xs outline-none"
+                style={{
+                  background: "rgba(0,0,0,0.3)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  color: "#e8eaff",
+                }}
+              />
+              <button
+                type="button"
+                onClick={addCustomInterest}
+                disabled={!customDraft.trim() || interests.length >= MAX_INTERESTS}
+                className="rounded-xl px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-40"
+                style={{
+                  background: "rgba(91,108,255,0.18)",
+                  border: "1px solid rgba(91,108,255,0.5)",
+                  color: "#7c8bff",
+                }}
+              >
+                Add
+              </button>
             </div>
           </div>
 

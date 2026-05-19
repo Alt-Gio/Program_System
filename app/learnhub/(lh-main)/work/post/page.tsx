@@ -57,7 +57,7 @@ function PostOpportunityPageInner() {
         <p className="text-4xl mb-3">🔒</p>
         <h1 className="text-xl font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>Verified creators only</h1>
         <p className="text-sm mt-2 mb-4" style={{ color: "#9ba3cc" }}>
-          Posting opportunities is restricted to DICT admins, verified mentors, and org partner accounts.
+          Posting opportunities is restricted to admins, verified mentors, and org partner accounts.
         </p>
         <Link href="/learnhub/work" className="text-sm font-semibold" style={{ color: "#7c8bff" }}>
           ← Back to Opportunities

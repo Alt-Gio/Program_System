@@ -82,4 +82,35 @@ crons.interval(
   {}
 );
 
+// ── LearnHub: Daily flashcards-due nudge (08:00 Asia/Manila ≈ 00:00 UTC) ────
+// Surfaces users with ≥5 due flashcards into the notification fan-out so the
+// review subsystem doesn't stay invisible. Runs once a day at 00:00 UTC,
+// which lands around morning in PHT and is gentle enough not to spam.
+crons.daily(
+  "learnhub-flashcards-due-daily",
+  { hourUTC: 0, minuteUTC: 0 },
+  internal.learnhub_notifications.notifyFlashcardsDue,
+  {}
+);
+
+// ── LearnHub: Streak-at-risk evening reminder (10:00 UTC ≈ 18:00 PHT) ──────
+// Late-day nudge for users who haven't logged anything yet today, so they
+// don't accidentally break a streak they care about.
+crons.daily(
+  "learnhub-streak-at-risk-daily",
+  { hourUTC: 10, minuteUTC: 0 },
+  internal.learnhub_notifications.notifyStreakAtRisk,
+  {}
+);
+
+// ── LearnHub: Sunday weekly digest (09:00 UTC ≈ 17:00 PHT Sunday) ──────────
+// One summary per learner — videos / flashcards / journals / streak / XP.
+// Skips dormant accounts with zero activity for the week.
+crons.weekly(
+  "learnhub-weekly-digest",
+  { dayOfWeek: "sunday", hourUTC: 9, minuteUTC: 0 },
+  internal.learnhub_notifications.notifyWeeklyDigest,
+  {}
+);
+
 export default crons;

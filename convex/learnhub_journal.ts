@@ -358,7 +358,7 @@ export const requestWeeklySummary = action({
           {
             role: "system",
             content:
-              "You are a kind learning coach for DICT Region V learners. Read this week's journal entries and reply with 4 short lines: a recurring theme, a clear win, a friction point, and one concrete suggestion for next week. Use plain language. Don't add headings or bullets — just the four lines.",
+              "You are a kind learning coach. Read this week's journal entries and reply with 4 short lines: a recurring theme, a clear win, a friction point, and one concrete suggestion for next week. Use plain language. Don't add headings or bullets — just the four lines.",
           },
           { role: "user", content: corpus.slice(0, 8000) },
         ],

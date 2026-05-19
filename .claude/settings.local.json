@@ -21,7 +21,14 @@
       "Bash(zcat \"/home/alt/.claude/projects/-home-alt-program-src/203ec317-e74e-49e1-a8d9-d4ece0b44d15/tool-results/webfetch-1778746300020-e8ezk0.bin\")",
       "Bash(tar -x --wildcards '*/BoxMap.html' -O)",
       "Bash(tar -t)",
-      "Bash(tar -x --wildcards '*/boxmap-app.jsx' -O)"
+      "Bash(tar -x --wildcards '*/boxmap-app.jsx' -O)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :3210)",
+      "Bash(git ls-remote *)",
+      "Bash(grep -E \"\\\\.ts$\")",
+      "Bash(npm run *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\actal\\\\Music\\\\Project\\\\CascadeProjects\\\\windsurf-project\" -Recurse -Name)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\actal\\\\Music\\\\Project\\\\CascadeProjects\\\\windsurf-project\\\\app\" -Depth 1 -Directory)"
     ]
   }
 }

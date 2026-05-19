@@ -43,14 +43,17 @@ const AMBER = "#fbbf24";
 const WATCH_INTEREST_TAGS = [
   { id: "Cybersecurity", label: "Security",    emoji: "🔒" },
   { id: "CLOUD",         label: "Cloud",       emoji: "☁️" },
-  { id: "TECH4ED",       label: "Tech4ED",     emoji: "💻" },
-  { id: "SPARK",         label: "SPARK",       emoji: "⚡" },
-  { id: "DWIA",          label: "DWIA",        emoji: "⚖️" },
-  { id: "LEADERSHIP",    label: "Leadership",  emoji: "🧭" },
   { id: "AI",            label: "AI",          emoji: "🤖" },
   { id: "Data",          label: "Data",        emoji: "📊" },
   { id: "PROGRAMMING",   label: "Programming", emoji: "⌨️" },
-  { id: "UX",            label: "UX",          emoji: "🎨" },
+  { id: "UX",            label: "Design",      emoji: "🎨" },
+  { id: "Health",        label: "Health",      emoji: "🏥" },
+  { id: "Business",      label: "Business",    emoji: "💼" },
+  { id: "Languages",     label: "Languages",   emoji: "🗣️" },
+  { id: "Sciences",      label: "Sciences",    emoji: "🧪" },
+  { id: "Arts",          label: "Arts",        emoji: "🎭" },
+  { id: "Trades",        label: "Trades",      emoji: "🔧" },
+  { id: "LEADERSHIP",    label: "Leadership",  emoji: "🧭" },
   { id: "NEUROSCIENCE",  label: "Learning",    emoji: "🧠" },
 ] as const;
 
@@ -338,7 +341,7 @@ export default function OrgCuratePage() {
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder={
-                mode === "channel" ? "DICT Region V"
+                mode === "channel" ? "Channel display name"
                 : mode === "short" ? "Phishing red flags in 30s"
                 : "Intro to FastAPI in 12 minutes"
               }

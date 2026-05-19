@@ -4,13 +4,16 @@ import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useLearnhubSession } from "@/lib/learnhub/hooks";
+import { ORG_CONFIG } from "@/lib/learnhub/org-config";
+import { INTEREST_TAXONOMY } from "@/lib/learnhub/interests";
 import type { Id } from "@/convex/_generated/dataModel";
 
-const PROGRAMS = ["SPARK", "DWIA", "Project CLICK", "Tech4ED", "EGOV"];
-const EXPERTISE_OPTIONS = [
-  "Digital Literacy", "Cybersecurity", "Web Development", "Data Analytics",
-  "Social Media", "eGovernance", "AI/Machine Learning", "Graphic Design",
-];
+const PROGRAMS = ORG_CONFIG.programs;
+// Expertise suggestions drawn from the same broad taxonomy used in
+// onboarding/settings so admin invites stay aligned with what learners
+// actually pick. Trimmed to a manageable list — admins can still type
+// custom tags via the free-text input below.
+const EXPERTISE_OPTIONS = INTEREST_TAXONOMY.slice(0, 16);
 
 // ── Invite Form Modal ─────────────────────────────────────────────────────────
 function InviteModal({ onClose, adminId }: { onClose: () => void; adminId: Id<"learnhub_users"> }) {
@@ -19,7 +22,7 @@ function InviteModal({ onClose, adminId }: { onClose: () => void; adminId: Id<"l
     invitedName: "",
     invitedEmail: "",
     dictDesignation: "",
-    regionalOffice: "DICT Region V",
+    regionalOffice: ORG_CONFIG.orgName,
     programs: [] as string[],
     expertiseTags: [] as string[],
     maxMentees: 5,
@@ -201,7 +204,7 @@ export default function AdminMentorsPage() {
             Mentor Management
           </h1>
           <p style={{ color: "#9ba3cc", fontSize: 13, marginTop: 4 }}>
-            Invite, verify, and manage ILCDB LearnHub mentors
+            Invite, verify, and manage {ORG_CONFIG.productName} mentors
           </p>
         </div>
         <button

@@ -26,6 +26,7 @@ import { Calendar, Flame, Search, X } from "lucide-react";
 import { useLearnhubSession } from "@/lib/learnhub/hooks";
 import { PostComposer } from "@/components/learnhub/feed/PostComposer";
 import { FeedPost, type MockPost } from "@/components/learnhub/feed/FeedPost";
+import { YourCoursesRail } from "@/components/learnhub/feed/YourCoursesRail";
 
 // ────────────────────────────────────────────────────────────────────
 // Convex doc → MockPost mapper
@@ -364,6 +365,10 @@ function FeedPageInner() {
           userAvatar={session?.avatarUrl}
           userRole={composerRole}
         />
+      )}
+
+      {tab === "for_you" && userId && (
+        <YourCoursesRail userId={userId as Id<"learnhub_users">} />
       )}
 
       {/* Tabs */}

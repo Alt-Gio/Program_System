@@ -45,14 +45,17 @@ const WATCH_INTERESTS = [
   { id: "All",           label: "All",           emoji: "✨" },
   { id: "Cybersecurity", label: "Security",      emoji: "🔒" },
   { id: "CLOUD",         label: "Cloud",         emoji: "☁️" },
-  { id: "TECH4ED",       label: "Tech4ED",       emoji: "💻" },
-  { id: "SPARK",         label: "SPARK",         emoji: "⚡" },
-  { id: "DWIA",          label: "DWIA",          emoji: "⚖️" },
-  { id: "LEADERSHIP",    label: "Leadership",    emoji: "🧭" },
   { id: "AI",            label: "AI",            emoji: "🤖" },
   { id: "Data",          label: "Data",          emoji: "📊" },
   { id: "PROGRAMMING",   label: "Programming",   emoji: "⌨️" },
-  { id: "UX",            label: "UX",            emoji: "🎨" },
+  { id: "UX",            label: "Design",        emoji: "🎨" },
+  { id: "Health",        label: "Health",        emoji: "🏥" },
+  { id: "Business",      label: "Business",      emoji: "💼" },
+  { id: "Languages",     label: "Languages",     emoji: "🗣️" },
+  { id: "Sciences",      label: "Sciences",      emoji: "🧪" },
+  { id: "Arts",          label: "Arts",          emoji: "🎭" },
+  { id: "Trades",        label: "Trades",        emoji: "🔧" },
+  { id: "LEADERSHIP",    label: "Leadership",    emoji: "🧭" },
   { id: "NEUROSCIENCE",  label: "Learning",      emoji: "🧠" },
 ] as const;
 
@@ -172,7 +175,7 @@ function WatchPageInner() {
     WATCH_INTERESTS.some((i) => i.id === initialInterest) ? initialInterest : "All",
   );
   const [pickedInterests, setPickedInterests] = useState<Set<string>>(
-    () => new Set(["Cybersecurity", "CLOUD", "TECH4ED"]),
+    () => new Set(["Cybersecurity", "CLOUD", "AI"]),
   );
   const [showInterests, setShowInterests] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);

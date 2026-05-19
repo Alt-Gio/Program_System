@@ -705,27 +705,6 @@ export const learnhubTables = {
     createdAt: v.number(),
   }).index("by_user", ["userId"]),
 
-  // ── Habits & XP ──────────────────────────────────────────
-  learnhub_habits: defineTable({
-    userId: v.id("learnhub_users"),
-    title: v.string(),
-    emoji: v.string(),
-    isActive: v.boolean(),
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  }).index("by_user_active", ["userId", "isActive"]),
-
-  learnhub_habit_logs: defineTable({
-    habitId: v.id("learnhub_habits"),
-    userId: v.id("learnhub_users"),
-    date: v.string(),
-    completed: v.boolean(),
-    completedAt: v.optional(v.number()),
-    xpAwarded: v.number(),
-  })
-    .index("by_habit_date", ["habitId", "date"])
-    .index("by_user_date", ["userId", "date"]),
-
   learnhub_xp_events: defineTable({
     userId: v.id("learnhub_users"),
     amount: v.number(),
@@ -735,6 +714,9 @@ export const learnhubTables = {
       v.literal("work_completion"),
       v.literal("journal_habit"),
       v.literal("flow_session"),
+      v.literal("video_completion"),
+      v.literal("flashcard_review"),
+      v.literal("mentor_acceptance"),
       v.literal("manual")
     ),
     sourceId: v.optional(v.string()),
