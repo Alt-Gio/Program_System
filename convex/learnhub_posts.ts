@@ -166,7 +166,7 @@ async function scorePostsForViewer(
     ),
   }));
   scored.sort((a, b) => (b.s - a.s) || (a.idx - b.idx));
-  return { scored, authors };
+  return { scored, authors, orgProfiles };
 }
 
 export const listFeedWithAuthors = query({
@@ -221,12 +221,21 @@ export const listFeedPaginated = query({
       posts = posts.filter((p) => (p.hashtags ?? []).some((h) => normalizeHashtag(h) === want));
     }
 
-    const { scored, authors } = await scorePostsForViewer(ctx, posts, args.userId ?? null);
+    const { scored, authors, orgProfiles } = await scorePostsForViewer(
+      ctx, posts, args.userId ?? null,
+    );
     const page = scored.slice(0, pageSize);
-    const items = page.map(({ p }) => ({
-      ...p,
-      author: authors.get(p.authorId as unknown as string) ?? null,
-    }));
+    const items = page.map(({ p }) => {
+      const key = p.authorId as unknown as string;
+      const author = authors.get(key) ?? null;
+      const profile = orgProfiles.get(key) ?? null;
+      // Only stamp `authorIsVerified=true` for org_partner authors with a
+      // verified org profile. Mentors carry their own verification flag
+      // elsewhere; we don't conflate them here.
+      const authorIsVerified =
+        author?.role === "org_partner" ? !!profile?.isVerified : false;
+      return { ...p, author, authorIsVerified };
+    });
 
     const nextCursor =
       posts.length === overscan
@@ -441,6 +450,35 @@ export const pinPost = mutation({
     await ctx.db.patch(args.postId, {
       isPinned: args.isPinned,
       updatedAt: Date.now(),
+    });
+  },
+});
+
+/**
+ * Coordinator / admin override: set a post's boost level. Used to push
+ * "featured" content (which scores +8 over `standard` boost) or to revoke
+ * an org_partner's auto-boost if it's being abused. `boostExpiresAt`
+ * defaults to 7 days from now for any non-`none` level.
+ */
+export const setPostBoost = mutation({
+  args: {
+    postId: v.id("learnhub_posts"),
+    actorId: v.id("learnhub_users"),
+    level: v.union(v.literal("none"), v.literal("standard"), v.literal("featured")),
+  },
+  handler: async (ctx, args) => {
+    const actor = await ctx.db.get(args.actorId);
+    if (!actor) throw new Error("Actor not found");
+    if (actor.role !== "coordinator" && actor.role !== "admin") {
+      throw new Error("FORBIDDEN: only coordinators or admins can boost posts.");
+    }
+    const now = Date.now();
+    const boostExpiresAt =
+      args.level === "none" ? undefined : now + ORG_BOOST_WINDOW_MS;
+    await ctx.db.patch(args.postId, {
+      boostLevel: args.level,
+      boostExpiresAt,
+      updatedAt: now,
     });
   },
 });

@@ -19,6 +19,10 @@ export interface MockAuthor {
   name: string;
   avatarUrl: string;
   role: "student" | "mentor" | "org_partner";
+  // True only when this org_partner has a verified `learnhub_org_profiles`
+  // row. Used to render the small ✓ badge next to the author name on the
+  // feed. Defaults to false; absent on legacy/mock posts.
+  isVerified?: boolean;
 }
 
 export interface MockPost {
@@ -299,6 +303,9 @@ export function FeedPost({ post, userId, onLike, onHashtagClick }: FeedPostProps
               {post.author.name}
               {post.author.role === "mentor" && (
                 <span className="lh-verify-badge-sm" title="Mentor">✓</span>
+              )}
+              {post.author.role === "org_partner" && post.author.isVerified && (
+                <span className="lh-verify-badge-sm" title="Verified Org Partner">✓</span>
               )}
               <span
                 className="lh-role-badge"

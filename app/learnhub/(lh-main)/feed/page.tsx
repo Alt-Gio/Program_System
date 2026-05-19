@@ -32,7 +32,13 @@ import { FeedPost, type MockPost } from "@/components/learnhub/feed/FeedPost";
 // ────────────────────────────────────────────────────────────────────
 
 type AuthorDoc = Doc<"learnhub_users"> | null;
-type PostWithAuthor = Doc<"learnhub_posts"> & { author: AuthorDoc };
+type PostWithAuthor = Doc<"learnhub_posts"> & {
+  author: AuthorDoc;
+  // Server-supplied: true if the org_partner author has a verified
+  // `learnhub_org_profiles` row. `listFeedWithAuthors` (legacy callers)
+  // doesn't return this — treat absence as `false`.
+  authorIsVerified?: boolean;
+};
 
 function isMockPostType(t: string): t is MockPost["type"] {
   return ["text", "youtube", "video", "meet", "drive", "form", "opportunity", "certificate"].includes(t);
@@ -57,6 +63,7 @@ function mapConvexPost(p: PostWithAuthor): MockPost {
       name: authorName,
       avatarUrl: author?.avatarUrl ?? fallbackAvatar,
       role,
+      isVerified: !!p.authorIsVerified,
     },
     content: p.content,
     metadata: (p.metadata ?? {}) as Record<string, unknown>,
