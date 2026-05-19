@@ -380,6 +380,40 @@ export const requestWeeklySummary = action({
   },
 });
 
+/**
+ * Bootstrap helper: seed the prompt bank without a role check. Callable
+ * only via Convex admin-key (i.e. `npx convex run`), never from the
+ * browser. Mirrors the public `seedPrompts` behaviour but skips the
+ * actor-role gate so a fresh deployment with no admin user yet can still
+ * populate prompts.
+ */
+export const _seedDefaultPrompts = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    let added = 0;
+    let updated = 0;
+    for (const p of DEFAULT_PROMPTS) {
+      const existing = await ctx.db
+        .query("learnhub_journal_prompts")
+        .withIndex("by_slug", (q) => q.eq("slug", p.slug))
+        .unique();
+      if (existing) {
+        await ctx.db.patch(existing._id, {
+          text: p.text,
+          category: p.category,
+          weight: p.weight,
+          isActive: true,
+        });
+        updated += 1;
+      } else {
+        await ctx.db.insert("learnhub_journal_prompts", { ...p, isActive: true });
+        added += 1;
+      }
+    }
+    return { added, updated };
+  },
+});
+
 // Silence unused-import warnings for the few types/consts we expose for
 // future consumers.
 void MOOD_OPTIONS;
