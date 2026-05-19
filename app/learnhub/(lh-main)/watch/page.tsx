@@ -22,7 +22,7 @@
  * Keyboard: ↓ / PageDown → next, ↑ / PageUp → previous. Both layouts.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -34,7 +34,20 @@ type CuratedItem = Doc<"learnhub_org_curated_channels"> & {
   org: { id: Id<"learnhub_users">; name: string; isVerified: boolean } | null;
 };
 
+// `useSearchParams()` opts the page into client-side rendering, which
+// Next 14 only permits inside a Suspense boundary during prerender. The
+// inner component holds the watch surface; the outer default-export
+// wraps it. Without the wrap, `next build` fails with the
+// missing-suspense-with-csr-bailout error.
 export default function WatchPage() {
+  return (
+    <Suspense fallback={<div className="lh-watch lh-watch--theater" aria-busy="true" />}>
+      <WatchPageInner />
+    </Suspense>
+  );
+}
+
+function WatchPageInner() {
   const sp = useSearchParams();
   const router = useRouter();
   const activeOrg = (sp.get("org") ?? "").trim() || null;
