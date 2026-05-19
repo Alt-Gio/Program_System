@@ -1,15 +1,26 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
+import type { Doc, Id } from "./_generated/dataModel";
+import { extractHashtags, normalizeHashtag } from "../lib/learnhub/interests";
+
+// 7-day default boost window for org_partner posts. Stored as a constant so
+// the management UI can show "Boosted until <date>" and the scoring path
+// reads the same value.
+const ORG_BOOST_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 // Pure scoring pass over the latest N posts. Higher score floats up; ties break
 // on createdAt-desc (stable sort because we use a stable sort fn). Not ML — a
 // small, transparent function that's easy to tune. Keep it pure.
 type ScorablePost = {
   tags?: string[];
+  hashtags?: string[];
   type?: string;
   authorId?: unknown;
   createdAt?: number;
+  boostLevel?: "none" | "standard" | "featured";
+  boostExpiresAt?: number;
+  metadata?: unknown;
 };
 
 type ScorableViewer = {
@@ -19,38 +30,143 @@ type ScorableViewer = {
   province?: string;
 } | null;
 
+type ScorableAuthor = {
+  province?: string;
+  role?: string;
+} | null;
+
+type ScorableOrgProfile = {
+  isVerified?: boolean;
+} | null;
+
 function scorePostForViewer(
   post: ScorablePost,
   viewer: ScorableViewer,
-  authorProvince: string | null,
+  author: ScorableAuthor,
+  orgProfile: ScorableOrgProfile,
+  now: number,
 ): number {
-  if (!viewer) return 0;
   let score = 0;
 
+  // 1. Recency decay. Half-life ≈ 24h (decay constant 36h chosen so a 36h-old
+  //    post still scores ~0.37). Applies regardless of viewer presence so
+  //    logged-out feed views still see fresh content first.
+  const ageMs = Math.max(0, now - (post.createdAt ?? now));
+  const hoursOld = ageMs / 3_600_000;
+  score += Math.exp(-hoursOld / 36) * 5;
+
+  // 2. Org boost — only while inside the boost window.
+  const boostActive =
+    post.boostLevel && post.boostLevel !== "none" &&
+    (!post.boostExpiresAt || post.boostExpiresAt > now);
+  if (boostActive && author?.role === "org_partner") {
+    score += 15;
+    if (orgProfile?.isVerified) score += 10;
+  }
+  if (post.boostLevel === "featured" && boostActive) score += 8;
+
+  if (!viewer) return score;
+
+  // 3. Interest match: union of legacy `tags` (taxonomy strings) and new
+  //    `hashtags` (normalized). Hashtag match is fuzzy on whitespace so
+  //    "AI & ML" interest matches "#aiml" hashtag.
   const interestSet = viewer.interests ? new Set(viewer.interests) : null;
-  if (interestSet && post.tags && post.tags.length > 0) {
-    for (const t of post.tags) {
-      if (!interestSet.has(t)) continue;
-      score += 3;
-      // Extra weight for areas the viewer is growing in — surface learning
-      // content for beginner/intermediate over content they've already
-      // mastered.
-      const level = viewer.skillLevels?.[t];
-      if (level === "beginner" || level === "intermediate") score += 1;
+  if (interestSet) {
+    if (post.tags && post.tags.length > 0) {
+      for (const t of post.tags) {
+        if (!interestSet.has(t)) continue;
+        score += 3;
+        const level = viewer.skillLevels?.[t];
+        if (level === "beginner" || level === "intermediate") score += 1;
+      }
+    }
+    if (post.hashtags && post.hashtags.length > 0) {
+      // Pre-normalize the viewer's interests once so every hashtag compare is
+      // a Set lookup instead of an O(n) scan.
+      const normalizedInterests = new Set(
+        Array.from(interestSet).map((i) => normalizeHashtag(i)),
+      );
+      for (const h of post.hashtags) {
+        const n = normalizeHashtag(h);
+        if (n && normalizedInterests.has(n)) score += 3;
+      }
     }
   }
 
+  // 4. Goal alignment.
   const goalSet = viewer.goals ? new Set(viewer.goals) : null;
   if (goalSet) {
     if (post.type === "opportunity" && goalSet.has("find_work")) score += 2;
     if (post.type === "certificate" && goalSet.has("build_portfolio")) score += 2;
   }
 
-  if (viewer.province && authorProvince && viewer.province === authorProvince) {
+  // 5. Province bonus.
+  if (viewer.province && author?.province && viewer.province === author.province) {
     score += 1;
   }
 
+  // 6. Event proximity — posts that link to an upcoming event get a bump
+  //    that fades to 0 by 7 days out. metadata.eventStartsAt is set by
+  //    createPost when type === "meet" or "event".
+  const meta = post.metadata as Record<string, unknown> | undefined;
+  const eventStartsAt =
+    meta && typeof meta.eventStartsAt === "number"
+      ? (meta.eventStartsAt as number)
+      : null;
+  if (eventStartsAt) {
+    const daysUntil = (eventStartsAt - now) / 86_400_000;
+    if (daysUntil >= 0 && daysUntil <= 7) {
+      score += 5 * (1 - daysUntil / 7);
+    }
+  }
+
   return score;
+}
+
+// Internal helper: join posts with their authors + (for org_partner authors)
+// the org profile, run the scoring pass, return the ordered list. Pulled out
+// so both `listFeedWithAuthors` and `listFeedPaginated` share one
+// implementation — the only thing they differ on is which posts to feed in.
+async function scorePostsForViewer(
+  ctx: QueryCtx,
+  posts: Array<Doc<"learnhub_posts">>,
+  viewerId: Id<"learnhub_users"> | null,
+) {
+  const now = Date.now();
+  const viewer = viewerId ? await ctx.db.get(viewerId) : null;
+
+  const authorIds = Array.from(new Set(posts.map((p) => p.authorId as unknown as string)));
+  const authors = new Map<string, Doc<"learnhub_users"> | null>();
+  for (const id of authorIds) {
+    authors.set(id, await ctx.db.get(id as unknown as Id<"learnhub_users">));
+  }
+
+  const orgProfiles = new Map<string, Doc<"learnhub_org_profiles"> | null>();
+  const authorEntries = Array.from(authors.entries());
+  for (let i = 0; i < authorEntries.length; i++) {
+    const [id, author] = authorEntries[i];
+    if (author && author.role === "org_partner") {
+      const profile = await ctx.db
+        .query("learnhub_org_profiles")
+        .withIndex("by_org", (q) => q.eq("orgId", id as unknown as Id<"learnhub_users">))
+        .unique();
+      orgProfiles.set(id, profile);
+    }
+  }
+
+  const scored = posts.map((p, idx) => ({
+    p,
+    idx,
+    s: scorePostForViewer(
+      p as ScorablePost,
+      viewer as ScorableViewer,
+      authors.get(p.authorId as unknown as string) as ScorableAuthor,
+      (orgProfiles.get(p.authorId as unknown as string) ?? null) as ScorableOrgProfile,
+      now,
+    ),
+  }));
+  scored.sort((a, b) => (b.s - a.s) || (a.idx - b.idx));
+  return { scored, authors };
 }
 
 export const listFeedWithAuthors = query({
@@ -64,26 +180,60 @@ export const listFeedWithAuthors = query({
       .withIndex("by_created")
       .order("desc")
       .take(args.limit ?? 30);
-    const viewer = args.userId ? await ctx.db.get(args.userId) : null;
 
-    // Resolve authors once, then score posts using author province for the
-    // local-bonus rule. We need this lookup anyway to attach `.author` below.
-    const withAuthors = await Promise.all(
-      posts.map(async (p) => ({
-        ...p,
-        author: await ctx.db.get(p.authorId),
-      })),
-    );
-
-    if (!viewer) return withAuthors;
-
-    const scored = withAuthors.map((p, idx) => ({
-      p,
-      idx,
-      s: scorePostForViewer(p, viewer, p.author?.province ?? null),
+    const { scored, authors } = await scorePostsForViewer(ctx, posts, args.userId ?? null);
+    return scored.map(({ p }) => ({
+      ...p,
+      author: authors.get(p.authorId as unknown as string) ?? null,
     }));
-    scored.sort((a, b) => (b.s - a.s) || (a.idx - b.idx));
-    return scored.map(({ p }) => p);
+  },
+});
+
+// Cursor-paginated feed. Returns up to `limit` items + a `nextCursor` you
+// can pass back in to load the page after this one. Cursor is the
+// `createdAt` of the oldest item in the previous chronological window.
+// Optional `hashtag` filter narrows the feed to a single #tag.
+export const listFeedPaginated = query({
+  args: {
+    limit: v.optional(v.number()),
+    userId: v.optional(v.id("learnhub_users")),
+    cursor: v.optional(v.number()),
+    hashtag: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const pageSize = Math.min(args.limit ?? 30, 50);
+    // Overscan: pull ~2× the page so the post-fetch re-rank can promote
+    // higher-scoring older items without dropping them off the page edge.
+    const overscan = Math.min(pageSize * 2, 100);
+
+    let postsQ = ctx.db
+      .query("learnhub_posts")
+      .withIndex("by_created")
+      .order("desc");
+    if (typeof args.cursor === "number") {
+      const cur = args.cursor;
+      postsQ = postsQ.filter((q) => q.lt(q.field("createdAt"), cur));
+    }
+    let posts = await postsQ.take(overscan);
+
+    if (args.hashtag) {
+      const want = normalizeHashtag(args.hashtag);
+      posts = posts.filter((p) => (p.hashtags ?? []).some((h) => normalizeHashtag(h) === want));
+    }
+
+    const { scored, authors } = await scorePostsForViewer(ctx, posts, args.userId ?? null);
+    const page = scored.slice(0, pageSize);
+    const items = page.map(({ p }) => ({
+      ...p,
+      author: authors.get(p.authorId as unknown as string) ?? null,
+    }));
+
+    const nextCursor =
+      posts.length === overscan
+        ? Math.min(...posts.map((p) => p.createdAt))
+        : null;
+
+    return { items, nextCursor, hashtag: args.hashtag ?? null };
   },
 });
 
@@ -98,22 +248,7 @@ export const listFeedPosts = query({
       .withIndex("by_created")
       .order("desc")
       .take(args.limit ?? 30);
-    const viewer = args.userId ? await ctx.db.get(args.userId) : null;
-    if (!viewer) return posts;
-
-    // Resolve author province only for posts that need it (province set on
-    // viewer). For the common case where viewer has no province, skip the
-    // per-post author fetch.
-    const needAuthorProvince = Boolean(viewer.province);
-    const scored = await Promise.all(
-      posts.map(async (p, idx) => {
-        const authorProvince = needAuthorProvince
-          ? (await ctx.db.get(p.authorId))?.province ?? null
-          : null;
-        return { p, idx, s: scorePostForViewer(p, viewer, authorProvince) };
-      }),
-    );
-    scored.sort((a, b) => (b.s - a.s) || (a.idx - b.idx));
+    const { scored } = await scorePostsForViewer(ctx, posts, args.userId ?? null);
     return scored.map(({ p }) => p);
   },
 });
@@ -152,12 +287,58 @@ export const createPost = mutation({
     content: v.string(),
     metadata: v.any(),
     tags: v.optional(v.array(v.string())),
+    // New: free-form #hashtags parsed by the client. We still
+    // re-normalize + dedupe server-side so the canonical list can't
+    // contain raw casing or whitespace.
+    hashtags: v.optional(v.array(v.string())),
     scheduledAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+
+    // Normalize hashtags: lowercase, strip leading `#`, drop bad chars,
+    // dedupe. Also pull any hashtags that exist in the content body but
+    // weren't passed in `hashtags` — covers older clients.
+    const fromContent = extractHashtags(args.content ?? "");
+    const fromArg = (args.hashtags ?? []).map((h) => normalizeHashtag(h)).filter(Boolean);
+    const merged: string[] = [];
+    const seen = new Set<string>();
+    for (const h of [...fromArg, ...fromContent]) {
+      if (h && !seen.has(h)) {
+        seen.add(h);
+        merged.push(h);
+      }
+      if (merged.length >= 10) break;
+    }
+
+    // Auto-boost: org_partner posts get a `standard` 7-day boost. Existing
+    // mentor / student / admin posts default to no boost. Coordinators can
+    // later upgrade to `featured` via pinPost / a separate mutation.
+    const author = await ctx.db.get(args.authorId);
+    const isOrg = author?.role === "org_partner";
+    const boostLevel: "none" | "standard" | "featured" = isOrg ? "standard" : "none";
+    const boostExpiresAt = isOrg ? now + ORG_BOOST_WINDOW_MS : undefined;
+
+    // For meet/event posts, mirror the start time into metadata.eventStartsAt
+    // so the ranking can apply the upcoming-event bonus without needing
+    // another lookup per post.
+    let metadata = args.metadata;
+    if (args.type === "meet" || (args.type as string) === "event") {
+      const m = (metadata ?? {}) as Record<string, unknown>;
+      const scheduledAt = typeof m.scheduledAt === "number" ? m.scheduledAt : null;
+      if (scheduledAt && !m.eventStartsAt) {
+        metadata = { ...m, eventStartsAt: scheduledAt };
+      }
+    }
+
+    const { hashtags: _drop, ...rest } = args;
+    void _drop;
     const postId = await ctx.db.insert("learnhub_posts", {
-      ...args,
+      ...rest,
+      metadata,
+      hashtags: merged.length > 0 ? merged : undefined,
+      boostLevel,
+      boostExpiresAt,
       likeCount: 0,
       commentCount: 0,
       isPinned: false,
@@ -168,7 +349,7 @@ export const createPost = mutation({
     // For Meet posts, schedule the lifecycle hooks (15-min "starting
     // soon" bell, markLive at scheduledAt, markEnded after duration).
     if (args.type === "meet") {
-      const m = (args.metadata ?? {}) as Record<string, unknown>;
+      const m = (metadata ?? {}) as Record<string, unknown>;
       const scheduledAt =
         typeof m.scheduledAt === "number" ? (m.scheduledAt as number) : null;
       const durationMinutes =

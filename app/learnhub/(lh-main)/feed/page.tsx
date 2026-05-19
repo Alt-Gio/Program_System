@@ -17,12 +17,12 @@ import { Suspense } from "react";
  *   5. Saved tab — bookmarked posts grouped by learning status.
  */
 
-import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
-import { Flame, Search } from "lucide-react";
+import { Calendar, Flame, Search, X } from "lucide-react";
 import { useLearnhubSession } from "@/lib/learnhub/hooks";
 import { PostComposer } from "@/components/learnhub/feed/PostComposer";
 import { FeedPost, type MockPost } from "@/components/learnhub/feed/FeedPost";
@@ -64,6 +64,9 @@ function mapConvexPost(p: PostWithAuthor): MockPost {
     commentCount: p.commentCount ?? 0,
     isPinned: p.isPinned ?? false,
     createdAt: p.createdAt,
+    hashtags: p.hashtags ?? undefined,
+    boostLevel: p.boostLevel ?? undefined,
+    boostExpiresAt: p.boostExpiresAt ?? undefined,
   };
 }
 
@@ -89,9 +92,15 @@ const SAVED_GROUPS: { key: "in_progress" | "want_to_learn" | "done"; label: stri
 function FeedPageInner() {
   const { session, userId, role } = useLearnhubSession();
   const sp = useSearchParams();
+  const router = useRouter();
   const [tab, setTab] = useState<FeedTab>("for_you");
   const [query, setQuery] = useState(sp.get("q") ?? "");
   const [category, setCategory] = useState<FeedCategory>("All");
+
+  // `?tag=` is the URL-owned filter. The query reads from sp on every render
+  // so navigating to `/learnhub/feed?tag=python` (from another page or a
+  // FeedPost pill click) re-narrows immediately without local mirroring.
+  const activeTag = (sp.get("tag") ?? "").trim().toLowerCase() || null;
 
   const me = useQuery(
     api.learnhub_users.getUser,
@@ -107,14 +116,89 @@ function FeedPageInner() {
     return Math.max(1, Math.min(4, Math.round(raw)));
   })();
 
-  // Live, real-time feed query. Returns posts with their author docs joined.
-  // Pass userId so the server re-ranks posts whose tags overlap the viewer's
-  // interests (set during onboarding). Falls back to chronological if no userId.
-  const feed = useQuery(
-    api.learnhub_posts.listFeedWithAuthors,
+  // ────────────────────────────────────────────────────────────────
+  // Cursor-based infinite scroll
+  // ────────────────────────────────────────────────────────────────
+  // `cursor` is the `createdAt` of the oldest item we've already shown —
+  // the server's `listFeedPaginated` does `lt(createdAt, cursor)` to grab
+  // the next page. `pages` accumulates each batch. We reset both whenever
+  // the `?tag=` filter changes so the new filter starts from the top.
+  const [cursor, setCursor] = useState<number | null>(null);
+  const [pages, setPages] = useState<PostWithAuthor[][]>([]);
+  const [exhausted, setExhausted] = useState(false);
+
+  const pageArgs = useMemo(() => {
+    const base: {
+      limit: number;
+      userId?: Id<"learnhub_users">;
+      cursor?: number;
+      hashtag?: string;
+    } = { limit: 25 };
+    if (userId) base.userId = userId as Id<"learnhub_users">;
+    if (cursor !== null) base.cursor = cursor;
+    if (activeTag) base.hashtag = activeTag;
+    return base;
+  }, [userId, cursor, activeTag]);
+
+  const feedPage = useQuery(api.learnhub_posts.listFeedPaginated, pageArgs);
+
+  // Reset accumulated pages whenever the filter changes — without this we'd
+  // mix a tag-filtered page on top of an unfiltered one.
+  useEffect(() => {
+    setCursor(null);
+    setPages([]);
+    setExhausted(false);
+  }, [activeTag, userId]);
+
+  // When a new page arrives, append it (de-duplicated by _id). Keep `exhausted`
+  // tracking the server's `nextCursor` so the loader sentinel knows to stop.
+  useEffect(() => {
+    if (!feedPage) return;
+    const items = (feedPage.items ?? []) as PostWithAuthor[];
+    if (items.length > 0) {
+      setPages((prev) => {
+        // The query refetches with the same args on initial mount; only
+        // append when this batch is for the active cursor we last set.
+        // We dedupe by id across all pages already in state.
+        const seen = new Set(prev.flat().map((p) => p._id as string));
+        const fresh = items.filter((p) => !seen.has(p._id as string));
+        if (fresh.length === 0) return prev;
+        // If `cursor === null` this is the very first page → replace.
+        if (cursor === null) return [fresh];
+        return [...prev, fresh];
+      });
+    }
+    setExhausted(feedPage.nextCursor === null);
+  }, [feedPage, cursor]);
+
+  const loadMore = useCallback(() => {
+    if (!feedPage || exhausted) return;
+    if (feedPage.nextCursor === null) return;
+    if (feedPage.nextCursor === cursor) return;
+    setCursor(feedPage.nextCursor);
+  }, [feedPage, cursor, exhausted]);
+
+  // IntersectionObserver wired to a sentinel near the bottom of the list.
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) loadMore();
+      },
+      { rootMargin: "320px 0px", threshold: 0.01 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [loadMore]);
+
+  // Upcoming events digest — injected into the feed every ~10 posts.
+  const eventsDigest = useQuery(
+    api.learnhub_events.getUpcomingDigest,
     userId
-      ? { limit: 30, userId: userId as Id<"learnhub_users"> }
-      : { limit: 30 }
+      ? { viewerId: userId as Id<"learnhub_users">, withinDays: 14, limit: 5 }
+      : { withinDays: 14, limit: 5 },
   );
 
   // Bookmarks for the signed-in user (only loaded when the Saved tab is open
@@ -131,11 +215,11 @@ function FeedPageInner() {
   // we clear the local array (the server is now the source of truth).
   const [localPosts, setLocalPosts] = useState<MockPost[]>([]);
   useEffect(() => {
-    if (!feed) return;
+    if (pages.length === 0) return;
     if (localPosts.length === 0) return;
-    const liveIds = new Set(feed.map((p) => p._id as string));
+    const liveIds = new Set(pages.flat().map((p) => p._id as string));
     setLocalPosts((prev) => prev.filter((p) => !liveIds.has(p.id) && !liveIds.has(p.convexPostId ?? "")));
-  }, [feed, localPosts.length]);
+  }, [pages, localPosts.length]);
 
   const handleOptimisticPost = (post: MockPost) => {
     setLocalPosts((prev) => [post, ...prev]);
@@ -150,11 +234,30 @@ function FeedPageInner() {
   const firstName = (session?.name ?? "there").split(" ")[0];
   const streak = (me as { currentStreak?: number } | null | undefined)?.currentStreak ?? 0;
 
-  // Final feed = optimistic prepended → live posts (mapped to MockPost).
+  // Final feed = optimistic prepended → live paginated posts (mapped to MockPost).
   const posts: MockPost[] = useMemo(() => {
-    const live = (feed ?? []).map(mapConvexPost);
+    const live = pages.flat().map(mapConvexPost);
     return [...localPosts, ...live];
-  }, [feed, localPosts]);
+  }, [pages, localPosts]);
+
+  // Click handler used by FeedPost's hashtag pills + inline `#token` links.
+  // Pushing the tag onto the URL keeps the back-button workable and lets the
+  // viewer share filtered views.
+  const handleHashtagClick = useCallback(
+    (tag: string) => {
+      const params = new URLSearchParams(Array.from(sp.entries()));
+      params.set("tag", tag);
+      router.push(`/learnhub/feed?${params.toString()}`);
+    },
+    [router, sp],
+  );
+
+  const clearTag = useCallback(() => {
+    const params = new URLSearchParams(Array.from(sp.entries()));
+    params.delete("tag");
+    const qs = params.toString();
+    router.push(qs ? `/learnhub/feed?${qs}` : "/learnhub/feed");
+  }, [router, sp]);
 
   const filteredPosts = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -222,6 +325,15 @@ function FeedPageInner() {
             placeholder="Search courses, articles, topics..."
           />
         </div>
+        {activeTag && (
+          <div className="lh-feed-active-tag">
+            <span>Filtering by</span>
+            <span className="lh-feed-active-tag-pill">#{activeTag}</span>
+            <button type="button" onClick={clearTag} aria-label="Clear hashtag filter">
+              <X size={12} />
+            </button>
+          </div>
+        )}
         <div className="lh-feed-category-row" aria-label="Feed categories">
           {FEED_CATEGORIES.map((item) => (
             <button
@@ -272,7 +384,7 @@ function FeedPageInner() {
       {/* ── For you tab ────────────────────────────────────────── */}
       {tab === "for_you" && (
         <>
-          {feed === undefined && (
+          {pages.length === 0 && feedPage === undefined && (
             <div className="lh-feed-masonry">
               {[0, 1, 2].map((i) => (
                 <div key={i} className="lh-post" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -291,25 +403,63 @@ function FeedPageInner() {
             </div>
           )}
 
-          {feed !== undefined && filteredPosts.length === 0 && (
+          {feedPage !== undefined && filteredPosts.length === 0 && (
             <div className="lh-feed-empty">
               <div className="lh-feed-empty-emoji">📭</div>
-              <p className="lh-feed-empty-title">{posts.length === 0 ? "No posts yet" : "No matching posts"}</p>
+              <p className="lh-feed-empty-title">
+                {activeTag
+                  ? `No posts tagged #${activeTag}`
+                  : (posts.length === 0 ? "No posts yet" : "No matching posts")}
+              </p>
               <p style={{ margin: 0, fontSize: 12 }}>
-                {posts.length === 0 ? "Be the first to share something with the cohort." : "Try another search or category."}
+                {activeTag
+                  ? "Try a different hashtag, or clear the filter."
+                  : (posts.length === 0
+                      ? "Be the first to share something with the cohort."
+                      : "Try another search or category.")}
               </p>
             </div>
           )}
 
-          {feed !== undefined && filteredPosts.length > 0 && (
+          {filteredPosts.length > 0 && (
             <div
               className="lh-feed-masonry"
               style={userFeedColumns ? { columnCount: userFeedColumns } : undefined}
             >
-              {filteredPosts.map((post) => (
-                <FeedPost key={post.id} post={post} userId={userId} />
-              ))}
+              {filteredPosts.map((post, idx) => {
+                // Inject the upcoming-events digest after roughly the 8th post,
+                // and again every ~20 posts after that. We only render it once
+                // there is real content to break up.
+                const showEventsHere =
+                  !activeTag
+                  && eventsDigest
+                  && eventsDigest.length > 0
+                  && (idx === 8 || (idx > 8 && (idx - 8) % 20 === 0));
+                return (
+                  <span key={post.id} style={{ display: "contents" }}>
+                    <FeedPost post={post} userId={userId} onHashtagClick={handleHashtagClick} />
+                    {showEventsHere && (
+                      <UpcomingEventsCard events={eventsDigest} />
+                    )}
+                  </span>
+                );
+              })}
             </div>
+          )}
+
+          {/* Infinite-scroll sentinel — observed and pulls the next page. */}
+          {pages.length > 0 && !exhausted && (
+            <div
+              ref={sentinelRef}
+              className="lh-feed-loader"
+              aria-live="polite"
+            >
+              <div className="lh-skeleton" style={{ height: 4, width: 120, borderRadius: 4 }} />
+              <span>Loading more…</span>
+            </div>
+          )}
+          {pages.length > 0 && exhausted && (
+            <div className="lh-feed-end">You&apos;re all caught up ✨</div>
           )}
         </>
       )}
@@ -364,6 +514,68 @@ function FeedPageInner() {
         </>
       )}
     </div>
+  );
+}
+
+type EventDigestItem = {
+  _id: string;
+  title: string;
+  description: string;
+  coverImageUrl: string | null;
+  type: string;
+  startTime: number;
+  endTime: number;
+  meetLink: string | null;
+  location: string | null;
+  registrantCount: number;
+  maxSlots: number;
+  category: string | null;
+};
+
+function UpcomingEventsCard({ events }: { events: EventDigestItem[] }) {
+  if (events.length === 0) return null;
+  const fmt = (ts: number) => {
+    try {
+      return new Date(ts).toLocaleString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      });
+    } catch {
+      return "";
+    }
+  };
+  return (
+    <aside className="lh-feed-events-card" aria-label="Upcoming events">
+      <div className="lh-feed-events-head">
+        <Calendar size={14} />
+        <span>Upcoming for you</span>
+      </div>
+      <div className="lh-feed-events-list">
+        {events.slice(0, 4).map((e) => (
+          <a
+            key={e._id}
+            href={`/learnhub/events/${e._id}`}
+            className="lh-feed-event-item"
+          >
+            <div className="lh-feed-event-date">{fmt(e.startTime)}</div>
+            <div className="lh-feed-event-title">{e.title}</div>
+            {(e.location || e.meetLink) && (
+              <div className="lh-feed-event-where">
+                {e.location ?? "Online · Google Meet"}
+              </div>
+            )}
+            {e.maxSlots > 0 && (
+              <div className="lh-feed-event-slots">
+                {e.registrantCount}/{e.maxSlots} registered
+              </div>
+            )}
+          </a>
+        ))}
+      </div>
+    </aside>
   );
 }
 

@@ -199,6 +199,33 @@ function OrgConsole({ summary }: { summary: NonNullable<SummaryData> }) {
         </section>
 
         <section>
+          <SectionHeader
+            title="Watch curation"
+            sub="Surface YouTube channels and videos to /learnhub/watch — Org Partners decide what learners see."
+            href="/learnhub/org/curate"
+            cta="Curate videos →"
+          />
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14,
+            padding: "14px 16px", borderRadius: 14,
+            background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)",
+          }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: "#fff" }}>Pick channels learners should follow</div>
+              <div style={{ marginTop: 4, fontSize: 12, color: "rgba(255,255,255,0.55)", lineHeight: 1.45 }}>
+                Paste a YouTube video or channel URL. Your curated content fills the Watch tab so it stays educational — not doom-scroll.
+              </div>
+            </div>
+            <Link href="/learnhub/org/curate" style={{
+              padding: "8px 14px", borderRadius: 10,
+              background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+              color: "#fff", fontSize: 12, fontWeight: 600, textDecoration: "none",
+              whiteSpace: "nowrap",
+            }}>Open curation →</Link>
+          </div>
+        </section>
+
+        <section>
           <SectionHeader title="Cohorts" sub="Active groups (batches + programs) you can target." href="/learnhub/org/cohorts" cta={summary.cohorts.length > 0 ? "See all →" : undefined} />
           {summary.cohorts.length === 0 ? (
             <EmptyState emoji="🧭" title="No cohorts visible yet"

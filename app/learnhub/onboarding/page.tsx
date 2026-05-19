@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { INTEREST_TAXONOMY as SHARED_TAXONOMY } from "@/lib/learnhub/interests";
 
 type Role = "student" | "mentor" | "org_partner";
 type SkillLevel = "beginner" | "intermediate" | "advanced";
@@ -23,22 +24,11 @@ const ROLES: Array<{ value: Role; label: string; desc: string; emoji: string }> 
   { value: "org_partner", label: "Org Partner", desc: "My organization posts online work opportunities for ILCDB graduates", emoji: "🏢" },
 ];
 
-// Initial taxonomy. Stored as plain strings so posts can be tagged with the
-// same vocabulary (see learnhub_posts.tags + listFeed* re-rank).
-export const INTEREST_TAXONOMY = [
-  "Digital Literacy",
-  "Python",
-  "Data Analysis",
-  "Web Dev",
-  "Cybersecurity",
-  "Project Management",
-  "Communication",
-  "Career Pivot",
-  "AI & ML",
-  "UI/UX Design",
-  "Public Speaking",
-  "Entrepreneurship",
-] as const;
+// Onboarding taxonomy is the shared one from lib/learnhub/interests so the
+// same vocabulary drives onboarding picks, feed ranking, and the composer's
+// hashtag suggestions. The const re-export keeps existing call-sites (and any
+// imports from this file) working unchanged.
+export const INTEREST_TAXONOMY = SHARED_TAXONOMY;
 
 const MIN_INTERESTS = 3;
 const MAX_INTERESTS = 5;

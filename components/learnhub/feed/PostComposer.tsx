@@ -27,19 +27,17 @@ const ALL_POST_TYPES: readonly PostTypeDef[] = [
 // while still allowing a 5–10 minute lesson at reasonable quality.
 const MAX_VIDEO_BYTES = 95 * 1024 * 1024;
 
-// Same vocabulary as INTEREST_TAXONOMY in app/learnhub/onboarding/page.tsx.
-// Posts tagged with any of these surface higher for students who picked them.
-const POST_TAGS = [
-  "Digital Literacy",
-  "Python",
-  "Data Analysis",
-  "Web Dev",
-  "Cybersecurity",
-  "Project Management",
-  "Communication",
-  "Career Pivot",
-] as const;
-const MAX_POST_TAGS = 3;
+// Hashtag suggestions are sourced from the shared interest taxonomy. The
+// composer no longer ships its own copy — `lib/learnhub/interests.ts` is
+// the single source of truth used by onboarding, feed scoring, and here.
+import {
+  INTEREST_TAXONOMY,
+  extractHashtags,
+  normalizeHashtag,
+} from "@/lib/learnhub/interests";
+
+// Pre-normalize the suggestion list once.
+const HASHTAG_SUGGESTIONS = INTEREST_TAXONOMY.map((i) => normalizeHashtag(i));
 
 interface PostComposerProps {
   onPost: (post: MockPost) => void;
@@ -141,7 +139,12 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
   const [videoProgress, setVideoProgress] = useState(0);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [videoCourseTitle, setVideoCourseTitle] = useState("");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  // Live preview of hashtags parsed from `content`. The viewer of the
+  // composer sees these as pills so they know what'll be saved; the
+  // server still re-normalizes on submit (createPost is authoritative).
+  const detectedHashtags = useMemo(() => extractHashtags(content), [content]);
+  const [hashtagQuery, setHashtagQuery] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [meetMode, setMeetMode] = useState<"generate" | "paste">("generate");
   const [meetGenerating, setMeetGenerating] = useState(false);
   const [meetGenerateError, setMeetGenerateError] = useState<string | null>(null);
@@ -149,13 +152,52 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
   const fileRef = useRef<HTMLInputElement | null>(null);
   const videoFileRef = useRef<HTMLInputElement | null>(null);
 
-  const toggleTag = (tag: string) => {
-    setSelectedTags((prev) => {
-      if (prev.includes(tag)) return prev.filter((t) => t !== tag);
-      if (prev.length >= MAX_POST_TAGS) return prev;
-      return [...prev, tag];
+  // Detect an in-progress `#token` at the caret so we can show suggestions.
+  // We only show the popover while the caret is touching a partial token
+  // (no trailing whitespace) — otherwise the user has moved on.
+  const onContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setContent(value);
+    const caret = e.target.selectionStart ?? value.length;
+    const before = value.slice(0, caret);
+    const m = before.match(/(?:^|\s)#([a-zA-Z0-9_]*)$/);
+    setHashtagQuery(m ? m[1].toLowerCase() : null);
+  };
+
+  const insertHashtag = (tag: string) => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const caret = el.selectionStart ?? content.length;
+    const before = content.slice(0, caret);
+    const after = content.slice(caret);
+    // Replace the partial `#token` (everything from the last `#` before the
+    // caret) with the chosen tag + a trailing space.
+    const replaced = before.replace(/#([a-zA-Z0-9_]*)$/, `#${tag} `);
+    const next = replaced + after;
+    setContent(next);
+    setHashtagQuery(null);
+    // Restore caret to just past the inserted tag.
+    requestAnimationFrame(() => {
+      const pos = replaced.length;
+      el.focus();
+      el.setSelectionRange(pos, pos);
     });
   };
+
+  const hashtagSuggestions = useMemo(() => {
+    if (hashtagQuery === null) return [];
+    const q = hashtagQuery;
+    // Sort: prefix matches first, then substring matches; exclude ones the
+    // composer has already used.
+    const already = new Set(detectedHashtags);
+    return HASHTAG_SUGGESTIONS
+      .filter((s) => !already.has(s))
+      .map((s) => ({ s, score: s.startsWith(q) ? 2 : s.includes(q) ? 1 : 0 }))
+      .filter((x) => q.length === 0 || x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 6)
+      .map((x) => x.s);
+  }, [hashtagQuery, detectedHashtags]);
 
   // Generate a real Meet link via the user's Google Calendar.
   // The composer treats the result as the Meet link going forward;
@@ -348,7 +390,7 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
           type,
           content,
           metadata,
-          ...(selectedTags.length > 0 ? { tags: selectedTags } : {}),
+          ...(detectedHashtags.length > 0 ? { hashtags: detectedHashtags } : {}),
         });
         // Alarm students: write a Firestore notification for meet posts
         if (type === "meet" && meetLink) {
@@ -375,7 +417,7 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
     setVideoCourseTitle("");
     setVideoError(null);
     setVideoProgress(0);
-    setSelectedTags([]);
+    setHashtagQuery(null);
     setMeetGenerateError(null);
     setMeetCalendarEventId(null);
     setMeetMode("generate");
@@ -551,15 +593,47 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
             ))}
           </div>
 
-          {/* Content textarea */}
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="What's on your mind? Use #hashtags for topics."
-            rows={3}
-            className="lh-composer-textarea"
-            autoFocus
-          />
+          {/* Content textarea with live #hashtag suggestions */}
+          <div style={{ position: "relative" }}>
+            <textarea
+              ref={textareaRef}
+              value={content}
+              onChange={onContentChange}
+              onBlur={() => setTimeout(() => setHashtagQuery(null), 150)}
+              placeholder="What's on your mind? Use #hashtags so the right learners see this."
+              rows={3}
+              className="lh-composer-textarea"
+              autoFocus
+            />
+            {hashtagSuggestions.length > 0 && (
+              <div
+                role="listbox"
+                style={{
+                  position: "absolute", left: 8, right: 8, bottom: -6,
+                  transform: "translateY(100%)", zIndex: 30,
+                  background: "#131626", border: "1px solid rgba(91,108,255,0.35)",
+                  borderRadius: 10, padding: 6, display: "flex", flexWrap: "wrap", gap: 6,
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.45)",
+                }}
+              >
+                {hashtagSuggestions.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    role="option"
+                    onMouseDown={(e) => { e.preventDefault(); insertHashtag(s); }}
+                    style={{
+                      padding: "4px 10px", borderRadius: 999, fontSize: 11.5, fontWeight: 600,
+                      background: "rgba(91,108,255,0.14)", border: "1px solid rgba(91,108,255,0.35)",
+                      color: "#a3b3ff", cursor: "pointer",
+                    }}
+                  >
+                    #{s}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Thumbnail attachment */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -854,40 +928,32 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
               placeholder="https://forms.gle/..." className="lh-composer-url-input" />
           )}
 
-          {/* Topic tags — surface this post to students whose interests overlap */}
-          <div style={{ marginTop: 10, marginBottom: 4 }}>
-            <div style={{ fontSize: 11, color: "#9ba3cc", marginBottom: 6, letterSpacing: "0.04em" }}>
-              Topics <span style={{ color: "#5c6490" }}>(optional · pick up to {MAX_POST_TAGS})</span>
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {POST_TAGS.map((tag) => {
-                const active = selectedTags.includes(tag);
-                const atCap = !active && selectedTags.length >= MAX_POST_TAGS;
-                return (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => toggleTag(tag)}
-                    disabled={atCap}
+          {/* Detected hashtags — confirms what'll be saved. The textarea
+              above is the source of truth; this is a read-only preview. */}
+          {detectedHashtags.length > 0 && (
+            <div style={{ marginTop: 10, marginBottom: 4 }}>
+              <div style={{ fontSize: 11, color: "#9ba3cc", marginBottom: 6, letterSpacing: "0.04em" }}>
+                Hashtags <span style={{ color: "#5c6490" }}>· extracted from your post</span>
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {detectedHashtags.map((h) => (
+                  <span
+                    key={h}
                     style={{
-                      padding: "4px 10px",
-                      borderRadius: 999,
-                      fontSize: 11,
-                      fontWeight: 500,
-                      background: active ? "rgba(91,108,255,0.18)" : "transparent",
-                      border: active ? "1px solid #5b6cff" : "1px solid rgba(255,255,255,0.1)",
-                      color: active ? "#7c8bff" : "#e8eaff",
-                      cursor: atCap ? "not-allowed" : "pointer",
-                      opacity: atCap ? 0.4 : 1,
-                      transition: "all 0.12s ease",
+                      padding: "3px 9px", borderRadius: 999, fontSize: 11, fontWeight: 600,
+                      background: "rgba(91,108,255,0.16)", border: "1px solid rgba(91,108,255,0.32)",
+                      color: "#a3b3ff",
                     }}
                   >
-                    {tag}
-                  </button>
-                );
-              })}
+                    #{h}
+                  </span>
+                ))}
+              </div>
+              <p style={{ marginTop: 6, fontSize: 10.5, color: "#6b7396", lineHeight: 1.45 }}>
+                Posts whose hashtags match a learner&rsquo;s interests reach more of the right people.
+              </p>
             </div>
-          </div>
+          )}
 
           {/* Footer */}
           <div className="lh-composer-footer">

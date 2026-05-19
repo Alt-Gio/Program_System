@@ -242,7 +242,19 @@ export const learnhubTables = {
     content: v.string(),
     metadata: v.any(),
     tags: v.optional(v.array(v.string())),
+    // Free-form `#hashtags` extracted from `content` at post time. Always
+    // stored lowercased + deduped. Drives the feed-rank match against the
+    // viewer's `interests`. `tags` (above) is kept for backward compat with
+    // posts created under the old chip picker.
+    hashtags: v.optional(v.array(v.string())),
     compressed: v.optional(v.boolean()),
+    // Visibility boost. `standard` is the org_partner auto-boost (decays
+    // after `boostExpiresAt`); `featured` is a coordinator-applied pin that
+    // ranks harder. `none` (or unset) is the default for student posts.
+    boostLevel: v.optional(
+      v.union(v.literal("none"), v.literal("standard"), v.literal("featured"))
+    ),
+    boostExpiresAt: v.optional(v.number()),
     likeCount: v.number(),
     commentCount: v.number(),
     isPinned: v.boolean(),
@@ -821,6 +833,25 @@ export const learnhubTables = {
     expiresAt: v.number(),
     createdAt: v.number(),
   }).index("by_token", ["inviteToken"]),
+
+  // Curated YouTube channels & videos picked by Org Partners. Drives the
+  // /learnhub/watch feed: viewers only see what one of the partner orgs has
+  // surfaced, so the catalog stays educational instead of doom-scrolly.
+  // `kind` decides which of the two id fields is populated; we keep both on
+  // one table so the management UI can render a single chronological list.
+  learnhub_org_curated_channels: defineTable({
+    orgId: v.id("learnhub_users"),
+    kind: v.union(v.literal("channel"), v.literal("video")),
+    youtubeChannelId: v.optional(v.string()),
+    youtubeVideoId: v.optional(v.string()),
+    displayName: v.string(),
+    thumbnailUrl: v.optional(v.string()),
+    description: v.optional(v.string()),
+    addedAt: v.number(),
+    isActive: v.boolean(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_active_added", ["isActive", "addedAt"]),
 
   // ── Reports ──────────────────────────────────────────────
   learnhub_quarterly_reports: defineTable({

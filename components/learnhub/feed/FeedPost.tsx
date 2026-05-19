@@ -40,6 +40,11 @@ export interface MockPost {
   commentCount: number;
   isPinned: boolean;
   createdAt: number;
+  // Optional ranking signals. The feed query supplies them when available;
+  // the legacy mock path leaves them undefined so older callers stay valid.
+  hashtags?: string[];
+  boostLevel?: "none" | "standard" | "featured";
+  boostExpiresAt?: number;
 }
 
 const ROLE_BADGE: Record<
@@ -69,22 +74,41 @@ function Avatar({ author }: { author: MockAuthor }) {
   );
 }
 
-function PostBody({ content }: { content: string }) {
+function PostBody({
+  content,
+  onHashtagClick,
+}: {
+  content: string;
+  onHashtagClick?: (tag: string) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const limit = 280;
   const needsTrunc = content.length > limit;
   const displayed = expanded ? content : content.slice(0, limit);
 
   const renderContent = (text: string) =>
-    text.split(/(\s+)/).map((word, i) =>
-      word.startsWith("#") ? (
+    text.split(/(\s+)/).map((word, i) => {
+      if (!word.startsWith("#")) return word;
+      const tag = word.replace(/^#+/, "").replace(/[^a-zA-Z0-9_]/g, "").toLowerCase();
+      if (!tag) return word;
+      if (onHashtagClick) {
+        return (
+          <button
+            key={i}
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onHashtagClick(tag); }}
+            className="lh-post-hashtag-inline"
+          >
+            #{tag}
+          </button>
+        );
+      }
+      return (
         <span key={i} style={{ color: "#5b6cff" }}>
-          {word}
+          #{tag}
         </span>
-      ) : (
-        word
-      )
-    );
+      );
+    });
 
   return (
     <p className="lh-post-text">
@@ -107,6 +131,7 @@ interface FeedPostProps {
   post: MockPost;
   userId?: string | null;
   onLike?: (postId: string) => void;
+  onHashtagClick?: (tag: string) => void;
 }
 
 function CommentsSection({ convexPostId, userId, authorName }: { convexPostId: Id<"learnhub_posts">; userId: string | null; authorName?: string }) {
@@ -174,7 +199,16 @@ function CommentsSection({ convexPostId, userId, authorName }: { convexPostId: I
   );
 }
 
-export function FeedPost({ post, userId, onLike }: FeedPostProps) {
+export function FeedPost({ post, userId, onLike, onHashtagClick }: FeedPostProps) {
+  // A boost is "live" only while it has time left on the clock. We treat a
+  // missing `boostExpiresAt` as expired so that a stray field doesn't pin a
+  // chip forever.
+  const now = Date.now();
+  const isBoostActive =
+    !!post.boostLevel
+    && post.boostLevel !== "none"
+    && (post.boostExpiresAt ?? 0) > now;
+  const isFeatured = post.boostLevel === "featured" && isBoostActive;
   const [liked, setLiked] = useState(false);
   const [localLikes, setLocalLikes] = useState(post.likeCount);
   const [showComments, setShowComments] = useState(false);
@@ -283,10 +317,36 @@ export function FeedPost({ post, userId, onLike }: FeedPostProps) {
         </button>
       </div>
 
+      {/* Boost chip — only when an active Org Partner boost is in effect */}
+      {isBoostActive && post.author.role === "org_partner" && (
+        <div className="lh-post-boost-row">
+          <span className={`lh-post-boost-chip${isFeatured ? " is-featured" : ""}`}>
+            <span className="lh-post-boost-chip-dot" aria-hidden />
+            {isFeatured ? "Featured by DICT" : "DICT Org boost"}
+          </span>
+        </div>
+      )}
+
       {/* Body */}
       <div className="lh-post-body">
-        <PostBody content={post.content} />
+        <PostBody content={post.content} onHashtagClick={onHashtagClick} />
       </div>
+
+      {/* Hashtag pills — clickable, filter the feed */}
+      {post.hashtags && post.hashtags.length > 0 && (
+        <div className="lh-post-hashtag-row">
+          {post.hashtags.map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              className="lh-post-hashtag"
+              onClick={(e) => { e.stopPropagation(); onHashtagClick?.(tag); }}
+            >
+              #{tag}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Thumbnail (any post type) */}
       {Boolean(post.metadata.thumbnailUrl) && (

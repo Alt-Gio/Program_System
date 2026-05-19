@@ -39,6 +39,8 @@ import type * as learnhub_bookmarks from "../learnhub_bookmarks.js";
 import type * as learnhub_certificates from "../learnhub_certificates.js";
 import type * as learnhub_comments from "../learnhub_comments.js";
 import type * as learnhub_conversations from "../learnhub_conversations.js";
+import type * as learnhub_curated from "../learnhub_curated.js";
+import type * as learnhub_events from "../learnhub_events.js";
 import type * as learnhub_forms from "../learnhub_forms.js";
 import type * as learnhub_google_credentials from "../learnhub_google_credentials.js";
 import type * as learnhub_journal from "../learnhub_journal.js";
@@ -112,6 +114,8 @@ declare const fullApi: ApiFromModules<{
   learnhub_certificates: typeof learnhub_certificates;
   learnhub_comments: typeof learnhub_comments;
   learnhub_conversations: typeof learnhub_conversations;
+  learnhub_curated: typeof learnhub_curated;
+  learnhub_events: typeof learnhub_events;
   learnhub_forms: typeof learnhub_forms;
   learnhub_google_credentials: typeof learnhub_google_credentials;
   learnhub_journal: typeof learnhub_journal;

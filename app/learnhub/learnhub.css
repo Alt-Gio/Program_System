@@ -2077,6 +2077,157 @@ button:active { transform: scale(0.97); }
   margin: 0 0 4px;
 }
 
+/* ── Active hashtag filter chip ────────────────────────────────── */
+.lh-feed-active-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--lh-accent-2) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--lh-accent-2) 35%, transparent);
+  color: var(--lh-text-2);
+  font-size: 12px;
+}
+.lh-feed-active-tag-pill {
+  font-weight: 700;
+  color: var(--lh-accent-2);
+  letter-spacing: 0.01em;
+}
+.lh-feed-active-tag button {
+  display: inline-flex; align-items: center;
+  border: 0; background: transparent; cursor: pointer;
+  color: var(--lh-text-3); padding: 2px;
+}
+.lh-feed-active-tag button:hover { color: var(--lh-text); }
+
+/* ── Boost chip on org-partner posts ───────────────────────────── */
+.lh-post-boost-row { padding: 0 16px; margin-top: 6px; }
+.lh-post-boost-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: color-mix(in srgb, var(--lh-accent) 18%, transparent);
+  color: var(--lh-accent);
+  border: 1px solid color-mix(in srgb, var(--lh-accent) 38%, transparent);
+}
+.lh-post-boost-chip.is-featured {
+  background: color-mix(in srgb, var(--lh-yellow, #f5c451) 22%, transparent);
+  color: var(--lh-yellow, #f5c451);
+  border-color: color-mix(in srgb, var(--lh-yellow, #f5c451) 50%, transparent);
+}
+.lh-post-boost-chip-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 25%, transparent);
+}
+
+/* ── Hashtag pills (post footer + inline) ──────────────────────── */
+.lh-post-hashtag-row {
+  display: flex; flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 16px 0;
+}
+.lh-post-hashtag,
+.lh-post-hashtag-inline {
+  font-family: inherit;
+  font-size: 12px;
+  border: 1px solid color-mix(in srgb, var(--lh-accent-2) 28%, transparent);
+  background: color-mix(in srgb, var(--lh-accent-2) 10%, transparent);
+  color: var(--lh-accent-2);
+  padding: 2px 9px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.lh-post-hashtag-inline {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-weight: 600;
+}
+.lh-post-hashtag:hover {
+  background: color-mix(in srgb, var(--lh-accent-2) 20%, transparent);
+  color: var(--lh-text);
+}
+.lh-post-hashtag-inline:hover {
+  text-decoration: underline;
+  color: var(--lh-text);
+}
+
+/* ── Infinite-scroll loader + end markers ──────────────────────── */
+.lh-feed-loader {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 8px;
+  padding: 26px 16px;
+  color: var(--lh-text-3);
+  font-size: 12px;
+}
+.lh-feed-end {
+  text-align: center;
+  padding: 22px 16px 30px;
+  color: var(--lh-text-3);
+  font-size: 12px;
+}
+
+/* ── Upcoming-events card injected into the feed ───────────────── */
+.lh-feed-events-card {
+  break-inside: avoid;
+  margin-bottom: 16px;
+  border-radius: var(--lh-r-lg);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--lh-accent-2) 14%, var(--lh-surface)) 0%,
+    var(--lh-surface) 70%);
+  border: 1px solid color-mix(in srgb, var(--lh-accent-2) 30%, transparent);
+  padding: 12px 14px;
+}
+.lh-feed-events-head {
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+  color: var(--lh-text);
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.lh-feed-events-list { display: flex; flex-direction: column; gap: 6px; }
+.lh-feed-event-item {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--lh-surface);
+  border: 1px solid var(--lh-surface-3);
+  color: var(--lh-text);
+  text-decoration: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.lh-feed-event-item:hover {
+  border-color: var(--lh-accent-2);
+  background: var(--lh-surface-2);
+}
+.lh-feed-event-date {
+  font-size: 11px;
+  color: var(--lh-accent-2);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.lh-feed-event-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 2px;
+  color: var(--lh-text);
+}
+.lh-feed-event-where,
+.lh-feed-event-slots {
+  font-size: 11px;
+  color: var(--lh-text-3);
+  margin-top: 1px;
+}
+
 /* DTC office widget (Right Panel) */
 .lh-dtc-card { padding: 14px; }
 .lh-dtc-row {
@@ -6438,4 +6589,221 @@ button:active { transform: scale(0.97); }
 
   .lh-progress-stat-row { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
   .lh-progress-stat-card { padding: 10px; }
+
+/* ─────────────────────────────────────────────────────────────────
+   Watch — curated theater / reels (overrides legacy declarations)
+   The selectors below intentionally come last so they win over the
+   earlier `.lh-watch` rules that targeted the Facebook-Watch-style
+   layout. Both `--theater` and `--reels` share the same scroll-snap
+   rail; only the player aspect ratio + max-width changes.
+   ───────────────────────────────────────────────────────────── */
+
+/* Container: fills the LearnHub center column from chrome to bottom. */
+.lh-watch.lh-watch--theater,
+.lh-watch.lh-watch--reels {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  max-width: 100%;
+  height: calc(100dvh - 70px);
+  background: #04040a;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Filter chip strip — pinned at top, scrolls horizontally on overflow. */
+.lh-watch-filterbar {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  background: linear-gradient(180deg, rgba(0,0,0,0.55), transparent);
+  scrollbar-width: none;
+}
+.lh-watch-filterbar::-webkit-scrollbar { display: none; }
+.lh-watch-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.06);
+  color: #e3e6ff;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.lh-watch-chip:hover {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.32);
+}
+.lh-watch-chip.is-active {
+  background: var(--lh-accent);
+  border-color: var(--lh-accent);
+  color: #0a0a14;
+}
+.lh-watch-verified { color: var(--lh-blue, #4aa3ff); }
+.lh-watch-chip.is-active .lh-watch-verified { color: rgba(10,10,20,0.85); }
+
+/* Snap rail — vertical mandatory snap, one slide per viewport. */
+.lh-watch-rail {
+  flex: 1 1 auto;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-snap-type: y mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.lh-watch-rail::-webkit-scrollbar { display: none; }
+
+/* Each slide owns one viewport. */
+.lh-watch-slide {
+  height: 100%;
+  min-height: 100%;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background: radial-gradient(ellipse at top, rgba(91,108,255,0.10) 0%, transparent 60%), #04040a;
+  padding: 14px;
+}
+
+.lh-watch-slide-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  max-width: 780px;
+  position: relative;
+}
+
+/* Player wrapper. Theater = 16:9 (default), Reels = 9:16. */
+.lh-watch--theater .lh-watch-player {
+  width: 100%;
+  max-width: 760px;
+  aspect-ratio: 16 / 9;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+  position: relative;
+}
+.lh-watch--reels .lh-watch-player {
+  width: min(100%, 380px);
+  aspect-ratio: 9 / 16;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #000;
+  position: relative;
+}
+.lh-watch--theater .lh-watch-player iframe,
+.lh-watch--reels .lh-watch-player iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+/* Caption / curator metadata. */
+.lh-watch-meta {
+  width: 100%;
+  max-width: 760px;
+  text-align: left;
+  color: #e3e6ff;
+}
+.lh-watch-meta-title {
+  margin: 0;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.3;
+  color: #fff;
+}
+.lh-watch-meta-org {
+  margin: 4px 0 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: rgba(255,255,255,0.75);
+}
+.lh-watch-meta-desc {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: rgba(255,255,255,0.7);
+  line-height: 1.5;
+  max-height: 4.4em;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+.lh-watch-meta-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.lh-watch-meta-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: rgba(255,255,255,0.7);
+  text-decoration: none;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.16);
+}
+.lh-watch-meta-link:hover { color: #fff; background: rgba(255,255,255,0.06); }
+
+/* Inline ↑/↓ nav — right edge, vertical pair. */
+.lh-watch-nav {
+  position: absolute;
+  right: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lh-watch-nav-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.55);
+  border: 1px solid rgba(255,255,255,0.16);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+.lh-watch-nav-btn:hover { background: rgba(0,0,0,0.75); }
+.lh-watch-nav-btn:disabled { opacity: 0.32; cursor: not-allowed; }
+
+@media (max-width: 768px) {
+  /* Reels mode: hide the side nav (let the snap rail be the only nav)
+     and tighten meta padding for narrow viewports. */
+  .lh-watch.lh-watch--reels .lh-watch-nav { display: none; }
+  .lh-watch.lh-watch--reels .lh-watch-slide { padding: 10px; }
+  .lh-watch.lh-watch--reels .lh-watch-meta-title { font-size: 15px; }
+}
 }

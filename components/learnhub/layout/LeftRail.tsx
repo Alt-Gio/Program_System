@@ -50,6 +50,7 @@ const ITEMS: RoleGatedItem[] = [
   { id: "leaderboard", href: "/learnhub/leaderboard",   icon: <Trophy size={20} />,      label: "Leaderboard" },
   { id: "progress", href: "/learnhub/progress", icon: <BarChart3 size={20} />,  label: "Progress · Restricted", roles: ["mentor", "coordinator", "admin"] },
   { id: "org",      href: "/learnhub/org",      icon: <ShieldCheck size={20} />, label: "Org Console",            roles: ["org_partner", "coordinator", "admin"] },
+  { id: "curate",   href: "/learnhub/org/curate", icon: <PlaySquare size={20} />, label: "Watch Curation",         roles: ["org_partner", "coordinator", "admin"] },
 ];
 
 function xpForLevel(level: number): number {

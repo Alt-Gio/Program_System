@@ -1,116 +1,231 @@
 "use client";
 
 /**
- * LearnHub Watch — Facebook-Watch-style video feed.
+ * LearnHub Watch — curated, scroll-snap, one-video-per-viewport.
  *
- * Pulls every post whose type is `video` or `youtube` from the live feed and
- * renders them as a single-column vertical stack. Video-type posts use a
- * native <video> element that auto-plays muted when ≥60% in view and pauses
- * when it leaves the viewport (same pattern as Facebook / Instagram Reels —
- * no autoplay-with-audio surprise). YouTube posts swap to a real iframe on
- * first tap so the user controls when to start them.
+ * Sourcing:
+ *   • Org Partners curate YouTube channels/videos via /learnhub/org/curate.
+ *   • This page reads the active feed from `learnhub_curated.listCuratedFeed`,
+ *     ordered newest-first with optional org filter and cursor pagination.
+ *
+ * Layout:
+ *   • Desktop (≥769px) → `.lh-watch--theater`. Every "slide" is 100dvh and
+ *     contains a centered 16:9 YouTube embed (max ~760px). Scrolling moves
+ *     to the next curated video; one video fills the viewport at a time.
+ *   • Mobile (≤768px)  → `.lh-watch--reels`. Same scroll-snap mental model,
+ *     vertical (9:16-ish) YouTube embed, taller card. Identical key bindings.
+ *
+ * URL state:
+ *   • `?v=<youtubeId>` — restores the currently-snapped video on deep-link.
+ *   • `?org=<orgId>`   — narrows the feed to a single curating org.
+ *
+ * Keyboard: ↓ / PageDown → next, ↑ / PageUp → previous. Both layouts.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "convex/react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
-import { formatDistanceToNow } from "date-fns";
-import { Play, Volume2, VolumeX, MessageCircle, Heart, Share2 } from "lucide-react";
-import { useLearnhubSession } from "@/lib/learnhub/hooks";
+import { CheckCircle2, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 
-type PostDoc = Doc<"learnhub_posts">;
-type AuthorDoc = Doc<"learnhub_users"> | null;
-type FeedPostWithAuthor = PostDoc & { author: AuthorDoc };
-
-function isVideoPost(p: PostDoc): boolean {
-  return p.type === "video" || p.type === "youtube";
-}
+type CuratedItem = Doc<"learnhub_org_curated_channels"> & {
+  org: { id: Id<"learnhub_users">; name: string; isVerified: boolean } | null;
+};
 
 export default function WatchPage() {
-  const { userId } = useLearnhubSession();
-  const [muted, setMuted] = useState(true);
-  const scrollerRef = useRef<HTMLDivElement | null>(null);
-  // Tracks whether we're in the mobile reels layout (≤768px). The page
-  // works in both modes — the CSS does the heavy visual lifting — but
-  // the IntersectionObserver inside each card needs to know which
-  // scroll container to observe (the snap rail on mobile, the viewport
-  // on desktop).
-  const [isReelsMode, setIsReelsMode] = useState(false);
+  const sp = useSearchParams();
+  const router = useRouter();
+  const activeOrg = (sp.get("org") ?? "").trim() || null;
+  const activeVideoParam = (sp.get("v") ?? "").trim() || null;
+
+  // Layout detection — desktop theater vs. mobile reels. Same scroll-snap
+  // mechanics in both; only the inner aspect ratio differs.
+  const [isReels, setIsReels] = useState(false);
   useEffect(() => {
     if (typeof window === "undefined") return;
     const mql = window.matchMedia("(max-width: 768px)");
-    const apply = () => setIsReelsMode(mql.matches);
+    const apply = () => setIsReels(mql.matches);
     apply();
     mql.addEventListener("change", apply);
     return () => mql.removeEventListener("change", apply);
   }, []);
 
-  const feed = useQuery(
-    api.learnhub_posts.listFeedWithAuthors,
-    userId
-      ? { limit: 60, userId: userId as Id<"learnhub_users"> }
-      : { limit: 60 },
-  );
+  const orgs = useQuery(api.learnhub_curated.listCuratingOrgs, {});
 
-  const videoPosts = useMemo<FeedPostWithAuthor[]>(() => {
-    if (!feed) return [];
-    return (feed as FeedPostWithAuthor[]).filter(isVideoPost);
-  }, [feed]);
+  // Pull the first 50 items. Pagination kicks in only when we approach the
+  // bottom; most viewers won't exceed a single page.
+  const curated = useQuery(api.learnhub_curated.listCuratedFeed, {
+    limit: 50,
+    orgId: activeOrg ? (activeOrg as Id<"learnhub_users">) : undefined,
+  });
+
+  // Surface only the videos. Channels don't yield watchable items until we
+  // wire a real YouTube API integration (deferred); we still show channel
+  // entries in the management page so the curator's intent isn't lost.
+  const videos = useMemo<CuratedItem[]>(() => {
+    if (!curated) return [];
+    return (curated.items as CuratedItem[]).filter(
+      (i) => i.kind === "video" && !!i.youtubeVideoId,
+    );
+  }, [curated]);
+
+  // Scroll-snap container + per-card refs. The container is the scroll root
+  // for the IntersectionObserver that watches which card is in view; that
+  // observer updates `currentVideoId`, which keeps `?v=` in sync.
+  const railRef = useRef<HTMLDivElement | null>(null);
+  const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  const setCardRef = useCallback((id: string) => (el: HTMLDivElement | null) => {
+    if (el) cardRefs.current.set(id, el);
+    else cardRefs.current.delete(id);
+  }, []);
+
+  const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
+
+  // Sync `currentVideoId` from whichever card is snapped (≥60% in view).
+  useEffect(() => {
+    const root = railRef.current;
+    if (!root) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        // Pick the entry with the largest intersectionRatio that's snapped.
+        let best: IntersectionObserverEntry | null = null;
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          if (!best || e.intersectionRatio > best.intersectionRatio) best = e;
+        }
+        if (!best) return;
+        const id = (best.target as HTMLElement).dataset.videoId ?? null;
+        if (id) setCurrentVideoId(id);
+      },
+      { root, threshold: [0.6, 0.9] },
+    );
+    for (const el of Array.from(cardRefs.current.values())) io.observe(el);
+    return () => io.disconnect();
+  }, [videos]);
+
+  // When `currentVideoId` changes, reflect it into `?v=`. We avoid pushing
+  // a fresh history entry per scroll — replace keeps the back button useful.
+  useEffect(() => {
+    if (!currentVideoId) return;
+    if (currentVideoId === activeVideoParam) return;
+    const params = new URLSearchParams(Array.from(sp.entries()));
+    params.set("v", currentVideoId);
+    router.replace(`/learnhub/watch?${params.toString()}`, { scroll: false });
+  }, [currentVideoId, activeVideoParam, router, sp]);
+
+  // Deep-link restore: when the page first loads with `?v=<id>`, scroll the
+  // matching card into view. We only do this once per param change.
+  useEffect(() => {
+    if (!activeVideoParam || videos.length === 0) return;
+    const el = cardRefs.current.get(activeVideoParam);
+    if (el) el.scrollIntoView({ block: "start", behavior: "auto" });
+  }, [activeVideoParam, videos]);
+
+  const advance = useCallback((direction: 1 | -1) => {
+    const ids = videos.map((v) => v.youtubeVideoId!).filter(Boolean);
+    if (ids.length === 0) return;
+    const idx = currentVideoId ? ids.indexOf(currentVideoId) : 0;
+    const next = Math.max(0, Math.min(ids.length - 1, idx + direction));
+    const target = cardRefs.current.get(ids[next]);
+    if (target) target.scrollIntoView({ block: "start", behavior: "smooth" });
+  }, [videos, currentVideoId]);
+
+  // Keyboard navigation. We only intercept when the watch surface has focus
+  // (or no editable element does) so typing in a search field elsewhere on
+  // the page isn't hijacked.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tgt = e.target as HTMLElement | null;
+      if (tgt && (tgt.tagName === "INPUT" || tgt.tagName === "TEXTAREA" || tgt.isContentEditable)) return;
+      if (e.key === "ArrowDown" || e.key === "PageDown") {
+        e.preventDefault();
+        advance(1);
+      } else if (e.key === "ArrowUp" || e.key === "PageUp") {
+        e.preventDefault();
+        advance(-1);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [advance]);
+
+  const setOrgFilter = useCallback((orgId: string | null) => {
+    const params = new URLSearchParams(Array.from(sp.entries()));
+    if (orgId) params.set("org", orgId);
+    else params.delete("org");
+    params.delete("v"); // changing filter invalidates the v= anchor
+    const qs = params.toString();
+    router.push(qs ? `/learnhub/watch?${qs}` : "/learnhub/watch");
+  }, [router, sp]);
 
   return (
-    <div className={`lh-watch${isReelsMode ? " lh-watch--reels" : ""}`}>
-      <header className="lh-watch-header">
-        <div>
-          <h1 className="lh-watch-title">Watch</h1>
-          <p className="lh-watch-sub">Videos and recorded sessions from the cohort.</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setMuted((m) => !m)}
-          className="lh-watch-sound"
-          aria-pressed={!muted}
-          aria-label={muted ? "Unmute videos" : "Mute videos"}
-          title={muted ? "Unmute videos" : "Mute videos"}
-        >
-          {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-          <span>{muted ? "Muted" : "Sound on"}</span>
-        </button>
-      </header>
-
-      {feed === undefined && (
-        <div className="lh-watch-skeleton" aria-busy="true">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="lh-watch-card">
-              <div className="lh-skeleton" style={{ height: 18, width: "55%", marginBottom: 10 }} />
-              <div className="lh-skeleton" style={{ aspectRatio: "16/9", borderRadius: 12 }} />
-            </div>
+    <div className={`lh-watch ${isReels ? "lh-watch--reels" : "lh-watch--theater"}`}>
+      {/* Top chip strip — curating orgs as filter pills */}
+      {orgs && orgs.length > 0 && (
+        <div className="lh-watch-filterbar" role="toolbar" aria-label="Filter videos by curating organization">
+          <button
+            type="button"
+            className={`lh-watch-chip${!activeOrg ? " is-active" : ""}`}
+            onClick={() => setOrgFilter(null)}
+          >
+            All curators
+          </button>
+          {orgs.map((o) => (
+            <button
+              key={o.id as string}
+              type="button"
+              className={`lh-watch-chip${activeOrg === (o.id as string) ? " is-active" : ""}`}
+              onClick={() => setOrgFilter(o.id as string)}
+              title={`${o.count} video${o.count === 1 ? "" : "s"}`}
+            >
+              <span>{o.name}</span>
+              {o.isVerified && <CheckCircle2 size={12} className="lh-watch-verified" />}
+            </button>
           ))}
         </div>
       )}
 
-      {feed !== undefined && videoPosts.length === 0 && (
+      {/* Loading state */}
+      {curated === undefined && (
+        <div className="lh-watch-rail" aria-busy="true">
+          <div className="lh-watch-slide">
+            <div className="lh-watch-slide-inner">
+              <div className="lh-skeleton" style={{ aspectRatio: isReels ? "9/16" : "16/9", width: "100%", maxWidth: 760, borderRadius: 14 }} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {curated !== undefined && videos.length === 0 && (
         <div className="lh-watch-empty">
           <div style={{ fontSize: 36, marginBottom: 10 }}>🎬</div>
-          <p style={{ margin: 0, fontWeight: 700 }}>No videos yet</p>
+          <p style={{ margin: 0, fontWeight: 700 }}>Nothing curated yet</p>
           <p style={{ margin: "6px 0 14px", fontSize: 13, color: "var(--lh-text-3)" }}>
-            Mentors and students will fill this up. Want to be first?
+            Org Partners surface YouTube content here so learners stay in
+            learning mode — not infinite scroll mode.
           </p>
-          <Link href="/learnhub/feed#compose" className="lh-watch-cta">
-            Post a video →
+          <Link href="/learnhub/org/curate" className="lh-watch-cta">
+            Curate videos →
           </Link>
         </div>
       )}
 
-      {feed !== undefined && videoPosts.length > 0 && (
-        <div className="lh-watch-feed" ref={scrollerRef}>
-          {videoPosts.map((post) => (
-            <WatchCard
-              key={post._id}
-              post={post}
-              muted={muted}
-              scrollRoot={isReelsMode ? scrollerRef.current : null}
+      {/* The snap rail — both desktop and mobile share this scaffolding */}
+      {videos.length > 0 && (
+        <div ref={railRef} className="lh-watch-rail">
+          {videos.map((item, idx) => (
+            <TheaterSlide
+              key={item._id as string}
+              item={item}
+              isReels={isReels}
+              setRef={setCardRef(item.youtubeVideoId!)}
+              isFirst={idx === 0}
+              isLast={idx === videos.length - 1}
+              onAdvance={advance}
             />
           ))}
         </div>
@@ -119,203 +234,89 @@ export default function WatchPage() {
   );
 }
 
-function WatchCard({
-  post,
-  muted,
-  scrollRoot,
+function TheaterSlide({
+  item,
+  isReels,
+  setRef,
+  isFirst,
+  isLast,
+  onAdvance,
 }: {
-  post: FeedPostWithAuthor;
-  muted: boolean;
-  scrollRoot: Element | null;
+  item: CuratedItem;
+  isReels: boolean;
+  setRef: (el: HTMLDivElement | null) => void;
+  isFirst: boolean;
+  isLast: boolean;
+  onAdvance: (direction: 1 | -1) => void;
 }) {
-  const author = post.author;
-  const authorName = author?.name ?? "Unknown";
-  const avatar =
-    author?.avatarUrl ||
-    `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(authorName)}&backgroundColor=5B6CFF&textColor=ffffff`;
+  const videoId = item.youtubeVideoId!;
+  const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
   return (
-    <article className="lh-watch-card">
-      <header className="lh-watch-author">
-        <img src={avatar} alt="" className="lh-watch-author-avatar" />
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <p className="lh-watch-author-name">{authorName}</p>
-          <p className="lh-watch-author-meta">
-            {formatDistanceToNow(post.createdAt, { addSuffix: true })}
-            {author?.role ? ` · ${author.role.replace("_", " ")}` : ""}
-          </p>
-        </div>
-      </header>
-
-      {post.content && <p className="lh-watch-caption">{post.content}</p>}
-
-      {post.type === "video" ? (
-        <UploadedVideoPlayer post={post} muted={muted} scrollRoot={scrollRoot} />
-      ) : (
-        <YouTubePreview post={post} />
-      )}
-
-      <footer className="lh-watch-actions">
-        <button type="button" className="lh-watch-action">
-          <Heart size={16} />
-          <span>{post.likeCount ?? 0}</span>
-        </button>
-        <button type="button" className="lh-watch-action">
-          <MessageCircle size={16} />
-          <span>{post.commentCount ?? 0}</span>
-        </button>
-        <button
-          type="button"
-          className="lh-watch-action"
-          onClick={() => {
-            if (typeof navigator !== "undefined" && navigator.share) {
-              navigator
-                .share({
-                  title: post.content?.slice(0, 80) || "LearnHub video",
-                  url: typeof window !== "undefined" ? window.location.origin + "/learnhub/feed" : "",
-                })
-                .catch(() => {});
-            }
-          }}
-        >
-          <Share2 size={16} />
-          <span>Share</span>
-        </button>
-      </footer>
-    </article>
-  );
-}
-
-function UploadedVideoPlayer({
-  post,
-  muted,
-  scrollRoot,
-}: {
-  post: FeedPostWithAuthor;
-  muted: boolean;
-  scrollRoot: Element | null;
-}) {
-  const m = (post.metadata ?? {}) as { storageId?: string; posterUrl?: string };
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [hasPlayed, setHasPlayed] = useState(false);
-  const [visible, setVisible] = useState(false);
-
-  const storageUrl = useQuery(
-    api.learnhub_posts.getStorageUrl,
-    m.storageId ? { storageId: m.storageId as Id<"_storage"> } : "skip",
-  );
-  const src = storageUrl ?? null;
-
-  // Autoplay (muted) when the card is sufficiently in view; pause when
-  // it leaves. In reels mode (scrollRoot set) we observe relative to the
-  // scrolling snap container and use a higher threshold so only the
-  // *snapped* card plays — the next card down the rail stays paused.
-  // On desktop (scrollRoot=null) we keep the original 0.6 threshold
-  // tracked against the viewport.
-  useEffect(() => {
-    const el = videoRef.current;
-    if (!el) return;
-    const isReels = Boolean(scrollRoot);
-    const threshold = isReels ? 0.75 : 0.6;
-    const obs = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting && entry.intersectionRatio >= threshold) {
-            setVisible(true);
-            el.play().then(() => setHasPlayed(true)).catch(() => {});
-          } else {
-            setVisible(false);
-            if (!el.paused) el.pause();
-          }
-        }
-      },
-      { root: scrollRoot, threshold: [0, threshold, 1] },
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [src, scrollRoot]);
-
-  // Reflect the global mute toggle on every player without re-attaching it.
-  useEffect(() => {
-    const el = videoRef.current;
-    if (el) el.muted = muted;
-  }, [muted]);
-
-  if (!src) {
-    return <div className="lh-skeleton" style={{ aspectRatio: "16/9", borderRadius: 12 }} />;
-  }
-
-  return (
-    <div className="lh-watch-player" style={{ position: "relative" }}>
-      <video
-        ref={videoRef}
-        src={src}
-        poster={m.posterUrl}
-        muted={muted}
-        playsInline
-        loop
-        preload="metadata"
-        controls={hasPlayed && visible}
-        onClick={(e) => {
-          const el = e.currentTarget;
-          if (el.paused) el.play().catch(() => {});
-          else el.pause();
-        }}
-      />
-      {!hasPlayed && (
-        <span aria-hidden className="lh-watch-play-badge">
-          <Play size={22} fill="white" stroke="white" />
-        </span>
-      )}
-    </div>
-  );
-}
-
-function YouTubePreview({ post }: { post: FeedPostWithAuthor }) {
-  const m = (post.metadata ?? {}) as { videoId?: string; thumbnail?: string };
-  const [embedded, setEmbedded] = useState(false);
-  if (!m.videoId) return null;
-  const thumb = m.thumbnail ?? `https://img.youtube.com/vi/${m.videoId}/maxresdefault.jpg`;
-
-  if (embedded) {
-    return (
-      <div className="lh-watch-player">
-        <iframe
-          src={`https://www.youtube.com/embed/${m.videoId}?autoplay=1&playsinline=1`}
-          title="YouTube video"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowFullScreen
-          style={{ width: "100%", aspectRatio: "16/9", border: 0, display: "block", borderRadius: 12 }}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={() => setEmbedded(true)}
-      className="lh-watch-player"
-      style={{
-        position: "relative",
-        padding: 0,
-        border: 0,
-        background: "transparent",
-        cursor: "pointer",
-      }}
-      aria-label="Play YouTube video"
+    <section
+      ref={setRef}
+      data-video-id={videoId}
+      className="lh-watch-slide"
     >
-      <img
-        src={thumb}
-        alt=""
-        style={{ width: "100%", aspectRatio: "16/9", objectFit: "cover", display: "block", borderRadius: 12 }}
-        onError={(e) => {
-          (e.currentTarget as HTMLImageElement).src = `https://img.youtube.com/vi/${m.videoId}/hqdefault.jpg`;
-        }}
-      />
-      <span aria-hidden className="lh-watch-play-badge">
-        <Play size={22} fill="white" stroke="white" />
-      </span>
-    </button>
+      <div className="lh-watch-slide-inner">
+        <div className={`lh-watch-player${isReels ? " is-reels" : ""}`}>
+          <iframe
+            src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&playsinline=1`}
+            title={item.displayName}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+          />
+        </div>
+
+        <div className="lh-watch-meta">
+          <h2 className="lh-watch-meta-title">{item.displayName}</h2>
+          {item.org && (
+            <p className="lh-watch-meta-org">
+              <span>Curated by {item.org.name}</span>
+              {item.org.isVerified && <CheckCircle2 size={13} className="lh-watch-verified" />}
+            </p>
+          )}
+          {item.description && (
+            <p className="lh-watch-meta-desc">{item.description}</p>
+          )}
+
+          <div className="lh-watch-meta-actions">
+            <a
+              href={watchUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="lh-watch-meta-link"
+            >
+              Open on YouTube <ExternalLink size={12} />
+            </a>
+          </div>
+        </div>
+
+        {/* Inline nav affordances — visible at all times so the scroll-snap
+            behavior is discoverable. Disabled at the ends. */}
+        <div className="lh-watch-nav">
+          <button
+            type="button"
+            onClick={() => onAdvance(-1)}
+            disabled={isFirst}
+            className="lh-watch-nav-btn"
+            aria-label="Previous video"
+            title="Previous (↑)"
+          >
+            <ChevronUp size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={() => onAdvance(1)}
+            disabled={isLast}
+            className="lh-watch-nav-btn"
+            aria-label="Next video"
+            title="Next (↓)"
+          >
+            <ChevronDown size={16} />
+          </button>
+        </div>
+      </div>
+    </section>
   );
 }
