@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono, DM_Sans } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import ServiceWorkerRegistrar from "@/components/ServiceWorkerRegistrar";
@@ -15,6 +15,16 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
   display: "swap",
+  preload: false,
+});
+
+// PMS Redesign: DM Sans is scoped to .pms-dashboard via the CSS variable
+// (no global font swap so other pages keep Inter).
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-pms",
+  display: "swap",
+  weight: ["400", "500", "600", "700"],
   preload: false,
 });
 
@@ -77,7 +87,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className={`${inter.className} ${jetbrainsMono.variable}`}>
+      <body className={`${inter.className} ${jetbrainsMono.variable} ${dmSans.variable}`}>
         <Providers>
           <ServiceWorkerRegistrar />
           {children}

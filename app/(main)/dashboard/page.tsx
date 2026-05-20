@@ -20,16 +20,14 @@ const DashboardQuarterChart = dynamic(
 import {
   Monitor, Building2, Wifi, Network, Shield,
   GraduationCap, TrendingUp, Key, AlertTriangle, Globe,
-  CheckCircle2, Clock, Users, Activity, ArrowRight, MapPin, Calendar,
-  Download, ChevronLeft, ChevronRight, Heart, Filter, FileSpreadsheet,
+  Users, Activity, ArrowRight, MapPin, Calendar,
+  Download, ChevronLeft, ChevronRight, Heart, FileSpreadsheet,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn, formatDate, getStatusColor, numberWithCommas, getCompletionRate, calcTotal } from "@/lib/utils";
 import { CURRENT_YEAR, DICT_PROJECTS } from "@/lib/types";
 import { Id } from "@/convex/_generated/dataModel";
@@ -41,7 +39,6 @@ const ICON_MAP: Record<string, React.ElementType> = {
   GraduationCap, TrendingUp, Key, AlertTriangle, Globe,
 };
 
-// Map project codes to actual logo filenames in public/Logo/
 const LOGO_MAP: Record<string, string> = {
   EGOVPH: "egov_ph_logo.png",
   ELGU: "elgu_logo.png",
@@ -56,7 +53,7 @@ const LOGO_MAP: Record<string, string> = {
 };
 
 function getProjectLogo(code: string): string {
-  return `/Logo/${LOGO_MAP[code.toUpperCase()] || "egov_ph_logo.png"}`;
+  return `/logo/${LOGO_MAP[code.toUpperCase()] || "egov_ph_logo.png"}`;
 }
 
 const MONTHS = [
@@ -132,16 +129,113 @@ export default function DashboardPage() {
     { quarter: "Q4", count: [10,11,12].reduce((s, m) => s + (summary.byMonth?.[m] ?? 0), 0) },
   ];
 
+  const yearLabel = selectedYear === "all" ? "All Years" : `FY ${selectedYear}`;
+  const inProgressCount =
+    (summary.byStatus.draft ?? 0) + (summary.byStatus.submitted ?? 0);
+  const quarterTotal = quarterData.reduce((s, q) => s + q.count, 0);
+  const currentMonth = new Date().getMonth() + 1;
+  const activeQuarterIdx =
+    selectedYear === "all" ? -1 : Math.min(3, Math.floor((currentMonth - 1) / 3));
+
   return (
-    <div className="page-content space-y-5">
+    <div className="pms-dashboard page-content">
       {/* Live strip: pending imports + recent sync activity */}
       <DashboardActivityStrip />
 
-      {/* Main Layout: Carousel (Left) + Stats + Progress (Right) */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+      {/* Page header */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between mb-5 mt-3">
+        <div>
+          <h1 className="pms-page-title">Programs Overview</h1>
+          <p className="pms-page-sub">
+            Live snapshot of DICT Region V program activity across the six
+            Bicol provinces — filtered by {yearLabel}.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <a
+            href={`/api/looker-export?year=${selectedYear === "all" ? CURRENT_YEAR : selectedYear}`}
+            target="_blank" rel="noopener noreferrer"
+          >
+            <button className="pms-btn pms-btn-ghost">
+              <Download className="w-3.5 h-3.5" /> Export CSV
+            </button>
+          </a>
+          <button
+            className="pms-btn pms-btn-primary"
+            onClick={handleExportToSheets}
+            disabled={isExporting}
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            {isExporting ? "Exporting…" : "Export to Sheets"}
+          </button>
+        </div>
+      </div>
+
+      {/* Stat strip */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+        <StatTile
+          label="Activities · YTD"
+          value={numberWithCommas(total)}
+          deltaLabel={yearLabel}
+          deltaKind="flat"
+        />
+        <StatTile
+          label="Validated / Reported"
+          value={numberWithCommas(completed)}
+          deltaLabel={`${completionRate}%`}
+          deltaKind={completionRate >= 70 ? "up" : completionRate >= 40 ? "flat" : "down"}
+          spark="up"
+        />
+        <StatTile
+          label="Total participants"
+          value={numberWithCommas(summary.totalParticipants)}
+          deltaLabel={`${numberWithCommas(summary.totalMale)}M / ${numberWithCommas(summary.totalFemale)}F`}
+          deltaKind="flat"
+        />
+        <StatTile
+          label="In progress"
+          value={numberWithCommas(inProgressCount)}
+          deltaLabel={`${summary.byStatus.draft ?? 0} draft · ${summary.byStatus.submitted ?? 0} submitted`}
+          deltaKind="flat"
+        />
+      </div>
+
+      {/* Quarters strip */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+        {quarterData.map((q, idx) => {
+          const target = Math.max(1, Math.round(total / 4) || 12);
+          const pct = Math.min(100, Math.round((q.count / target) * 100));
+          let stateClass = "queued";
+          let stateLabel = "Queued";
+          if (idx < activeQuarterIdx) { stateClass = "done"; stateLabel = "Closed"; }
+          else if (idx === activeQuarterIdx) { stateClass = "active"; stateLabel = "Active"; }
+          return (
+            <div key={q.quarter} className="pms-q">
+              <div className="flex items-center justify-between">
+                <span className="pms-q-label">{q.quarter} · {["Jan–Mar","Apr–Jun","Jul–Sep","Oct–Dec"][idx]}</span>
+                <span className={`pms-q-state ${stateClass}`}>{stateLabel}</span>
+              </div>
+              <div className="pms-q-num">{q.count}</div>
+              <div className="pms-q-bar">
+                <div
+                  className="pms-q-bar-fill"
+                  style={{
+                    width: `${pct}%`,
+                    background: idx === activeQuarterIdx ? "var(--pms-accent)" : "var(--pms-ink)",
+                  }}
+                />
+              </div>
+              <div className="pms-q-foot">target {target} · {pct}%</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Main Layout: Carousel (Left) + Progress (Right) */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 mb-5">
         {/* LEFT: Activity Carousel */}
         <div className="xl:col-span-2">
-          <ActivityCarousel 
+          <ActivityCarousel
             provinceId={selectedProvince === "all" ? undefined : selectedProvince}
             year={selectedYear === "all" ? undefined : selectedYear}
             month={selectedMonth === 0 ? undefined : selectedMonth}
@@ -149,284 +243,337 @@ export default function DashboardPage() {
           />
         </div>
 
-        {/* RIGHT: KPI Stats + Progress Bar */}
+        {/* RIGHT: Completion summary */}
         <div className="space-y-3">
-          <KPICard label="Total Activities" value={numberWithCommas(total)} 
-            subtext={selectedYear === "all" ? "All Years" : `FY ${selectedYear}`}
-            icon={<Activity className="w-5 h-5 text-blue-600" />} bg="bg-blue-50" />
-          <KPICard label="Validated / Reported" value={numberWithCommas(completed)}
-            subtext={`${completionRate}% completion rate`}
-            icon={<CheckCircle2 className="w-5 h-5 text-green-600" />} bg="bg-green-50"
-            highlight={completionRate >= 70 ? "green" : completionRate >= 40 ? "yellow" : "red"} />
-          <KPICard label="Total Participants" value={numberWithCommas(summary.totalParticipants)}
-            subtext={`${numberWithCommas(summary.totalMale)}M / ${numberWithCommas(summary.totalFemale)}F`}
-            icon={<Users className="w-5 h-5 text-violet-600" />} bg="bg-violet-50" />
-          <KPICard label="In Progress"
-            value={numberWithCommas((summary.byStatus.draft ?? 0) + (summary.byStatus.submitted ?? 0))}
-            subtext={`${summary.byStatus.draft ?? 0} draft · ${summary.byStatus.submitted ?? 0} submitted`}
-            icon={<Clock className="w-5 h-5 text-amber-600" />} bg="bg-amber-50" />
-          
-          {/* Overall Progress - Same Column as Stats */}
-          <Card>
-            <CardContent className="p-4">
-              <div className="mb-3">
-                <p className="text-sm font-semibold text-gray-900">
-                  {selectedYear === "all" ? "All Years" : `FY ${selectedYear}`} Progress
-                </p>
-                <p className="text-xs text-gray-500 mt-0.5">{completed} of {total} validated</p>
+          <div className="pms-card">
+            <div className="pms-card-head">
+              <span className="pms-card-title">{yearLabel} Progress</span>
+              <span className="pms-card-sub">{completed} of {total} validated</span>
+              <div className="pms-card-tools">
+                <span className="pms-pill">{completionRate}%</span>
               </div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-gray-500">Completion Rate</span>
-                <span className={cn("text-xl font-bold",
-                  completionRate >= 70 ? "text-green-600" : completionRate >= 40 ? "text-amber-600" : "text-red-600")}>
-                  {completionRate}%
-                </span>
+            </div>
+            <div className="pms-card-body" style={{ paddingTop: 14 }}>
+              <div
+                className="pms-q-bar"
+                style={{ height: 6, marginTop: 0, marginBottom: 14, background: "rgba(14,15,19,0.06)" }}
+              >
+                <div
+                  className="pms-q-bar-fill"
+                  style={{
+                    width: `${completionRate}%`,
+                    background:
+                      completionRate >= 70 ? "var(--pms-ok)"
+                      : completionRate >= 40 ? "var(--pms-warn)"
+                      : "var(--pms-danger)",
+                  }}
+                />
               </div>
-              <Progress value={completionRate} className="h-2.5 mb-3" />
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 {[
-                  { label: "Draft",     count: summary.byStatus.draft     ?? 0, color: "bg-gray-400" },
-                  { label: "Submitted", count: summary.byStatus.submitted ?? 0, color: "bg-amber-400" },
-                  { label: "Validated", count: summary.byStatus.validated ?? 0, color: "bg-blue-500" },
-                  { label: "Reported",  count: summary.byStatus.reported  ?? 0, color: "bg-green-500" },
+                  { label: "Draft",     count: summary.byStatus.draft     ?? 0, color: "rgba(14,15,19,0.35)" },
+                  { label: "Submitted", count: summary.byStatus.submitted ?? 0, color: "var(--pms-warn)" },
+                  { label: "Validated", count: summary.byStatus.validated ?? 0, color: "var(--pms-accent)" },
+                  { label: "Reported",  count: summary.byStatus.reported  ?? 0, color: "var(--pms-ok)" },
                 ].map(s => (
                   <div key={s.label} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-1.5">
-                      <div className={cn("w-2 h-2 rounded-full", s.color)} />
-                      <span className="text-gray-600">{s.label}</span>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="inline-block w-2 h-2 rounded-full"
+                        style={{ background: s.color }}
+                      />
+                      <span style={{ color: "var(--pms-muted)" }}>{s.label}</span>
                     </div>
-                    <span className="font-medium text-gray-900">{s.count}</span>
+                    <span style={{ color: "var(--pms-ink)", fontWeight: 500 }}>
+                      {numberWithCommas(s.count)}
+                    </span>
                   </div>
                 ))}
               </div>
-              <div className="flex gap-2 mt-3">
-                <a href={`/api/looker-export?year=${selectedYear === "all" ? CURRENT_YEAR : selectedYear}`} target="_blank" rel="noopener noreferrer" className="flex-1">
-                  <Button size="sm" variant="outline" className="w-full gap-1.5 text-xs">
-                    <Download className="w-3.5 h-3.5" /> Export CSV
-                  </Button>
-                </a>
-                <Button 
-                  size="sm" 
-                  variant="default" 
-                  className="flex-1 gap-1.5 text-xs"
-                  onClick={handleExportToSheets}
-                  disabled={isExporting}
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5" /> 
-                  {isExporting ? "Exporting..." : "Export to Sheets"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Programs grid + Charts */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 mb-5">
         {/* Programs — 2/3 width */}
         <div className="xl:col-span-2">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-semibold text-gray-900">
-              {selectedProgram === "all" ? "Programs Overview" : `${DICT_PROJECTS.find(p => p.code === selectedProgram)?.shortName || "Program"} Overview`}
-            </h2>
-            <span className="text-xs text-gray-500">
-              {selectedYear === "all" ? "All Years" : `FY ${selectedYear}`} · click to open
-            </span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {summary.summary
-              .filter(proj => selectedProgram === "all" || proj.code === selectedProgram)
-              .map((proj) => {
-              const def = DICT_PROJECTS.find(p => p.code === proj.code);
-              const projCompleted = (proj.byStatus?.validated ?? 0) + (proj.byStatus?.reported ?? 0);
-              const rate = getCompletionRate(projCompleted, proj.totalActivities);
-              return (
-                <Link key={proj.code} href={`/projects/${proj.code.toLowerCase()}`}>
-                  <div className="flex items-start gap-3 p-4 rounded-xl border border-gray-100 hover:border-blue-200 hover:shadow-md transition-all cursor-pointer bg-white group">
-                    <div className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0 bg-white border border-gray-100 overflow-hidden p-1">
-                      {def?.code ? (
-                        <Image
-                          src={getProjectLogo(def.code)}
-                          alt={def.shortName}
-                          width={48}
-                          height={48}
-                          className="object-contain"
-                          unoptimized
-                        />
-                      ) : (
-                        <Activity style={{ width: 20, height: 20, color: proj.color }} />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-semibold text-gray-900 group-hover:text-blue-700 truncate">
-                          {proj.shortName}
-                        </p>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <ProgramHealthBadge projectCode={proj.code} showLabel={false} />
-                          <span className="text-xs text-gray-400">{proj.totalActivities} acts</span>
-                        </div>
+          <div className="pms-card">
+            <div className="pms-card-head">
+              <span className="pms-card-title">
+                {selectedProgram === "all"
+                  ? "By program"
+                  : `${DICT_PROJECTS.find(p => p.code === selectedProgram)?.shortName || "Program"} overview`}
+              </span>
+              <span className="pms-card-sub">
+                ranked by activity volume · {yearLabel}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4">
+              {summary.summary
+                .filter(proj => selectedProgram === "all" || proj.code === selectedProgram)
+                .map((proj, idx) => {
+                const def = DICT_PROJECTS.find(p => p.code === proj.code);
+                const projCompleted = (proj.byStatus?.validated ?? 0) + (proj.byStatus?.reported ?? 0);
+                const rate = getCompletionRate(projCompleted, proj.totalActivities);
+                const isLead = idx === 0 && selectedProgram === "all";
+                return (
+                  <Link key={proj.code} href={`/projects/${proj.code.toLowerCase()}`}>
+                    <div
+                      className="flex items-start gap-3 p-4 rounded-[9px] cursor-pointer transition-all group"
+                      style={isLead ? {
+                        background: "linear-gradient(160deg, #0e0f13, #1a1b22)",
+                        color: "#fff",
+                        border: "1px solid transparent",
+                      } : {
+                        background: "#fff",
+                        border: "1px solid var(--pms-line)",
+                      }}
+                    >
+                      <div
+                        className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0 overflow-hidden p-1"
+                        style={isLead
+                          ? { background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)" }
+                          : { background: "#fff", border: "1px solid var(--pms-line)" }}
+                      >
+                        {def?.code ? (
+                          <Image
+                            src={getProjectLogo(def.code)}
+                            alt={def.shortName}
+                            width={44}
+                            height={44}
+                            className="object-contain"
+                            unoptimized
+                          />
+                        ) : (
+                          <Activity style={{ width: 18, height: 18, color: proj.color }} />
+                        )}
                       </div>
-                      <div className="mt-1.5">
-                        <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-                          <span>{projCompleted} validated</span>
-                          <span className={cn("font-medium",
-                            rate >= 70 ? "text-green-600" : rate >= 40 ? "text-amber-600" : "text-gray-400")}>
-                            {rate}%
-                          </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p
+                            className="text-[13px] font-semibold truncate"
+                            style={{ color: isLead ? "#fff" : "var(--pms-ink)", letterSpacing: "-0.005em" }}
+                          >
+                            {proj.shortName}
+                          </p>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <ProgramHealthBadge projectCode={proj.code} showLabel={false} />
+                            <span
+                              className="pms-mono"
+                              style={{
+                                fontSize: 10.5,
+                                padding: "2px 6px",
+                                borderRadius: 5,
+                                background: isLead ? "rgba(255,255,255,0.12)" : "rgba(14,15,19,0.05)",
+                                color: isLead ? "rgba(255,255,255,0.85)" : "var(--pms-muted)",
+                              }}
+                            >
+                              #{idx + 1}
+                            </span>
+                          </div>
                         </div>
-                        <div className="w-full bg-gray-100 rounded-full h-1.5">
-                          <div className="h-1.5 rounded-full transition-all"
-                            style={{ width: `${rate}%`, backgroundColor: proj.color }} />
+                        <div className="mt-2.5">
+                          <div
+                            className="flex items-center justify-between"
+                            style={{
+                              fontSize: 11,
+                              color: isLead ? "rgba(255,255,255,0.55)" : "var(--pms-muted)",
+                              marginBottom: 6,
+                            }}
+                          >
+                            <span>{numberWithCommas(proj.totalActivities)} activities · {projCompleted} validated</span>
+                            <span style={{ fontWeight: 500 }}>{rate}%</span>
+                          </div>
+                          <div
+                            className="rounded-full"
+                            style={{
+                              height: 4,
+                              background: isLead ? "rgba(255,255,255,0.1)" : "rgba(14,15,19,0.05)",
+                              overflow: "hidden",
+                            }}
+                          >
+                            <div
+                              className="rounded-full transition-all"
+                              style={{
+                                width: `${rate}%`,
+                                height: "100%",
+                                background: isLead ? "#fff" : "var(--pms-accent)",
+                              }}
+                            />
+                          </div>
                         </div>
+                        {proj.totalParticipants > 0 && (
+                          <p
+                            style={{
+                              fontSize: 10.5,
+                              marginTop: 6,
+                              color: isLead ? "rgba(255,255,255,0.55)" : "var(--pms-faint)",
+                              fontFamily: "var(--font-mono), 'JetBrains Mono', monospace",
+                            }}
+                          >
+                            {numberWithCommas(proj.totalParticipants)} participants
+                          </p>
+                        )}
                       </div>
-                      {proj.totalParticipants > 0 && (
-                        <p className="text-xs text-gray-400 mt-1">{numberWithCommas(proj.totalParticipants)} participants</p>
-                      )}
+                      <ArrowRight
+                        className="w-4 h-4 shrink-0 mt-1 transition-colors"
+                        style={{ color: isLead ? "rgba(255,255,255,0.45)" : "var(--pms-faint)" }}
+                      />
                     </div>
-                    <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-blue-400 shrink-0 mt-2 transition-colors" />
-                  </div>
-                </Link>
-              );
-            })}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
         </div>
 
         {/* Charts — 1/3 width */}
-        <div className="space-y-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Activities by Quarter</CardTitle>
-              <CardDescription className="text-xs">
-                {selectedYear === "all" ? "All Years" : `FY ${selectedYear}`}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-0">
+        <div className="space-y-3">
+          <div className="pms-card">
+            <div className="pms-card-head">
+              <span className="pms-card-title">Activities by quarter</span>
+              <span className="pms-card-sub">{yearLabel}</span>
+            </div>
+            <div className="pms-card-body pt-2">
               <DashboardQuarterChart data={quarterData} />
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Gender Breakdown</CardTitle>
-              <CardDescription className="text-xs">{numberWithCommas(summary.totalParticipants)} total</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-0 space-y-2">
+          <div className="pms-card">
+            <div className="pms-card-head">
+              <span className="pms-card-title">Gender breakdown</span>
+              <span className="pms-card-sub">{numberWithCommas(summary.totalParticipants)} total</span>
+            </div>
+            <div className="pms-card-body space-y-3">
               {[
-                { label: "Male",   value: summary.totalMale,   pct: 100 - genderRate, color: "bg-blue-500" },
-                { label: "Female", value: summary.totalFemale, pct: genderRate,        color: "bg-pink-400" },
+                { label: "Male",   value: summary.totalMale,   pct: 100 - genderRate, color: "var(--pms-accent)" },
+                { label: "Female", value: summary.totalFemale, pct: genderRate,        color: "var(--pms-warn)" },
               ].map(g => (
                 <div key={g.label}>
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-gray-600">{g.label}</span>
-                    <span className="font-medium text-gray-800">{numberWithCommas(g.value)} ({g.pct}%)</span>
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span style={{ color: "var(--pms-muted)" }}>{g.label}</span>
+                    <span style={{ color: "var(--pms-ink)", fontWeight: 500 }}>
+                      {numberWithCommas(g.value)} <span style={{ color: "var(--pms-faint)" }}>({g.pct}%)</span>
+                    </span>
                   </div>
-                  <div className="w-full bg-gray-100 rounded-full h-2">
-                    <div className={cn("h-2 rounded-full", g.color)} style={{ width: `${g.pct}%` }} />
+                  <div
+                    className="rounded-full"
+                    style={{ height: 5, background: "rgba(14,15,19,0.06)", overflow: "hidden" }}
+                  >
+                    <div
+                      className="rounded-full"
+                      style={{ width: `${g.pct}%`, height: "100%", background: g.color }}
+                    />
                   </div>
                 </div>
               ))}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">Coverage</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0 space-y-1">
+          <div className="pms-card">
+            <div className="pms-card-head">
+              <span className="pms-card-title">Coverage</span>
+            </div>
+            <div className="pms-card-body space-y-2">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-600">Active programs</span>
-                <span className="font-semibold text-gray-800">{summary.summary.filter(s => s.totalActivities > 0).length}</span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-600">Total programs</span>
-                <span className="font-semibold text-gray-800">{summary.summary.length}</span>
-              </div>
-              <div className="flex items-center justify-between text-xs mt-2 pt-2 border-t border-gray-100">
-                <span className="text-gray-600">Fiscal year</span>
-                <span className="font-semibold text-gray-800">
-                  {selectedYear === "all" ? "All Years" : `FY ${selectedYear}`}
+                <span style={{ color: "var(--pms-muted)" }}>Active programs</span>
+                <span style={{ color: "var(--pms-ink)", fontWeight: 500 }}>
+                  {summary.summary.filter(s => s.totalActivities > 0).length}
                 </span>
               </div>
-              <Link href="/map" className="block mt-3">
-                <Button variant="outline" size="sm" className="w-full gap-1.5 text-xs">
+              <div className="flex items-center justify-between text-xs">
+                <span style={{ color: "var(--pms-muted)" }}>Total programs</span>
+                <span style={{ color: "var(--pms-ink)", fontWeight: 500 }}>{summary.summary.length}</span>
+              </div>
+              <div
+                className="flex items-center justify-between text-xs pt-2"
+                style={{ borderTop: "1px solid var(--pms-line-2)" }}
+              >
+                <span style={{ color: "var(--pms-muted)" }}>Fiscal year</span>
+                <span style={{ color: "var(--pms-ink)", fontWeight: 500 }}>{yearLabel}</span>
+              </div>
+              <Link href="/map" className="block pt-1">
+                <button className="pms-btn pms-btn-soft w-full justify-center">
                   <MapPin className="w-3.5 h-3.5" /> Open Activity Map
-                </Button>
+                </button>
               </Link>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Recent Activities */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-base">Recent Activities</CardTitle>
-              <CardDescription>Latest entries across all programs</CardDescription>
-            </div>
+      <div className="pms-card">
+        <div className="pms-card-head">
+          <span className="pms-card-title">Recent activity</span>
+          <span className="pms-card-sub">latest entries across all programs</span>
+          <div className="pms-card-tools">
             <Link href="/activities">
-              <Button variant="ghost" size="sm" className="text-xs gap-1">
+              <button className="pms-btn pms-btn-soft" style={{ padding: "4px 10px", fontSize: 11.5 }}>
                 View all <ArrowRight className="w-3.5 h-3.5" />
-              </Button>
+              </button>
             </Link>
           </div>
-        </CardHeader>
-        <CardContent className="pt-0">
+        </div>
+        <div className="pms-card-body pt-1">
           <RecentActivitiesList />
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
 
 function RecentActivitiesList() {
   const { selectedYear } = useDashboardFilters();
-  const activities = useQuery(api.activities.listActivities, { 
-    year: selectedYear === "all" ? undefined : selectedYear, 
-    limit: 8 
+  const activities = useQuery(api.activities.listActivities, {
+    year: selectedYear === "all" ? undefined : selectedYear,
+    limit: 8
   });
   if (!activities) return <Skeleton className="h-32 w-full" />;
   if (activities.length === 0) {
     return (
-      <div className="text-center py-10 text-gray-400">
+      <div className="text-center py-10" style={{ color: "var(--pms-faint)" }}>
         <Activity className="w-10 h-10 mx-auto mb-2 opacity-30" />
         <p className="text-sm">No activities yet.</p>
         <Link href="/activities/new" className="mt-3 inline-block">
-          <Button size="sm" variant="outline">Add First Activity</Button>
+          <button className="pms-btn pms-btn-ghost">Add First Activity</button>
         </Link>
       </div>
     );
   }
   return (
-    <div className="divide-y divide-gray-50">
+    <div>
       {activities.map((activity) => {
         const def = DICT_PROJECTS.find(p => p.code === (activity as any).projectCode);
         const total = calcTotal(activity.participants);
         return (
           <Link key={activity._id} href={`/activities/${activity._id}`}>
-            <div className="flex items-start gap-3 py-3 hover:bg-gray-50 -mx-2 px-2 rounded-lg transition-colors">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 bg-white border border-gray-100 overflow-hidden">
+            <div className="pms-feed-row">
+              <div
+                className="pms-feed-icon"
+                style={def?.code ? { background: "#fff", border: "1px solid var(--pms-line)", color: "var(--pms-ink)" } : undefined}
+              >
                 {def?.code ? (
                   <Image
                     src={getProjectLogo(def.code)}
                     alt={def.shortName}
-                    width={32}
-                    height={32}
-                    className="object-contain p-0.5"
+                    width={24}
+                    height={24}
+                    className="object-contain"
                     unoptimized
                   />
                 ) : (
-                  <Activity style={{ width: 16, height: 16, color: "#6b7280" }} />
+                  <Activity style={{ width: 14, height: 14 }} />
                 )}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">{activity.activityTitle}</p>
-                <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500">
-                  <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{activity.venue}</span>
-                  <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{formatDate(activity.startDate, "MMM d")}</span>
-                  {total > 0 && <span className="flex items-center gap-1"><Users className="w-3 h-3" />{numberWithCommas(total)}</span>}
+              <div className="pms-feed-text">
+                <strong>{activity.activityTitle}</strong>
+                <div className="pms-feed-meta flex items-center gap-3">
+                  <span className="inline-flex items-center gap-1"><MapPin className="w-3 h-3" />{activity.venue}</span>
+                  <span className="inline-flex items-center gap-1"><Calendar className="w-3 h-3" />{formatDate(activity.startDate, "MMM d")}</span>
+                  {total > 0 && <span className="inline-flex items-center gap-1"><Users className="w-3 h-3" />{numberWithCommas(total)}</span>}
                 </div>
               </div>
               <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium shrink-0 mt-0.5 border", getStatusColor(activity.status))}>
@@ -440,25 +587,50 @@ function RecentActivitiesList() {
   );
 }
 
-function KPICard({ label, value, subtext, icon, bg, highlight }: {
-  label: string; value: string; subtext: string;
-  icon: React.ReactNode; bg: string; highlight?: "green" | "yellow" | "red";
+function StatTile({
+  label,
+  value,
+  deltaLabel,
+  deltaKind = "flat",
+  spark,
+}: {
+  label: string;
+  value: string;
+  deltaLabel?: string;
+  deltaKind?: "up" | "down" | "flat";
+  spark?: "up" | "flat";
 }) {
+  const deltaCls =
+    deltaKind === "up" ? "pms-delta-up"
+    : deltaKind === "down" ? "pms-delta-down"
+    : "pms-delta-flat";
   return (
-    <Card>
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</p>
-            <p className={cn("text-2xl font-bold mt-1",
-              highlight === "green" ? "text-green-600" : highlight === "yellow" ? "text-amber-600" :
-              highlight === "red" ? "text-red-600" : "text-gray-900")}>{value}</p>
-            <p className="text-xs text-gray-500 mt-1">{subtext}</p>
-          </div>
-          <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0", bg)}>{icon}</div>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="pms-stat">
+      <div className="pms-stat-label">{label}</div>
+      <div className="pms-stat-row">
+        <div className="pms-stat-num">{value}</div>
+        {deltaLabel && <span className={`pms-stat-delta ${deltaCls}`}>{deltaLabel}</span>}
+      </div>
+      {spark === "up" ? (
+        <svg className="pms-spark" viewBox="0 0 200 24" preserveAspectRatio="none">
+          <path
+            d="M0,18 L25,14 L50,16 L75,10 L100,11 L125,7 L150,9 L175,5 L200,8"
+            stroke="oklch(0.58 0.15 155)" strokeWidth="1.5" fill="none" strokeLinecap="round"
+          />
+          <path
+            d="M0,18 L25,14 L50,16 L75,10 L100,11 L125,7 L150,9 L175,5 L200,8 L200,24 L0,24 Z"
+            fill="oklch(0.58 0.15 155 / 0.08)"
+          />
+        </svg>
+      ) : (
+        <svg className="pms-spark" viewBox="0 0 200 24" preserveAspectRatio="none">
+          <path
+            d="M0,18 L20,14 L40,16 L60,10 L80,12 L100,8 L120,6 L140,9 L160,11 L180,7 L200,12"
+            stroke="rgba(14,15,19,0.18)" strokeWidth="1.5" fill="none" strokeLinecap="round"
+          />
+        </svg>
+      )}
+    </div>
   );
 }
 
