@@ -18,10 +18,14 @@ import {
   Download,
   Keyboard,
   ScanFace,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSidebar } from "./SidebarContext";
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 
 const projectLogos: Record<string, string> = {
   EGOVPH: "/logo/egov_ph_logo.png",
@@ -63,6 +67,15 @@ export function Sidebar() {
   const router = useRouter();
   const [projectsExpanded, setProjectsExpanded] = useState(true);
   const { collapsed, setCollapsed, mobileOpen, setMobileOpen } = useSidebar();
+  const [user, setUser] = useState<{ fullName?: string; role?: string; provinceName?: string } | null>(null);
+  const logout = useMutation(api.auth.logout);
+
+  useEffect(() => {
+    const raw = typeof window !== "undefined" ? localStorage.getItem("user") : null;
+    if (raw) {
+      try { setUser(JSON.parse(raw)); } catch { /* ignore parse error */ }
+    }
+  }, []);
 
   // Prefetch project routes on hover — 10 programs is too many to
   // prefetch upfront, but warming the cache when the user hovers is free.
@@ -70,6 +83,25 @@ export function Sidebar() {
     router.prefetch(`/projects/${route}`);
 
   function closeMobile() { setMobileOpen(false); }
+
+  async function handleLogout() {
+    const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+    if (token) {
+      try { await logout({ token }); } catch (e) { console.error("Logout error:", e); }
+    }
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("user");
+    document.cookie = "auth_token=; path=/; max-age=0";
+    toast.success("Logged out");
+    router.push("/login");
+  }
+
+  const initials = (user?.fullName ?? "DICT Region V")
+    .split(" ").map((s) => s[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "D5";
+  const userLabel = user?.fullName ?? "DICT Region V";
+  const userSub = user?.role
+    ? `${user.provinceName ?? "Legazpi City"} · ${user.role}`
+    : "Legazpi City, Bicol";
 
   return (
     <>
@@ -316,19 +348,41 @@ export function Sidebar() {
       </nav>
 
       {/* Footer */}
-      {!collapsed && (
-        <div className="p-4 border-t border-gray-200 shrink-0 bg-white">
-          <div className="flex items-center gap-3 px-3 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
-            <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white text-sm font-bold shrink-0 shadow-sm">
-              D5
+      <div className={cn(
+        "border-t border-gray-200 shrink-0 bg-white",
+        collapsed ? "p-2" : "p-3"
+      )}>
+        {collapsed ? (
+          <button
+            onClick={handleLogout}
+            title={`Sign out — ${userLabel}`}
+            className="w-full flex flex-col items-center gap-1 px-2 py-2 rounded-xl text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+          >
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center text-white text-[11px] font-bold">
+              {initials}
             </div>
-            <div className="min-w-0">
-              <p className="text-xs font-bold text-gray-800 truncate">DICT Region V</p>
-              <p className="text-xs text-gray-600 truncate">Legazpi City, Bicol</p>
+            <LogOut className="w-3.5 h-3.5" />
+          </button>
+        ) : (
+          <div className="flex items-center gap-2 px-2 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center text-white text-sm font-bold shrink-0 shadow-sm">
+              {initials}
             </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold text-gray-800 truncate">{userLabel}</p>
+              <p className="text-[11px] text-gray-600 truncate">{userSub}</p>
+            </div>
+            <button
+              onClick={handleLogout}
+              title="Sign out"
+              className="shrink-0 w-8 h-8 rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition-colors"
+              aria-label="Sign out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </aside>
     </>
   );

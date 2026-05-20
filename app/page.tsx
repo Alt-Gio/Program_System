@@ -398,7 +398,7 @@ function ProgramsBox({ side }: { side: "left" | "right" }) {
                 boxShadow: `0 6px 18px -6px ${p.color}aa`,
               }}>
                 <Image
-                  src={`/Logo/${LOGO_MAP[p.code] || "egov_ph_logo.png"}`}
+                  src={`/logo/${LOGO_MAP[p.code] || "egov_ph_logo.png"}`}
                   alt={p.shortName} width={40} height={40}
                   className="object-contain p-1" unoptimized
                 />
