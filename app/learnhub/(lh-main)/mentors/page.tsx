@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Suspense, useMemo, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
@@ -7,15 +7,15 @@ import { useLearnhubSession } from "@/lib/learnhub/hooks";
 import { ORG_CONFIG, orgHeadlineLabel } from "@/lib/learnhub/org-config";
 import type { Id } from "@/convex/_generated/dataModel";
 
-// Visual tokens — match the rest of LearnHub
-const BG = "#090b18";
-const CARD = "#111323";
-const CARD2 = "#161929";
-const BORDER = "rgba(255,255,255,0.06)";
-const BORDER2 = "rgba(255,255,255,0.1)";
-const TEXT = "#e8eaf4";
-const MUTED = "rgba(185,190,230,0.6)";
-const DIM = "rgba(100,110,165,0.5)";
+// Visual tokens â€” match the rest of LearnHub
+const BG = "var(--lh-bg)";
+const CARD = "var(--lh-card)";
+const CARD2 = "var(--lh-card-2)";
+const BORDER = "var(--lh-border)";
+const BORDER2 = "var(--lh-border-strong)";
+const TEXT = "var(--lh-text)";
+const MUTED = "var(--lh-text-2)";
+const DIM = "var(--lh-text-3)";
 const ORANGE = "#f97316";
 const GREEN = "#22c55e";
 const SKY = "#38bdf8";
@@ -124,7 +124,7 @@ function MentorsPageInner() {
     <div className="mx-auto" style={{ maxWidth: 1100, padding: "20px 16px 40px", color: TEXT, background: BG, minHeight: "100vh" }}>
       <div style={{ marginBottom: 18 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: ORANGE, letterSpacing: 1.4 }}>
-          MENTOR MARKETPLACE · {orgHeadlineLabel()}
+          MENTOR MARKETPLACE Â· {orgHeadlineLabel()}
         </div>
         <h1
           style={{
@@ -146,7 +146,7 @@ function MentorsPageInner() {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by name, designation, expertise…"
+          placeholder="Search by name, designation, expertiseâ€¦"
           style={{
             flex: "1 1 220px",
             minWidth: 200,
@@ -222,7 +222,7 @@ function MentorsPageInner() {
       )}
 
       {mentors === undefined && (
-        <div style={{ color: MUTED, fontSize: 13, padding: 20 }}>Loading mentors…</div>
+        <div style={{ color: MUTED, fontSize: 13, padding: 20 }}>Loading mentorsâ€¦</div>
       )}
 
       {mentors && filtered.length === 0 && (
@@ -370,7 +370,7 @@ function MentorCard({
           </p>
           <p style={{ margin: "2px 0 0", fontSize: 11.5, color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {mentor.designation ?? `${ORG_CONFIG.orgShort} Mentor`}
-            {mentor.regionalOffice ? ` · ${mentor.regionalOffice}` : ""}
+            {mentor.regionalOffice ? ` Â· ${mentor.regionalOffice}` : ""}
           </p>
         </div>
       </div>
@@ -400,7 +400,7 @@ function MentorCard({
               style={{
                 fontSize: 10.5,
                 color: TEXT,
-                background: "rgba(255,255,255,0.04)",
+                background: "var(--lh-card-3)",
                 border: `1px solid ${BORDER2}`,
                 padding: "3px 7px",
                 borderRadius: 999,
@@ -422,8 +422,8 @@ function MentorCard({
           {mentor.maxMentees == null
             ? `${mentor.activeMenteeCount} mentees`
             : mentor.hasCapacity
-            ? `${mentor.activeMenteeCount}/${mentor.maxMentees} mentees · open`
-            : `Full · ${mentor.maxMentees}/${mentor.maxMentees}`}
+            ? `${mentor.activeMenteeCount}/${mentor.maxMentees} mentees Â· open`
+            : `Full Â· ${mentor.maxMentees}/${mentor.maxMentees}`}
         </span>
         <button
           onClick={(e) => {
@@ -436,14 +436,14 @@ function MentorCard({
             padding: "6px 12px",
             borderRadius: 999,
             background: disabled
-              ? "rgba(255,255,255,0.05)"
+              ? "var(--lh-card-3)"
               : `linear-gradient(135deg, ${ORANGE}, #ef4444)`,
             color: disabled ? MUTED : "#fff",
             border: disabled ? `1px solid ${BORDER2}` : "none",
             cursor: "pointer",
           }}
         >
-          View profile →
+          View profile â†’
         </button>
       </div>
     </div>
@@ -543,13 +543,13 @@ function RequestModal({
             width: 28,
             height: 28,
             borderRadius: 8,
-            background: "rgba(255,255,255,0.05)",
+            background: "var(--lh-card-3)",
             border: `1px solid ${BORDER2}`,
             color: MUTED,
             cursor: "pointer",
           }}
         >
-          ×
+          Ã—
         </button>
 
         <div style={{ display: "flex", gap: 14, alignItems: "center", marginBottom: 14 }}>
@@ -594,8 +594,8 @@ function RequestModal({
             </div>
             <p style={{ margin: "2px 0 0", fontSize: 12, color: MUTED }}>
               {mentor.designation ?? `${ORG_CONFIG.orgShort} Mentor`}
-              {mentor.regionalOffice ? ` · ${mentor.regionalOffice}` : ""}
-              {mentor.province ? ` · ${mentor.province}` : ""}
+              {mentor.regionalOffice ? ` Â· ${mentor.regionalOffice}` : ""}
+              {mentor.province ? ` Â· ${mentor.province}` : ""}
             </p>
           </div>
         </div>
@@ -694,7 +694,7 @@ function RequestModal({
               <textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="Hi! I'm working on… and I'd love your help with…"
+                placeholder="Hi! I'm working onâ€¦ and I'd love your help withâ€¦"
                 rows={4}
                 maxLength={800}
                 style={{
@@ -711,7 +711,7 @@ function RequestModal({
                 }}
               />
               <span style={{ display: "block", fontSize: 10.5, color: DIM, marginTop: 4 }}>
-                {note.trim().length}/800 · 10 chars minimum
+                {note.trim().length}/800 Â· 10 chars minimum
               </span>
             </label>
 
@@ -783,7 +783,7 @@ function RequestModal({
                         style={{ background: "transparent", border: "none", color: INDIGO, cursor: "pointer", padding: 0, fontSize: 14, lineHeight: 1 }}
                         aria-label={`Remove goal ${g}`}
                       >
-                        ×
+                        Ã—
                       </button>
                     </span>
                   ))}
@@ -813,7 +813,7 @@ function RequestModal({
               style={{
                 width: "100%",
                 padding: "12px 16px",
-                background: submitting || note.trim().length < 10 ? "rgba(255,255,255,0.05)" : `linear-gradient(135deg, ${ORANGE}, #ef4444)`,
+                background: submitting || note.trim().length < 10 ? "var(--lh-card-3)" : `linear-gradient(135deg, ${ORANGE}, #ef4444)`,
                 color: submitting || note.trim().length < 10 ? DIM : "#fff",
                 border: "none",
                 borderRadius: 12,
@@ -822,7 +822,7 @@ function RequestModal({
                 cursor: submitting || note.trim().length < 10 ? "not-allowed" : "pointer",
               }}
             >
-              {submitting ? "Sending…" : `Send mentorship request`}
+              {submitting ? "Sendingâ€¦" : `Send mentorship request`}
             </button>
           </>
         )}
@@ -836,7 +836,7 @@ export default function MentorsPage() {
     <Suspense
       fallback={
         <div style={{ background: BG, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ color: MUTED, fontSize: 13 }}>Loading…</div>
+          <div style={{ color: MUTED, fontSize: 13 }}>Loadingâ€¦</div>
         </div>
       }
     >

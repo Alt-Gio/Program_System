@@ -67,7 +67,7 @@ export function VideoPost({ metadata }: { metadata: Record<string, unknown> }) {
     <div
       className="rounded-xl overflow-hidden relative"
       style={{
-        background: "#0d0f1a",
+        background: "var(--lh-input-bg)",
         border: "1px solid rgba(255,255,255,0.08)",
       }}
     >
@@ -90,7 +90,7 @@ export function VideoPost({ metadata }: { metadata: Record<string, unknown> }) {
           width: "100%",
           maxHeight: 480,
           display: "block",
-          background: "#0d0f1a",
+          background: "var(--lh-input-bg)",
           cursor: playing ? "default" : "pointer",
         }}
       />

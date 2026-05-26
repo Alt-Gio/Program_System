@@ -87,6 +87,11 @@ export const STRINGS = {
     "settings.language.sub": "Switch the LearnHub interface between English and Tagalog. Updates apply instantly.",
     "settings.install.title": "Install LearnHub",
     "settings.install.sub": "Install LearnHub as a standalone app on your phone or desktop so it works offline and opens without browser chrome.",
+    "settings.theme.title": "Appearance",
+    "settings.theme.sub": "Choose how LearnHub looks. System follows your device setting and switches automatically.",
+    "settings.theme.light": "Light",
+    "settings.theme.dark": "Dark",
+    "settings.theme.system": "System",
     "settings.danger.title": "Delete Account",
 
     // Generic
@@ -163,6 +168,11 @@ export const STRINGS = {
     "settings.language.sub": "Palitan ang wika ng LearnHub sa pagitan ng Ingles at Tagalog. Agad na maa-apply.",
     "settings.install.title": "I-install ang LearnHub",
     "settings.install.sub": "I-install ang LearnHub bilang standalone na app sa iyong phone o desktop para gumana kahit offline.",
+    "settings.theme.title": "Itsura",
+    "settings.theme.sub": "Piliin kung paano magmukha ang LearnHub. Ang System ay susunod sa setting ng iyong device.",
+    "settings.theme.light": "Maliwanag",
+    "settings.theme.dark": "Madilim",
+    "settings.theme.system": "System",
     "settings.danger.title": "Burahin ang Account",
 
     // Generic

@@ -15,12 +15,12 @@ import { useLearnhubSession } from "@/lib/learnhub/hooks";
 import { formatDistanceToNow } from "date-fns";
 import type { Id } from "@/convex/_generated/dataModel";
 
-const CARD = "#111323";
-const CARD2 = "#161929";
+const CARD = "var(--lh-card)";
+const CARD2 = "var(--lh-card-2)";
 const BORDER = "rgba(255,255,255,0.06)";
 const BORDER2 = "rgba(255,255,255,0.1)";
-const TEXT = "#e8eaf4";
-const MUTED = "rgba(185,190,230,0.6)";
+const TEXT = "var(--lh-text)";
+const MUTED = "var(--lh-text-2)";
 const INDIGO = "#6366f1";
 
 export function CohortPostsFeed({

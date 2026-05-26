@@ -46,7 +46,7 @@ export function YourCoursesRail({ userId }: { userId: Id<"learnhub_users"> | nul
         </span>
         <Link
           href="/learnhub/learning-path"
-          style={{ fontSize: 11, color: "#9ba3cc", textDecoration: "none" }}
+          style={{ fontSize: 11, color: "var(--lh-text-2)", textDecoration: "none" }}
         >
           See all →
         </Link>
@@ -62,7 +62,7 @@ export function YourCoursesRail({ userId }: { userId: Id<"learnhub_users"> | nul
               borderRadius: 10,
               background: "rgba(13,15,26,0.6)",
               border: "1px solid rgba(255,255,255,0.06)",
-              color: "#e8eaff",
+              color: "var(--lh-text)",
               textDecoration: "none",
               display: "flex",
               flexDirection: "column",
@@ -72,7 +72,7 @@ export function YourCoursesRail({ userId }: { userId: Id<"learnhub_users"> | nul
             <span style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}>
               {c.title}
             </span>
-            <span style={{ fontSize: 10.5, color: "#9ba3cc" }}>
+            <span style={{ fontSize: 10.5, color: "var(--lh-text-2)" }}>
               {c.visibility === "public"
                 ? "Public"
                 : c.visibility === "learnhub"

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useQuery } from "convex/react";
@@ -14,19 +14,19 @@ export default function OrgCohortsPage() {
     userId ? { orgId: userId as Id<"learnhub_users"> } : "skip",
   );
 
-  if (loading || summary === undefined) return <div style={{ padding: 24, color: "#fff" }}>Loading cohorts…</div>;
+  if (loading || summary === undefined) return <div style={{ padding: 24, color: "#fff" }}>Loading cohortsâ€¦</div>;
   if (!userId || (role !== "org_partner" && role !== "coordinator" && role !== "admin")) {
     return (
       <div style={{ padding: 24, color: "#fff" }}>
         Cohort view is restricted to Org Partners, Coordinators, and Admins.{" "}
-        <Link href="/learnhub/feed" style={{ color: "#5b6cff" }}>← Back</Link>
+        <Link href="/learnhub/feed" style={{ color: "#5b6cff" }}>â† Back</Link>
       </div>
     );
   }
   if (summary.forbidden) return null;
 
   return (
-    <div style={{ color: "#fff", background: "#06060f", minHeight: "100%", padding: "24px 20px", fontFamily: "'Inter', sans-serif" }}>
+    <div style={{ color: "#fff", background: "var(--lh-bg)", minHeight: "100%", padding: "24px 20px", fontFamily: "'Inter', sans-serif" }}>
       <Link href="/learnhub/org" style={{
         fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "rgba(255,255,255,0.6)",
         letterSpacing: 1.2, textTransform: "uppercase",
@@ -46,7 +46,7 @@ export default function OrgCohortsPage() {
           }}>
             <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
               letterSpacing: 1.4, textTransform: "uppercase", color: "#0ea5e9", marginBottom: 6 }}>
-              {c.type}{c.programType ? ` · ${c.programType}` : ""}
+              {c.type}{c.programType ? ` Â· ${c.programType}` : ""}
             </div>
             <div style={{ fontSize: 15, fontWeight: 700 }}>{c.name}</div>
             <p style={{ margin: "6px 0 0", fontSize: 12.5, color: "rgba(255,255,255,0.6)", lineHeight: 1.5,
@@ -56,7 +56,7 @@ export default function OrgCohortsPage() {
             <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.06)",
               display: "flex", justifyContent: "space-between", alignItems: "center",
               fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
-              <span>👥 {c.memberCount} members</span>
+              <span>ðŸ‘¥ {c.memberCount} members</span>
               <span>Created {new Date(c.createdAt).toLocaleDateString()}</span>
             </div>
           </div>

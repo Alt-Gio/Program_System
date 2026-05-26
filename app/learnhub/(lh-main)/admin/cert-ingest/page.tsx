@@ -1,15 +1,15 @@
-"use client";
+﻿"use client";
 
 /**
- * /learnhub/admin/cert-ingest — admin/coordinator-only page to manage
+ * /learnhub/admin/cert-ingest â€” admin/coordinator-only page to manage
  * the Gmail certificate auto-ingest.
  *
  * Wires three things end-to-end:
- *   1. Trusted sender email — stored in `learnhub_cert_email_config`.
- *   2. Gmail connection — runs the OAuth flow via /api/learnhub/gmail/connect.
+ *   1. Trusted sender email â€” stored in `learnhub_cert_email_config`.
+ *   2. Gmail connection â€” runs the OAuth flow via /api/learnhub/gmail/connect.
  *      The token row gets the `gmail.readonly` scope on top of any
  *      Calendar scopes the admin already has.
- *   3. Manual poll trigger — calls `triggerManualPoll` so an admin can
+ *   3. Manual poll trigger â€” calls `triggerManualPoll` so an admin can
  *      sanity-check ingestion without waiting for the 15-min cron.
  */
 
@@ -33,7 +33,7 @@ type PollResult =
 
 export default function AdminCertIngestPage() {
   return (
-    <Suspense fallback={<div style={{ padding: 28, color: "#9ba3cc" }}>Loading…</div>}>
+    <Suspense fallback={<div style={{ padding: 28, color: "var(--lh-text-2)" }}>Loadingâ€¦</div>}>
       <AdminCertIngestInner />
     </Suspense>
   );
@@ -80,17 +80,17 @@ function AdminCertIngestInner() {
     router.replace(params.toString() ? `?${params}` : "?", { scroll: false });
   }, [sp, router]);
 
-  if (loading) return <div style={{ padding: 28, color: "#9ba3cc" }}>Loading…</div>;
+  if (loading) return <div style={{ padding: 28, color: "var(--lh-text-2)" }}>Loadingâ€¦</div>;
   if (!uid || (role !== "admin" && role !== "coordinator")) {
     return (
-      <div style={{ padding: 28, color: "#e8eaff", maxWidth: 540 }}>
+      <div style={{ padding: 28, color: "var(--lh-text)", maxWidth: 540 }}>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 8, color: RED }}>
           <ShieldAlert size={16} /> Admins / coordinators only
         </div>
-        <p style={{ margin: "8px 0 0", color: "#9ba3cc", fontSize: 13 }}>
+        <p style={{ margin: "8px 0 0", color: "var(--lh-text-2)", fontSize: 13 }}>
           This page lets a coordinator configure the trusted sender and connect a Gmail mailbox for automatic certificate ingest.
         </p>
-        <Link href="/learnhub/feed" style={{ color: SKY, marginTop: 12, display: "inline-block" }}>← Back to feed</Link>
+        <Link href="/learnhub/feed" style={{ color: SKY, marginTop: 12, display: "inline-block" }}>â† Back to feed</Link>
       </div>
     );
   }
@@ -132,7 +132,7 @@ function AdminCertIngestInner() {
 
   return (
     <div style={{
-      padding: "24px 20px", color: "#e8eaff",
+      padding: "24px 20px", color: "var(--lh-text)",
       fontFamily: "var(--font-dm-sans, 'Inter', sans-serif)", maxWidth: 720, margin: "0 auto",
     }}>
       <Link href="/learnhub/org" style={{
@@ -147,7 +147,7 @@ function AdminCertIngestInner() {
       <h1 style={{ margin: 0, fontSize: 26, fontWeight: 900, letterSpacing: "-0.03em", fontFamily: "var(--font-sora, 'Plus Jakarta Sans', sans-serif)" }}>
         Certificate auto-ingest
       </h1>
-      <p style={{ margin: "4px 0 14px", fontSize: 13, color: "#9ba3cc", lineHeight: 1.55 }}>
+      <p style={{ margin: "4px 0 14px", fontSize: 13, color: "var(--lh-text-2)", lineHeight: 1.55 }}>
         When the trusted sender emails a learner with an image or PDF attachment, the system creates a certificate record automatically and surfaces the attachment on /learnhub/certificates. Cron runs every 15 minutes; you can also poll manually below.
       </p>
 
@@ -174,7 +174,7 @@ function AdminCertIngestInner() {
           Trusted sender
         </h2>
         <label style={{ display: "block", marginBottom: 10 }}>
-          <span style={{ fontSize: 11, color: "#9ba3cc", letterSpacing: 0.4 }}>Sender email</span>
+          <span style={{ fontSize: 11, color: "var(--lh-text-2)", letterSpacing: 0.4 }}>Sender email</span>
           <input
             value={sender}
             onChange={(e) => setSender(e.target.value)}
@@ -183,7 +183,7 @@ function AdminCertIngestInner() {
           />
         </label>
         <label style={{ display: "block", marginBottom: 10 }}>
-          <span style={{ fontSize: 11, color: "#9ba3cc", letterSpacing: 0.4 }}>Program type (optional)</span>
+          <span style={{ fontSize: 11, color: "var(--lh-text-2)", letterSpacing: 0.4 }}>Program type (optional)</span>
           <input
             value={programType}
             onChange={(e) => setProgramType(e.target.value)}
@@ -196,7 +196,7 @@ function AdminCertIngestInner() {
             padding: "9px 16px", borderRadius: 10, border: 0,
             background: `linear-gradient(135deg, ${ORANGE}, #ea580c)`,
             color: "white", fontWeight: 700, fontSize: 12.5, cursor: saving ? "wait" : "pointer",
-          }}>{saving ? "Saving…" : config ? "Update sender" : "Save sender"}</button>
+          }}>{saving ? "Savingâ€¦" : config ? "Update sender" : "Save sender"}</button>
           {config && (
             <button onClick={onDisable} style={{
               padding: "9px 14px", borderRadius: 10,
@@ -216,9 +216,9 @@ function AdminCertIngestInner() {
         <h2 style={{ margin: "0 0 10px", fontSize: 13, color: SKY, letterSpacing: 1.2, textTransform: "uppercase", fontWeight: 800, display: "inline-flex", alignItems: "center", gap: 6 }}>
           <Mail size={13} /> Gmail mailbox
         </h2>
-        <p style={{ fontSize: 12.5, color: "#9ba3cc", margin: "0 0 12px", lineHeight: 1.55 }}>
-          The poll runs against <strong style={{ color: "#e8eaff" }}>{config?.enabledByName ?? "—"}</strong>{" "}
-          <span style={{ color: "#5c6490" }}>({config?.enabledByEmail ?? "no Gmail connected yet"})</span>. Click below to connect (or reconnect) the Gmail account whose inbox should be scanned.
+        <p style={{ fontSize: 12.5, color: "var(--lh-text-2)", margin: "0 0 12px", lineHeight: 1.55 }}>
+          The poll runs against <strong style={{ color: "var(--lh-text)" }}>{config?.enabledByName ?? "â€”"}</strong>{" "}
+          <span style={{ color: "var(--lh-text-3)" }}>({config?.enabledByEmail ?? "no Gmail connected yet"})</span>. Click below to connect (or reconnect) the Gmail account whose inbox should be scanned.
         </p>
         <a href={`/api/learnhub/gmail/connect?returnTo=${encodeURIComponent("/learnhub/admin/cert-ingest")}`} style={{
           display: "inline-flex", alignItems: "center", gap: 6,
@@ -239,7 +239,7 @@ function AdminCertIngestInner() {
         <h2 style={{ margin: "0 0 10px", fontSize: 13, color: GREEN, letterSpacing: 1.2, textTransform: "uppercase", fontWeight: 800, display: "inline-flex", alignItems: "center", gap: 6 }}>
           <Play size={13} /> Poll now
         </h2>
-        <p style={{ fontSize: 12.5, color: "#9ba3cc", margin: "0 0 12px", lineHeight: 1.55 }}>
+        <p style={{ fontSize: 12.5, color: "var(--lh-text-2)", margin: "0 0 12px", lineHeight: 1.55 }}>
           Manually trigger a poll to verify the wiring. The cron does this on its own every 15 minutes.
           {config?.lastPolledAt && (
             <> Last polled <strong>{new Date(config.lastPolledAt).toLocaleString()}</strong>.</>
@@ -251,7 +251,7 @@ function AdminCertIngestInner() {
           color: "#06070f", fontWeight: 700, fontSize: 12.5, cursor: polling ? "wait" : "pointer",
           display: "inline-flex", alignItems: "center", gap: 6,
         }}>
-          <RefreshCw size={13} /> {polling ? "Polling…" : "Run poll now"}
+          <RefreshCw size={13} /> {polling ? "Pollingâ€¦" : "Run poll now"}
         </button>
         {pollResult && (
           <div style={{
@@ -261,22 +261,22 @@ function AdminCertIngestInner() {
             color: pollResult.status === "ok" ? GREEN : RED, lineHeight: 1.5,
           }}>
             {pollResult.status === "ok" && (
-              <>scanned {pollResult.scanned ?? 0} · ingested {pollResult.ingested ?? 0} · skipped {pollResult.skipped ?? 0}</>
+              <>scanned {pollResult.scanned ?? 0} Â· ingested {pollResult.ingested ?? 0} Â· skipped {pollResult.skipped ?? 0}</>
             )}
-            {pollResult.status === "no_config" && "No active config — save a sender first."}
-            {pollResult.status === "not_connected" && (pollResult.message ?? "Gmail not connected — click Connect Gmail above.")}
+            {pollResult.status === "no_config" && "No active config â€” save a sender first."}
+            {pollResult.status === "not_connected" && (pollResult.message ?? "Gmail not connected â€” click Connect Gmail above.")}
             {pollResult.status === "error" && (pollResult.message ?? "Unknown error.")}
           </div>
         )}
       </section>
 
       <p style={{
-        marginTop: 16, fontSize: 11.5, color: "#5c6490", lineHeight: 1.55,
+        marginTop: 16, fontSize: 11.5, color: "var(--lh-text-3)", lineHeight: 1.55,
         display: "inline-flex", alignItems: "flex-start", gap: 6,
       }}>
         <Info size={12} style={{ marginTop: 2, flexShrink: 0 }} />
         <span>
-          Dedup is keyed on Gmail messageId, so re-runs are safe. The poll only scans messages newer than 14 days — older certs need to be re-mailed if they were missed during an outage.
+          Dedup is keyed on Gmail messageId, so re-runs are safe. The poll only scans messages newer than 14 days â€” older certs need to be re-mailed if they were missed during an outage.
         </span>
       </p>
     </div>

@@ -40,7 +40,7 @@ export function MeetPost({ metadata }: { metadata: Record<string, unknown> }) {
     <div
       className="rounded-xl overflow-hidden"
       style={{
-        background: "#0d0f1a",
+        background: "var(--lh-input-bg)",
         border: isLive
           ? "1px solid rgba(34,211,160,0.4)"
           : startsSoon
@@ -93,7 +93,7 @@ export function MeetPost({ metadata }: { metadata: Record<string, unknown> }) {
           <div className="flex items-center gap-2">
             <p
               className="text-sm font-semibold"
-              style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}
+              style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}
             >
               Google Meet Session
             </p>
@@ -113,7 +113,7 @@ export function MeetPost({ metadata }: { metadata: Record<string, unknown> }) {
               </span>
             )}
           </div>
-          <p className="text-xs mt-0.5" style={{ color: "#9ba3cc" }}>
+          <p className="text-xs mt-0.5" style={{ color: "var(--lh-text-2)" }}>
             {isLive && m.viewerCount !== undefined
               ? `${m.viewerCount} viewers now`
               : isUpcoming && m.scheduledAt
@@ -164,7 +164,7 @@ export function MeetPost({ metadata }: { metadata: Record<string, unknown> }) {
             className="flex items-center justify-center gap-2 w-full rounded-xl py-2.5 text-sm font-semibold transition-all"
             style={{
               background: isLive ? "#22d3a0" : "#5b6cff",
-              color: isLive ? "#0d0f1a" : "#fff",
+              color: isLive ? "var(--lh-input-bg)" : "#fff",
               fontFamily: "var(--font-sora)",
             }}
           >

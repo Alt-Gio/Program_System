@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 /**
  * Route-level error boundary for /learnhub/progress.
- * Mirrors /learnhub/org/error.tsx — most-common failure is the Convex
+ * Mirrors /learnhub/org/error.tsx â€” most-common failure is the Convex
  * "function not found" when the new learnhub_progress module hasn't
  * propagated to the backend yet.
  */
@@ -30,13 +30,13 @@ export default function ProgressError({
     msg.includes("not found in deployment");
 
   return (
-    <div style={{ color: "#fff", background: "#06060f", minHeight: "100%", padding: 28, fontFamily: "'Inter', sans-serif" }}>
+    <div style={{ color: "#fff", background: "var(--lh-bg)", minHeight: "100%", padding: 28, fontFamily: "'Inter', sans-serif" }}>
       <div style={{
         margin: "30px auto", maxWidth: 580, padding: 28, borderRadius: 18,
         background: "linear-gradient(180deg, rgba(0,212,255,0.06), rgba(255,255,255,0.02))",
         border: `1px solid ${CYAN}44`,
       }}>
-        <div style={{ fontSize: 32, marginBottom: 6 }}>🚧</div>
+        <div style={{ fontSize: 32, marginBottom: 6 }}>ðŸš§</div>
         <h2 style={{ margin: 0, fontWeight: 800, letterSpacing: "-0.02em" }}>
           {isMissingFunction ? "Progress console deployment lagging" : "Progress console hit an error"}
         </h2>
@@ -61,14 +61,14 @@ export default function ProgressError({
           {msg.slice(0, 280) || "(no message)"}
         </div>
         <button type="button" onClick={() => reset()} style={{
-          padding: "9px 16px", borderRadius: 10, background: CYAN, color: "#06060f",
+          padding: "9px 16px", borderRadius: 10, background: CYAN, color: "var(--lh-bg)",
           border: 0, fontWeight: 700, fontSize: 13, cursor: "pointer", marginRight: 8,
         }}>Try again</button>
         <a href="/learnhub/feed" style={{
-          padding: "9px 16px", borderRadius: 10, background: "rgba(255,255,255,0.06)",
+          padding: "9px 16px", borderRadius: 10, background: "var(--lh-border)",
           border: "1px solid rgba(255,255,255,0.12)", color: "#fff", fontSize: 13, fontWeight: 600,
           textDecoration: "none", display: "inline-block",
-        }}>Back to feed →</a>
+        }}>Back to feed â†’</a>
       </div>
     </div>
   );

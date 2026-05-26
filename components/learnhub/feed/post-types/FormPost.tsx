@@ -20,7 +20,7 @@ export function FormPost({ metadata }: { metadata: Record<string, unknown> }) {
     <div
       className="rounded-xl overflow-hidden"
       style={{
-        background: "#0d0f1a",
+        background: "var(--lh-input-bg)",
         border: "1px solid rgba(255,255,255,0.08)",
       }}
     >
@@ -69,13 +69,13 @@ export function FormPost({ metadata }: { metadata: Record<string, unknown> }) {
         <div className="flex-1 min-w-0">
           <p
             className="text-sm font-semibold"
-            style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}
+            style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}
           >
             {m.formTitle ?? "Google Form"}
           </p>
           <div className="flex items-center gap-3 mt-1 flex-wrap">
             {m.responseCount !== undefined && (
-              <span className="text-xs" style={{ color: "#9ba3cc" }}>
+              <span className="text-xs" style={{ color: "var(--lh-text-2)" }}>
                 {m.responseCount} responses
               </span>
             )}

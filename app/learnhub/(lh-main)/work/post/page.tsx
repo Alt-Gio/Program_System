@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { Suspense } from "react";
 
 import { useState } from "react";
@@ -45,7 +45,7 @@ function PostOpportunityPageInner() {
   if (sessionLoading || (userId && user === undefined)) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-10">
-        <div className="h-40 rounded-2xl animate-pulse" style={{ background: "#131626" }} />
+        <div className="h-40 rounded-2xl animate-pulse" style={{ background: "var(--lh-card)" }} />
       </div>
     );
   }
@@ -54,13 +54,13 @@ function PostOpportunityPageInner() {
   if (!canPost) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-10 text-center">
-        <p className="text-4xl mb-3">🔒</p>
-        <h1 className="text-xl font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>Verified creators only</h1>
-        <p className="text-sm mt-2 mb-4" style={{ color: "#9ba3cc" }}>
+        <p className="text-4xl mb-3">ðŸ”’</p>
+        <h1 className="text-xl font-bold" style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}>Verified creators only</h1>
+        <p className="text-sm mt-2 mb-4" style={{ color: "var(--lh-text-2)" }}>
           Posting opportunities is restricted to admins, verified mentors, and org partner accounts.
         </p>
         <Link href="/learnhub/work" className="text-sm font-semibold" style={{ color: "#7c8bff" }}>
-          ← Back to Opportunities
+          â† Back to Opportunities
         </Link>
       </div>
     );
@@ -117,17 +117,17 @@ function PostOpportunityPageInner() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 lh-work-page">
       <Link href="/learnhub/work" className="text-xs font-semibold mb-3 inline-block" style={{ color: "#7c8bff" }}>
-        ← Back to Opportunities
+        â† Back to Opportunities
       </Link>
 
-      <h1 className="text-xl font-bold mt-2 mb-1" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>
+      <h1 className="text-xl font-bold mt-2 mb-1" style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}>
         Post an Opportunity
       </h1>
-      <p className="text-sm mb-6" style={{ color: "#9ba3cc" }}>
+      <p className="text-sm mb-6" style={{ color: "var(--lh-text-2)" }}>
         Create a matched work pathway with clear requirements, review rules, and eligibility scoring.
       </p>
 
-      <div className="rounded-2xl p-5 flex flex-col gap-4" style={{ background: "#131626", border: "1px solid rgba(91,108,255,0.2)" }}>
+      <div className="rounded-2xl p-5 flex flex-col gap-4" style={{ background: "var(--lh-card)", border: "1px solid rgba(91,108,255,0.2)" }}>
         <Field label="Title">
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Remote IT Support Specialist" style={inputStyle} />
         </Field>
@@ -162,7 +162,7 @@ function PostOpportunityPageInner() {
 
         {payType !== "volunteer" && (
           <Field label="Pay amount (optional)">
-            <input value={payAmount} onChange={(e) => setPayAmount(e.target.value)} placeholder="₱18,000/mo" style={inputStyle} />
+            <input value={payAmount} onChange={(e) => setPayAmount(e.target.value)} placeholder="â‚±18,000/mo" style={inputStyle} />
           </Field>
         )}
 
@@ -188,9 +188,9 @@ function PostOpportunityPageInner() {
 
         <Field label="Eligibility mode">
           <select value={eligibilityMode} onChange={(e) => setEligibilityMode(e.target.value as EligibilityMode)} style={inputStyle}>
-            <option value="open">Open — accept all applications</option>
-            <option value="guided">Guided — allow borderline reasoning</option>
-            <option value="strict">Strict — block weak matches unless referred</option>
+            <option value="open">Open â€” accept all applications</option>
+            <option value="guided">Guided â€” allow borderline reasoning</option>
+            <option value="strict">Strict â€” block weak matches unless referred</option>
           </select>
         </Field>
 
@@ -215,7 +215,7 @@ function PostOpportunityPageInner() {
                   style={{
                     background: active ? "rgba(91,108,255,0.18)" : "transparent",
                     border: active ? "1px solid #5b6cff" : "1px solid rgba(255,255,255,0.1)",
-                    color: active ? "#7c8bff" : "#e8eaff",
+                    color: active ? "#7c8bff" : "var(--lh-text)",
                   }}
                 >
                   {cert}
@@ -232,7 +232,7 @@ function PostOpportunityPageInner() {
         {error && <p className="text-sm" style={{ color: "#ff5f6d" }}>{error}</p>}
 
         <div className="flex gap-2 justify-end pt-2">
-          <Link href="/learnhub/work" className="text-sm font-semibold px-4 py-2 rounded-xl" style={{ color: "#9ba3cc" }}>
+          <Link href="/learnhub/work" className="text-sm font-semibold px-4 py-2 rounded-xl" style={{ color: "var(--lh-text-2)" }}>
             Cancel
           </Link>
           <button
@@ -241,7 +241,7 @@ function PostOpportunityPageInner() {
             className="text-sm font-semibold px-5 py-2 rounded-xl disabled:opacity-50"
             style={{ background: "#ff8c42", color: "#fff", fontFamily: "var(--font-sora)" }}
           >
-            {submitting ? "Posting…" : "Post Opportunity →"}
+            {submitting ? "Postingâ€¦" : "Post Opportunity â†’"}
           </button>
         </div>
       </div>
@@ -252,7 +252,7 @@ function PostOpportunityPageInner() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs font-medium mb-1.5" style={{ color: "#9ba3cc" }}>{label}</label>
+      <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--lh-text-2)" }}>{label}</label>
       {children}
     </div>
   );
@@ -260,11 +260,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
-  background: "#0d0f1a",
+  background: "var(--lh-input-bg)",
   border: "1px solid rgba(255,255,255,0.1)",
   borderRadius: 10,
   padding: "10px 14px",
-  color: "#e8eaff",
+  color: "var(--lh-text)",
   fontSize: 13,
   outline: "none",
 };

@@ -60,15 +60,15 @@ function CalendarPageInner() {
   const [modalEvent, setModalEvent] = useState<GcalEvent | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
   const [newPrefill, setNewPrefill] = useState<Date | null>(null);
-  // Rec #2 — deep-link prefill from /api notification target
+  // Rec #2 â€” deep-link prefill from /api notification target
   const [titlePrefill, setTitlePrefill] = useState<string>("");
   const [attendeePrefill, setAttendeePrefill] = useState<string>("");
 
-  // Stable month key (e.g. "2026-05") — every other Date derived from this
+  // Stable month key (e.g. "2026-05") â€” every other Date derived from this
   // is recomputed only when the month changes. The earlier implementation
   // computed gridStart/gridEnd as new Date instances every render and used
-  // them as useCallback / useEffect deps, which created a fetch → setState
-  // → re-render → new Date → fetch loop and froze the tab.
+  // them as useCallback / useEffect deps, which created a fetch â†’ setState
+  // â†’ re-render â†’ new Date â†’ fetch loop and froze the tab.
   const monthKey = format(cursor, "yyyy-MM");
 
   const { gridStart, gridEnd } = useMemo(() => {
@@ -79,7 +79,7 @@ function CalendarPageInner() {
   }, [monthKey]);
 
   const fetchEvents = useCallback(async (signal?: AbortSignal) => {
-    // Keep last-known events visible during refresh — only flash the loading
+    // Keep last-known events visible during refresh â€” only flash the loading
     // screen on a true cold start. The refreshing pill in the header shows
     // the user a background update is in flight without yanking the UI.
     setState((cur) => (cur.kind === "ready" ? cur : { kind: "loading" }));
@@ -113,7 +113,7 @@ function CalendarPageInner() {
     return () => ctrl.abort();
   }, [fetchEvents]);
 
-  // Rec #2 — open new-event modal pre-filled from URL params:
+  // Rec #2 â€” open new-event modal pre-filled from URL params:
   // ?newEvent=1&attendee={userId}&title={title}
   // Looks up the attendee's email via Convex so the API can invite them.
   const sp = useSearchParams();
@@ -134,7 +134,7 @@ function CalendarPageInner() {
     }
   }, [sp, attendeeUser, attendeeUserId, showNewModal]);
 
-  // Keyboard nav: ← / → flips months, "t" jumps to today. Skips when a
+  // Keyboard nav: â† / â†’ flips months, "t" jumps to today. Skips when a
   // modal is open or the user is typing in a field.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -211,11 +211,11 @@ function CalendarPageInner() {
       <div className="lh-cal-main" style={{ minWidth: 0 }}>
       <header className="flex items-center justify-between mb-4 sm:mb-5 gap-2">
         <div className="min-w-0">
-          <h1 className="text-lg sm:text-xl font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>
+          <h1 className="text-lg sm:text-xl font-bold" style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}>
             Calendar
           </h1>
-          <p className="hidden sm:block text-sm mt-0.5" style={{ color: "#9ba3cc" }}>
-            Your real Google Calendar — manage events and Meet links from here.
+          <p className="hidden sm:block text-sm mt-0.5" style={{ color: "var(--lh-text-2)" }}>
+            Your real Google Calendar â€” manage events and Meet links from here.
           </p>
         </div>
         <button
@@ -235,7 +235,7 @@ function CalendarPageInner() {
           <button
             onClick={() => setCursor(addMonths(cursor, -1))}
             className="p-1.5 rounded-lg"
-            style={{ background: "rgba(255,255,255,0.05)", color: "#e8eaff" }}
+            style={{ background: "var(--lh-card-3)", color: "var(--lh-text)" }}
             aria-label="Previous month"
           >
             <ChevronLeft size={16} />
@@ -243,7 +243,7 @@ function CalendarPageInner() {
           <button
             onClick={() => setCursor(addMonths(cursor, 1))}
             className="p-1.5 rounded-lg"
-            style={{ background: "rgba(255,255,255,0.05)", color: "#e8eaff" }}
+            style={{ background: "var(--lh-card-3)", color: "var(--lh-text)" }}
             aria-label="Next month"
           >
             <ChevronRight size={16} />
@@ -257,7 +257,7 @@ function CalendarPageInner() {
           </button>
         </div>
         <div className="flex items-center gap-2">
-          <p className="text-sm font-semibold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>
+          <p className="text-sm font-semibold" style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}>
             {format(cursor, "MMMM yyyy")}
           </p>
           {refreshing && state.kind === "ready" && (
@@ -282,13 +282,13 @@ function CalendarPageInner() {
       {state.kind === "not_connected" && (
         <div
           className="rounded-2xl p-6 text-center mb-4"
-          style={{ background: "#131626", border: "1px solid rgba(91,108,255,0.3)" }}
+          style={{ background: "var(--lh-card)", border: "1px solid rgba(91,108,255,0.3)" }}
         >
-          <p className="text-3xl mb-2">📅</p>
-          <h2 className="font-bold mb-1" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>
+          <p className="text-3xl mb-2">ðŸ“…</p>
+          <h2 className="font-bold mb-1" style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}>
             Connect Google Calendar
           </h2>
-          <p className="text-sm mb-4" style={{ color: "#9ba3cc" }}>
+          <p className="text-sm mb-4" style={{ color: "var(--lh-text-2)" }}>
             Link your Google account to see and edit your real calendar inside LearnHub.
           </p>
           <Link
@@ -296,7 +296,7 @@ function CalendarPageInner() {
             className="inline-block text-sm font-semibold px-4 py-2 rounded-xl"
             style={{ background: "#5b6cff", color: "#fff" }}
           >
-            Connect →
+            Connect â†’
           </Link>
         </div>
       )}
@@ -310,7 +310,7 @@ function CalendarPageInner() {
       {/* Day-of-week header */}
       <div className="grid grid-cols-7 gap-0.5 sm:gap-1 mb-1">
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-          <div key={d} className="text-[10px] font-semibold text-center py-1" style={{ color: "#9ba3cc", letterSpacing: "0.06em" }}>
+          <div key={d} className="text-[10px] font-semibold text-center py-1" style={{ color: "var(--lh-text-2)", letterSpacing: "0.06em" }}>
             <span className="sm:hidden">{d[0]}</span>
             <span className="hidden sm:inline">{d.toUpperCase()}</span>
           </div>
@@ -350,7 +350,7 @@ function CalendarPageInner() {
               }}
               className="rounded-md sm:rounded-lg p-1 sm:p-2 min-h-[56px] sm:min-h-[88px] text-left flex flex-col gap-0.5 sm:gap-1"
               style={{
-                background: isSelected ? "rgba(91,108,255,0.15)" : inMonth ? "#131626" : "#0d0f1a",
+                background: isSelected ? "rgba(91,108,255,0.15)" : inMonth ? "var(--lh-card)" : "var(--lh-input-bg)",
                 border: isSelected
                   ? "1px solid #5b6cff"
                   : isTodayCell
@@ -359,16 +359,16 @@ function CalendarPageInner() {
                 cursor: "pointer",
                 opacity: inMonth ? 1 : 0.5,
               }}
-              aria-label={`${format(day, "EEEE, MMMM d")}${dayEvents.length ? ` — ${dayEvents.length} event${dayEvents.length > 1 ? "s" : ""}` : ""}`}
+              aria-label={`${format(day, "EEEE, MMMM d")}${dayEvents.length ? ` â€” ${dayEvents.length} event${dayEvents.length > 1 ? "s" : ""}` : ""}`}
             >
               <span
                 className="text-[11px] sm:text-xs font-semibold"
-                style={{ color: isTodayCell ? "#7c8bff" : inMonth ? "#e8eaff" : "#5c6490" }}
+                style={{ color: isTodayCell ? "#7c8bff" : inMonth ? "var(--lh-text)" : "var(--lh-text-3)" }}
               >
                 {format(day, "d")}
               </span>
 
-              {/* Mobile: a tight row of colored dots — one per event, up to 3.
+              {/* Mobile: a tight row of colored dots â€” one per event, up to 3.
                   Saves vertical space and stays legible on a 360px screen. */}
               {dayEvents.length > 0 && (
                 <span className="flex sm:hidden gap-0.5 mt-auto" aria-hidden>
@@ -384,7 +384,7 @@ function CalendarPageInner() {
                     />
                   ))}
                   {dayEvents.length > 3 && (
-                    <span style={{ fontSize: 8, color: "#9ba3cc", marginLeft: 1 }}>+{dayEvents.length - 3}</span>
+                    <span style={{ fontSize: 8, color: "var(--lh-text-2)", marginLeft: 1 }}>+{dayEvents.length - 3}</span>
                   )}
                 </span>
               )}
@@ -412,7 +412,7 @@ function CalendarPageInner() {
                   </span>
                 ))}
                 {dayEvents.length > 3 && (
-                  <span className="text-[10px]" style={{ color: "#9ba3cc" }}>
+                  <span className="text-[10px]" style={{ color: "var(--lh-text-2)" }}>
                     +{dayEvents.length - 3} more
                   </span>
                 )}
@@ -464,7 +464,7 @@ function CalendarPageInner() {
   );
 }
 
-// ── Habit Tracker rail ───────────────────────────────────────────────
+// â”€â”€ Habit Tracker rail â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function HabitRail() {
   return (
@@ -474,7 +474,7 @@ function HabitRail() {
   );
 }
 
-// ── New event modal ──────────────────────────────────────────────────
+// â”€â”€ New event modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function NewEventModal({
   prefill,
@@ -559,11 +559,11 @@ function NewEventModal({
       </Field>
       <label className="flex items-center gap-2 cursor-pointer mt-1">
         <input type="checkbox" checked={withMeet} onChange={(e) => setWithMeet(e.target.checked)} />
-        <span className="text-sm" style={{ color: "#e8eaff" }}>Add Google Meet link</span>
+        <span className="text-sm" style={{ color: "var(--lh-text)" }}>Add Google Meet link</span>
       </label>
       {error && <p className="text-sm" style={{ color: "#ff5f6d" }}>{error}</p>}
       <div className="flex gap-2 justify-end mt-2">
-        <button onClick={onClose} className="text-sm font-semibold px-4 py-2 rounded-xl" style={{ color: "#9ba3cc" }}>
+        <button onClick={onClose} className="text-sm font-semibold px-4 py-2 rounded-xl" style={{ color: "var(--lh-text-2)" }}>
           Cancel
         </button>
         <button
@@ -579,7 +579,7 @@ function NewEventModal({
   );
 }
 
-// ── Edit / view existing event modal ─────────────────────────────────
+// â”€â”€ Edit / view existing event modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function EventModal({
   event,
@@ -651,7 +651,7 @@ function EventModal({
   return (
     <ModalShell title={canEdit ? "Edit Event" : "View Event"} onClose={onClose}>
       {!canEdit && (
-        <p className="text-xs" style={{ color: "#9ba3cc" }}>
+        <p className="text-xs" style={{ color: "var(--lh-text-2)" }}>
           You can't edit this event because you're not the organizer.
         </p>
       )}
@@ -688,7 +688,7 @@ function EventModal({
           className="text-sm font-semibold inline-block"
           style={{ color: "#22d3a0" }}
         >
-          🎥  Join Meet →
+          ðŸŽ¥  Join Meet â†’
         </a>
       )}
       {error && <p className="text-sm" style={{ color: "#ff5f6d" }}>{error}</p>}
@@ -704,7 +704,7 @@ function EventModal({
           </button>
         ) : <span />}
         <div className="flex gap-2">
-          <button onClick={onClose} className="text-sm font-semibold px-4 py-2 rounded-xl" style={{ color: "#9ba3cc" }}>
+          <button onClick={onClose} className="text-sm font-semibold px-4 py-2 rounded-xl" style={{ color: "var(--lh-text-2)" }}>
             Close
           </button>
           {canEdit && (
@@ -723,7 +723,7 @@ function EventModal({
   );
 }
 
-// ── Shared bits ──────────────────────────────────────────────────────
+// â”€â”€ Shared bits â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
@@ -737,21 +737,21 @@ function ModalShell({ title, onClose, children }: { title: string; onClose: () =
       <div
         className="w-full max-w-md p-5 flex flex-col gap-3 rounded-t-2xl sm:rounded-2xl"
         style={{
-          background: "#131626",
+          background: "var(--lh-card)",
           border: "1px solid rgba(91,108,255,0.2)",
           maxHeight: "92vh",
           overflowY: "auto",
           paddingBottom: "calc(20px + env(safe-area-inset-bottom, 0px))",
         }}
       >
-        <div className="flex items-center justify-between sticky top-0 -mt-5 -mx-5 px-5 py-3" style={{ background: "#131626", borderBottom: "1px solid rgba(255,255,255,0.05)", zIndex: 1 }}>
-          <h2 className="font-bold text-base sm:text-lg" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>{title}</h2>
+        <div className="flex items-center justify-between sticky top-0 -mt-5 -mx-5 px-5 py-3" style={{ background: "var(--lh-card)", borderBottom: "1px solid rgba(255,255,255,0.05)", zIndex: 1 }}>
+          <h2 className="font-bold text-base sm:text-lg" style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}>{title}</h2>
           <button
             onClick={onClose}
             aria-label="Close"
             style={{
-              color: "#9ba3cc",
-              background: "rgba(255,255,255,0.05)",
+              color: "var(--lh-text-2)",
+              background: "var(--lh-card-3)",
               border: "1px solid rgba(255,255,255,0.08)",
               borderRadius: 999,
               cursor: "pointer",
@@ -774,7 +774,7 @@ function ModalShell({ title, onClose, children }: { title: string; onClose: () =
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs font-medium mb-1.5" style={{ color: "#9ba3cc" }}>{label}</label>
+      <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--lh-text-2)" }}>{label}</label>
       {children}
     </div>
   );
@@ -782,11 +782,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
-  background: "#0d0f1a",
+  background: "var(--lh-input-bg)",
   border: "1px solid rgba(255,255,255,0.1)",
   borderRadius: 10,
   padding: "10px 14px",
-  color: "#e8eaff",
+  color: "var(--lh-text)",
   fontSize: 13,
   outline: "none",
   colorScheme: "dark",
@@ -800,11 +800,11 @@ export default function CalendarPage() {
   )
 }
 
-// ────────────────────────────────────────────────────────────────────
-// HabitRailInner — pulled in by HabitRail above. Streak card + this-week
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// HabitRailInner â€” pulled in by HabitRail above. Streak card + this-week
 // habit grid + per-habit list + add-habit input. Pulls only this user's
 // data, so no role checks here.
-// ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function HabitRailInner() {
   const { userId } = useLearnhubSession();
@@ -839,7 +839,7 @@ function HabitRailInner() {
   );
 
   // On first load with zero habits, drop in the defaults so the user has
-  // something to interact with. Idempotent server-side — re-running is a
+  // something to interact with. Idempotent server-side â€” re-running is a
   // no-op once at least one habit exists.
   useEffect(() => {
     if (!uid) return;
@@ -849,13 +849,13 @@ function HabitRailInner() {
   }, [uid, habits, seedDefaults]);
 
   const [newLabel, setNewLabel] = useState("");
-  const [newEmoji, setNewEmoji] = useState("🌱");
+  const [newEmoji, setNewEmoji] = useState("ðŸŒ±");
   const [creating, setCreating] = useState(false);
   const [activityToast, setActivityToast] = useState<string | null>(null);
 
   if (!uid) {
     return (
-      <aside style={{ padding: 16, color: "#9ba3cc", fontSize: 13 }}>
+      <aside style={{ padding: 16, color: "var(--lh-text-2)", fontSize: 13 }}>
         Sign in to track your daily habits.
       </aside>
     );
@@ -873,7 +873,7 @@ function HabitRailInner() {
     try {
       await createHabit({ userId: uid, label: newLabel.trim(), emoji: newEmoji });
       setNewLabel("");
-      setNewEmoji("🌱");
+      setNewEmoji("ðŸŒ±");
     } finally {
       setCreating(false);
     }
@@ -887,7 +887,7 @@ function HabitRailInner() {
   return (
     <aside className="lh-habit-rail" style={{
       display: "flex", flexDirection: "column", gap: 14,
-      fontFamily: "var(--font-dm-sans, 'Inter', sans-serif)", color: "#e8eaff",
+      fontFamily: "var(--font-dm-sans, 'Inter', sans-serif)", color: "var(--lh-text)",
     }}>
       {/* Streak card */}
       <section style={{
@@ -901,14 +901,14 @@ function HabitRailInner() {
             background: "rgba(249,115,22,0.18)",
             display: "inline-flex", alignItems: "center", justifyContent: "center",
             fontSize: 20,
-          }}>🔥</span>
+          }}>ðŸ”¥</span>
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: "var(--font-sora, 'Plus Jakarta Sans', sans-serif)", fontWeight: 800, color: "#f97316", fontSize: 22, lineHeight: 1 }}>
               {streak?.currentStreak ?? 0}
-              <span style={{ fontSize: 11, marginLeft: 5, color: "#9ba3cc", fontWeight: 600, letterSpacing: 0.8, textTransform: "uppercase" }}>day streak</span>
+              <span style={{ fontSize: 11, marginLeft: 5, color: "var(--lh-text-2)", fontWeight: 600, letterSpacing: 0.8, textTransform: "uppercase" }}>day streak</span>
             </div>
-            <div style={{ fontSize: 11, color: "#9ba3cc", marginTop: 3 }}>
-              Longest {streak?.longestStreak ?? 0} · {streak?.streakFreezesAvailable ?? 0} freezes
+            <div style={{ fontSize: 11, color: "var(--lh-text-2)", marginTop: 3 }}>
+              Longest {streak?.longestStreak ?? 0} Â· {streak?.streakFreezesAvailable ?? 0} freezes
             </div>
           </div>
         </div>
@@ -919,7 +919,7 @@ function HabitRailInner() {
           color: streak?.activeToday ? "#22d3a0" : "white",
           fontWeight: 700, fontSize: 12.5,
         }}>
-          {streak?.activeToday ? "✓ Checked in today" : "Check in today"}
+          {streak?.activeToday ? "âœ“ Checked in today" : "Check in today"}
         </button>
         {activityToast && (
           <div style={{ marginTop: 8, fontSize: 11.5, color: "#22d3a0" }}>{activityToast}</div>
@@ -932,21 +932,21 @@ function HabitRailInner() {
         background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)",
       }}>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10 }}>
-          <h2 style={{ margin: 0, fontSize: 11, color: "#9ba3cc", letterSpacing: 1.4, textTransform: "uppercase", fontWeight: 800 }}>
+          <h2 style={{ margin: 0, fontSize: 11, color: "var(--lh-text-2)", letterSpacing: 1.4, textTransform: "uppercase", fontWeight: 800 }}>
             This week
           </h2>
-          <span style={{ fontSize: 10.5, color: "#5c6490" }}>
-            {weekGrid?.weekDates[0]?.slice(5) ?? "…"} – {weekGrid?.weekDates[6]?.slice(5) ?? "…"}
+          <span style={{ fontSize: 10.5, color: "var(--lh-text-3)" }}>
+            {weekGrid?.weekDates[0]?.slice(5) ?? "…"} â€“ {weekGrid?.weekDates[6]?.slice(5) ?? "…"}
           </span>
         </div>
 
         {weekGrid === undefined && (
-          <div style={{ color: "#5c6490", fontSize: 12 }}>Loading habits…</div>
+          <div style={{ color: "var(--lh-text-3)", fontSize: 12 }}>Loading habits…</div>
         )}
 
         {weekGrid && weekGrid.rows.length === 0 && (
-          <div style={{ color: "#5c6490", fontSize: 12 }}>
-            No habits yet — add one below.
+          <div style={{ color: "var(--lh-text-3)", fontSize: 12 }}>
+            No habits yet â€” add one below.
           </div>
         )}
 
@@ -956,16 +956,16 @@ function HabitRailInner() {
             <div key={row.habit.id as unknown as string} style={{ marginBottom: 12 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                 <span style={{ fontSize: 14 }}>{row.habit.emoji}</span>
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: "#e8eaff", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--lh-text)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {row.habit.label}
                 </span>
-                <span style={{ fontSize: 10.5, color: weekCount >= row.habit.targetPerWeek ? "#22d3a0" : "#9ba3cc" }}>
+                <span style={{ fontSize: 10.5, color: weekCount >= row.habit.targetPerWeek ? "#22d3a0" : "var(--lh-text-2)" }}>
                   {weekCount}/{row.habit.targetPerWeek}
                 </span>
                 <button onClick={() => archiveHabit({ userId: uid, habitId: row.habit.id })} title="Remove habit" style={{
                   fontSize: 11, padding: "2px 6px", borderRadius: 6, cursor: "pointer",
-                  background: "transparent", border: 0, color: "#5c6490",
-                }}>✕</button>
+                  background: "transparent", border: 0, color: "var(--lh-text-3)",
+                }}>âœ•</button>
               </div>
               <div className="lh-habit-grid" style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
                 {row.days.map((day) => {
@@ -982,13 +982,13 @@ function HabitRailInner() {
                         date: day.date,
                         delta: filled ? -1 : 1,
                       })}
-                      title={`${day.date}${filled ? ` · ${day.count}` : ""}`}
+                      title={`${day.date}${filled ? ` Â· ${day.count}` : ""}`}
                       className="lh-habit-cell"
                       style={{
                         height: 28, padding: 0, borderRadius: 6,
-                        background: filled ? "#f97316" : "rgba(255,255,255,0.04)",
+                        background: filled ? "#f97316" : "var(--lh-card-3)",
                         border: isToday ? "1.5px solid rgba(249,115,22,0.8)" : "1px solid rgba(255,255,255,0.06)",
-                        color: filled ? "#06060f" : "#9ba3cc",
+                        color: filled ? "var(--lh-bg)" : "var(--lh-text-2)",
                         cursor: isFuture ? "default" : "pointer",
                         opacity: isFuture ? 0.35 : 1,
                         fontSize: 10, fontWeight: 800,
@@ -1013,7 +1013,7 @@ function HabitRailInner() {
               style={{
                 width: 38, padding: "8px 6px", textAlign: "center", borderRadius: 8,
                 background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.08)",
-                color: "#e8eaff", fontSize: 14, outline: "none",
+                color: "var(--lh-text)", fontSize: 14, outline: "none",
               }}
             />
             <input
@@ -1024,13 +1024,13 @@ function HabitRailInner() {
               style={{
                 flex: 1, padding: "8px 10px", borderRadius: 8,
                 background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.08)",
-                color: "#e8eaff", fontSize: 12.5, outline: "none",
+                color: "var(--lh-text)", fontSize: 12.5, outline: "none",
               }}
             />
             <button onClick={onCreate} disabled={!newLabel.trim() || creating} style={{
               padding: "8px 12px", borderRadius: 8, border: 0, cursor: "pointer",
-              background: newLabel.trim() ? "#5b6cff" : "rgba(255,255,255,0.06)",
-              color: newLabel.trim() ? "white" : "#5c6490",
+              background: newLabel.trim() ? "#5b6cff" : "var(--lh-border)",
+              color: newLabel.trim() ? "white" : "var(--lh-text-3)",
               fontWeight: 700, fontSize: 12,
             }}>Add</button>
           </div>

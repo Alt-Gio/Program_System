@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useQuery } from "convex/react";
@@ -19,19 +19,19 @@ export default function OrgOpportunitiesPage() {
     userId ? { orgId: userId as Id<"learnhub_users"> } : "skip",
   );
 
-  if (loading || summary === undefined) return <div style={{ padding: 24, color: "#fff" }}>Loading job orders…</div>;
+  if (loading || summary === undefined) return <div style={{ padding: 24, color: "#fff" }}>Loading job ordersâ€¦</div>;
   if (!userId || (role !== "org_partner" && role !== "coordinator" && role !== "admin")) {
     return (
       <div style={{ padding: 24, color: "#fff" }}>
         Posting management is restricted to Org Partners, Coordinators, and Admins.{" "}
-        <Link href="/learnhub/feed" style={{ color: "#5b6cff" }}>← Back</Link>
+        <Link href="/learnhub/feed" style={{ color: "#5b6cff" }}>â† Back</Link>
       </div>
     );
   }
   if (summary.forbidden) return null;
 
   return (
-    <div style={{ color: "#fff", background: "#06060f", minHeight: "100%", padding: "24px 20px", fontFamily: "'Inter', sans-serif" }}>
+    <div style={{ color: "#fff", background: "var(--lh-bg)", minHeight: "100%", padding: "24px 20px", fontFamily: "'Inter', sans-serif" }}>
       <Link href="/learnhub/org" style={{
         fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "rgba(255,255,255,0.6)",
         letterSpacing: 1.2, textTransform: "uppercase",
@@ -42,13 +42,13 @@ export default function OrgOpportunitiesPage() {
         <div>
           <h1 style={{ margin: 0, fontSize: 28, fontWeight: 900, letterSpacing: "-0.03em" }}>All job orders</h1>
           <p style={{ margin: "4px 0 0", color: "rgba(255,255,255,0.55)", fontSize: 13 }}>
-            {summary.kpi.openOpportunities} open · {summary.kpi.totalApplicants} applicants total
+            {summary.kpi.openOpportunities} open Â· {summary.kpi.totalApplicants} applicants total
           </p>
         </div>
         <Link href="/learnhub/work/post" style={{
           padding: "8px 14px", borderRadius: 99,
           background: `linear-gradient(135deg, ${ORANGE}, ${PINK})`,
-          color: "#06060f", fontWeight: 700, fontSize: 12.5,
+          color: "var(--lh-bg)", fontWeight: 700, fontSize: 12.5,
           display: "inline-flex", alignItems: "center", gap: 6,
         }}><Plus size={14} /> Post a job order</Link>
       </div>
@@ -69,15 +69,15 @@ export default function OrgOpportunitiesPage() {
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{o.title}</div>
                 <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "rgba(255,255,255,0.45)", marginTop: 3 }}>
-                  {o.workType} · {o.payType}
+                  {o.workType} Â· {o.payType}
                 </div>
               </div>
               <span style={{
                 padding: "4px 10px", borderRadius: 99,
                 fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase",
                 color: o.status === "open" ? GREEN : "rgba(255,255,255,0.5)",
-                background: o.status === "open" ? `${GREEN}1c` : "rgba(255,255,255,0.04)",
-                border: `1px solid ${o.status === "open" ? `${GREEN}55` : "rgba(255,255,255,0.1)"}`,
+                background: o.status === "open" ? `${GREEN}1c` : "var(--lh-card-3)",
+                border: `1px solid ${o.status === "open" ? `${GREEN}55` : "var(--lh-border-strong)"}`,
                 width: "fit-content",
               }}>{o.status}</span>
               <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>{o.filledSlots ?? 0} / {o.slots}</div>
@@ -86,9 +86,9 @@ export default function OrgOpportunitiesPage() {
               </div>
               <Link href={`/learnhub/work/manage?id=${o.id}`} style={{
                 justifySelf: "end", padding: "6px 12px", borderRadius: 8,
-                background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+                background: "var(--lh-card-3)", border: "1px solid rgba(255,255,255,0.1)",
                 color: "#fff", fontSize: 11.5, fontWeight: 600,
-              }}>Manage →</Link>
+              }}>Manage â†’</Link>
             </div>
           ))
         )}

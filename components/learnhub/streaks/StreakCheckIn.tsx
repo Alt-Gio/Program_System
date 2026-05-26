@@ -70,7 +70,7 @@ export function StreakCheckIn() {
       ? "#38bdf8"
       : toast.outcome === "started" || toast.outcome === "advanced"
       ? "#f97316"
-      : "#9ba3cc";
+      : "var(--lh-text-2)";
 
   return (
     <div
@@ -86,7 +86,7 @@ export function StreakCheckIn() {
         border: `1px solid ${color}55`,
         borderRadius: 12,
         padding: "12px 14px",
-        color: "#e8eaf4",
+        color: "var(--lh-text)",
         fontSize: 13,
         boxShadow: "0 12px 30px rgba(0,0,0,0.35)",
         display: "flex",

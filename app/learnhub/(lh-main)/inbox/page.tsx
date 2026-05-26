@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 /**
- * /learnhub/inbox — full notification history.
+ * /learnhub/inbox â€” full notification history.
  *
  * Reuses the NotificationProvider (Firestore subscription) so this view
  * stays in sync with the bell dropdown in TopNav. The provider already
@@ -15,34 +15,34 @@ import { useNotifications } from "@/components/learnhub/notifications/Notificati
 import type { LHNotification } from "@/components/learnhub/notifications/NotificationProvider";
 
 const EVENT_ICONS: Record<string, string> = {
-  mentor_verification_pending: "🛡️",
-  mentor_verified: "✅",
-  mentor_verification_rejected: "❌",
-  mentor_match_available: "✨",
-  mentorship_request_received: "🙋",
-  mentorship_accepted: "📅",
-  flashcards_due: "🎴",
-  streak_at_risk: "🔥",
-  work_opportunity_posted: "💼",
-  certificate_issued: "🎓",
-  meet_starting: "🎥",
-  meet_live: "🎥",
-  new_message: "💬",
-  endorsement_request: "📝",
-  cohort_announcement: "📣",
-  cohort_member_joined: "🤝",
-  cohort_milestone_reached: "🎯",
-  cohort_started: "🚀",
-  cohort_ending_soon: "⏳",
-  streak_reminder: "🔥",
-  level_up: "⭐",
-  challenge_started: "🏆",
-  challenge_completed: "🥇",
-  path_completed: "🏁",
+  mentor_verification_pending: "ðŸ›¡ï¸",
+  mentor_verified: "âœ…",
+  mentor_verification_rejected: "âŒ",
+  mentor_match_available: "âœ¨",
+  mentorship_request_received: "ðŸ™‹",
+  mentorship_accepted: "ðŸ“…",
+  flashcards_due: "ðŸŽ´",
+  streak_at_risk: "ðŸ”¥",
+  work_opportunity_posted: "ðŸ’¼",
+  certificate_issued: "ðŸŽ“",
+  meet_starting: "ðŸŽ¥",
+  meet_live: "ðŸŽ¥",
+  new_message: "ðŸ’¬",
+  endorsement_request: "ðŸ“",
+  cohort_announcement: "ðŸ“£",
+  cohort_member_joined: "ðŸ¤",
+  cohort_milestone_reached: "ðŸŽ¯",
+  cohort_started: "ðŸš€",
+  cohort_ending_soon: "â³",
+  streak_reminder: "ðŸ”¥",
+  level_up: "â­",
+  challenge_started: "ðŸ†",
+  challenge_completed: "ðŸ¥‡",
+  path_completed: "ðŸ",
 };
 
 function iconFor(event: string): string {
-  return EVENT_ICONS[event] ?? "🔔";
+  return EVENT_ICONS[event] ?? "ðŸ””";
 }
 
 export default function InboxPage() {
@@ -58,7 +58,7 @@ export default function InboxPage() {
   return (
     <div
       className="px-4 py-6 max-w-2xl mx-auto"
-      style={{ color: "#e8eaff", fontFamily: "var(--font-dm-sans, 'Inter', sans-serif)" }}
+      style={{ color: "var(--lh-text)", fontFamily: "var(--font-dm-sans, 'Inter', sans-serif)" }}
     >
       <div className="mb-5 flex items-start justify-between gap-3 flex-wrap">
         <div>
@@ -70,12 +70,12 @@ export default function InboxPage() {
           </p>
           <h1
             className="text-2xl font-bold mt-0.5"
-            style={{ color: "#e8eaff", fontFamily: "var(--font-sora)", letterSpacing: "-0.02em" }}
+            style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)", letterSpacing: "-0.02em" }}
           >
             Notifications
           </h1>
-          <p className="text-sm mt-0.5" style={{ color: "#9ba3cc" }}>
-            {notifications.length} total · {unreadCount} unread
+          <p className="text-sm mt-0.5" style={{ color: "var(--lh-text-2)" }}>
+            {notifications.length} total Â· {unreadCount} unread
           </p>
         </div>
         {unreadCount > 0 && (
@@ -100,11 +100,11 @@ export default function InboxPage() {
           className="rounded-2xl px-6 py-10 text-center"
           style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
         >
-          <p className="text-4xl mb-2">📭</p>
-          <p className="text-sm font-semibold" style={{ color: "#e8eaff" }}>
+          <p className="text-4xl mb-2">ðŸ“­</p>
+          <p className="text-sm font-semibold" style={{ color: "var(--lh-text)" }}>
             No notifications yet
           </p>
-          <p className="text-xs mt-1" style={{ color: "#9ba3cc" }}>
+          <p className="text-xs mt-1" style={{ color: "var(--lh-text-2)" }}>
             Activity from mentors, work, and your habits will show up here.
           </p>
           <Link
@@ -112,7 +112,7 @@ export default function InboxPage() {
             className="inline-block mt-4 text-xs font-semibold"
             style={{ color: "#7c8bff" }}
           >
-            Open your dashboard →
+            Open your dashboard â†’
           </Link>
         </div>
       ) : (
@@ -124,18 +124,18 @@ export default function InboxPage() {
               className="rounded-xl px-4 py-3 flex gap-3 cursor-pointer transition-colors"
               style={{
                 background: notif.read ? "rgba(255,255,255,0.02)" : "rgba(91,108,255,0.06)",
-                border: `1px solid ${notif.read ? "rgba(255,255,255,0.06)" : "rgba(91,108,255,0.25)"}`,
+                border: `1px solid ${notif.read ? "var(--lh-border)" : "rgba(91,108,255,0.25)"}`,
               }}
             >
               <span style={{ fontSize: 20, lineHeight: 1.2 }}>{iconFor(notif.event)}</span>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold" style={{ color: "#e8eaff" }}>
+                <p className="text-sm font-bold" style={{ color: "var(--lh-text)" }}>
                   {notif.title}
                 </p>
-                <p className="text-xs mt-0.5" style={{ color: "#9ba3cc", lineHeight: 1.45 }}>
+                <p className="text-xs mt-0.5" style={{ color: "var(--lh-text-2)", lineHeight: 1.45 }}>
                   {notif.body}
                 </p>
-                <p className="text-[10px] mt-1" style={{ color: "#5c6490" }}>
+                <p className="text-[10px] mt-1" style={{ color: "var(--lh-text-3)" }}>
                   {formatDistanceToNow(notif.createdAt, { addSuffix: true })}
                 </p>
               </div>
@@ -145,10 +145,10 @@ export default function InboxPage() {
                   clearNotif(notif.id);
                 }}
                 className="shrink-0 text-xs opacity-40 hover:opacity-100"
-                style={{ color: "#9ba3cc", background: "none", border: "none", cursor: "pointer" }}
+                style={{ color: "var(--lh-text-2)", background: "none", border: "none", cursor: "pointer" }}
                 aria-label="Dismiss"
               >
-                ✕
+                âœ•
               </button>
             </div>
           ))}

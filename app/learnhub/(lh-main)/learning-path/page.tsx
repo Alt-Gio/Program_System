@@ -1,15 +1,15 @@
-"use client";
+﻿"use client";
 
 /**
- * /learnhub/learning-path — three-tab learner overview.
+ * /learnhub/learning-path â€” three-tab learner overview.
  *
- *   • Paths   — enrolled learnhub_learning_paths with module progress.
- *   • Courses — active learnhub_video_courses with watch progress.
- *   • Saved   — the legacy bookmark Kanban (kept for muscle-memory).
+ *   â€¢ Paths   â€” enrolled learnhub_learning_paths with module progress.
+ *   â€¢ Courses â€” active learnhub_video_courses with watch progress.
+ *   â€¢ Saved   â€” the legacy bookmark Kanban (kept for muscle-memory).
  *
  * One subscription powers the Paths/Courses headers via the new
  * `learnhub_progress.getLearnerOverview` and
- * `learnhub_video_courses.getCoursesForUser` queries — the existing
+ * `learnhub_video_courses.getCoursesForUser` queries â€” the existing
  * `learnhub_bookmarks` queries still power the Saved tab.
  */
 
@@ -32,9 +32,9 @@ type Tab = "paths" | "courses" | "saved";
 type BookmarkStatus = "want_to_learn" | "in_progress" | "done";
 
 const BOOKMARK_COLUMNS: { id: BookmarkStatus; label: string; emoji: string; color: string }[] = [
-  { id: "want_to_learn", label: "Want to Learn", emoji: "🎯", color: INDIGO },
-  { id: "in_progress",   label: "In Progress",   emoji: "⚡", color: ORANGE },
-  { id: "done",          label: "Done",          emoji: "✅", color: GREEN },
+  { id: "want_to_learn", label: "Want to Learn", emoji: "ðŸŽ¯", color: INDIGO },
+  { id: "in_progress",   label: "In Progress",   emoji: "âš¡", color: ORANGE },
+  { id: "done",          label: "Done",          emoji: "âœ…", color: GREEN },
 ];
 
 export default function LearningPathPage() {
@@ -65,9 +65,9 @@ export default function LearningPathPage() {
 
   if (!uid) {
     return (
-      <div className="px-4 py-6" style={{ color: "#e8eaff" }}>
+      <div className="px-4 py-6" style={{ color: "var(--lh-text)" }}>
         <p>Sign in to see your learning path.</p>
-        <Link href="/learnhub/login" style={{ color: INDIGO }}>← Sign in</Link>
+        <Link href="/learnhub/login" style={{ color: INDIGO }}>â† Sign in</Link>
       </div>
     );
   }
@@ -77,17 +77,17 @@ export default function LearningPathPage() {
   const inProgressSessions = overview?.sessionsInProgress ?? [];
 
   return (
-    <div className="px-4 py-6" style={{ color: "#e8eaff", fontFamily: "var(--font-dm-sans, 'Inter', sans-serif)" }}>
+    <div className="px-4 py-6" style={{ color: "var(--lh-text)", fontFamily: "var(--font-dm-sans, 'Inter', sans-serif)" }}>
       {/* Header */}
       <div className="mb-5 flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-xl font-bold" style={{ fontFamily: "var(--font-sora, 'Plus Jakarta Sans', sans-serif)", letterSpacing: "-0.02em" }}>
             My Learning Path
           </h1>
-          <p className="text-sm mt-0.5" style={{ color: "#9ba3cc" }}>
+          <p className="text-sm mt-0.5" style={{ color: "var(--lh-text-2)" }}>
             {overview === undefined || overview === null
-              ? "Loading…"
-              : `${pathCount} path${pathCount === 1 ? "" : "s"} · ${inProgressSessions.length} video${inProgressSessions.length === 1 ? "" : "s"} in progress · ${overview.certCount} certificate${overview.certCount === 1 ? "" : "s"}`}
+              ? "Loadingâ€¦"
+              : `${pathCount} path${pathCount === 1 ? "" : "s"} Â· ${inProgressSessions.length} video${inProgressSessions.length === 1 ? "" : "s"} in progress Â· ${overview.certCount} certificate${overview.certCount === 1 ? "" : "s"}`}
           </p>
         </div>
         {streak && (streak.currentStreak ?? 0) > 0 && (
@@ -140,7 +140,7 @@ export default function LearningPathPage() {
             <button key={t.id} role="tab" aria-selected={active} onClick={() => setTab(t.id)} style={{
               padding: "8px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700,
               background: active ? "rgba(91,108,255,0.18)" : "transparent",
-              color: active ? "#e8eaff" : "#9ba3cc",
+              color: active ? "var(--lh-text)" : "var(--lh-text-2)",
               border: active ? "1px solid rgba(91,108,255,0.4)" : "1px solid transparent",
               cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8,
               fontFamily: "var(--font-sora, 'Plus Jakarta Sans', sans-serif)",
@@ -148,8 +148,8 @@ export default function LearningPathPage() {
               <span>{t.label}</span>
               <span style={{
                 fontSize: 10, fontWeight: 800, padding: "2px 6px", borderRadius: 999,
-                background: active ? "rgba(91,108,255,0.3)" : "rgba(255,255,255,0.06)",
-                color: active ? "#e8eaff" : "#9ba3cc",
+                background: active ? "rgba(91,108,255,0.3)" : "var(--lh-border)",
+                color: active ? "var(--lh-text)" : "var(--lh-text-2)",
               }}>{t.count}</span>
             </button>
           );
@@ -206,13 +206,13 @@ function FlashcardsTile({
         flexWrap: "wrap",
       }}
     >
-      <span style={{ fontSize: 22, lineHeight: 1 }}>{hasDue ? "🎴" : "✅"}</span>
+      <span style={{ fontSize: 22, lineHeight: 1 }}>{hasDue ? "ðŸŽ´" : "âœ…"}</span>
       <div style={{ flex: "1 1 200px", minWidth: 0 }}>
         <div
           style={{
             fontSize: 13,
             fontWeight: 800,
-            color: "#e8eaff",
+            color: "var(--lh-text)",
             fontFamily: "var(--font-sora, 'Plus Jakarta Sans', sans-serif)",
           }}
         >
@@ -220,10 +220,10 @@ function FlashcardsTile({
             ? `${dueCount} flashcard${dueCount === 1 ? "" : "s"} due for review`
             : "All caught up on flashcards"}
         </div>
-        <div style={{ fontSize: 11.5, color: "#9ba3cc", marginTop: 2 }}>
+        <div style={{ fontSize: 11.5, color: "var(--lh-text-2)", marginTop: 2 }}>
           {hasDue
             ? "Spend a few minutes to keep your spaced-repetition streak alive."
-            : "New cards become due as you space them out — check back tomorrow."}
+            : "New cards become due as you space them out â€” check back tomorrow."}
         </div>
       </div>
       {href && (
@@ -240,7 +240,7 @@ function FlashcardsTile({
             whiteSpace: "nowrap",
           }}
         >
-          Review now →
+          Review now â†’
         </Link>
       )}
     </div>
@@ -258,14 +258,14 @@ function StatTile({ icon, label, value, color }: { icon: React.ReactNode; label:
         {icon}
         <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase" }}>{label}</span>
       </div>
-      <div style={{ fontSize: 24, fontWeight: 900, color: "#e8eaff", letterSpacing: "-0.02em" }}>{value}</div>
+      <div style={{ fontSize: 24, fontWeight: 900, color: "var(--lh-text)", letterSpacing: "-0.02em" }}>{value}</div>
     </div>
   );
 }
 
-// ────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Paths tab
-// ────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type OverviewResult = NonNullable<ReturnType<typeof useQuery<typeof api.learnhub_progress.getLearnerOverview>>>;
 
@@ -284,10 +284,10 @@ function PathsTab({ overview, userId }: { overview: OverviewResult | undefined; 
       <div style={{
         padding: 40, textAlign: "center", borderRadius: 16,
         background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.1)",
-        color: "#9ba3cc",
+        color: "var(--lh-text-2)",
       }}>
-        <div style={{ fontSize: 38, marginBottom: 10 }}>🗺️</div>
-        <p style={{ margin: 0, fontWeight: 700, color: "#e8eaff", fontFamily: "var(--font-sora, 'Plus Jakarta Sans', sans-serif)" }}>
+        <div style={{ fontSize: 38, marginBottom: 10 }}>ðŸ—ºï¸</div>
+        <p style={{ margin: 0, fontWeight: 700, color: "var(--lh-text)", fontFamily: "var(--font-sora, 'Plus Jakarta Sans', sans-serif)" }}>
           You haven&rsquo;t enrolled in a path yet
         </p>
         <p style={{ margin: "6px auto 14px", fontSize: 13, maxWidth: 460 }}>
@@ -297,7 +297,7 @@ function PathsTab({ overview, userId }: { overview: OverviewResult | undefined; 
           display: "inline-block", padding: "9px 18px", borderRadius: 999,
           background: ORANGE, color: "white", fontWeight: 700, fontSize: 13,
           textDecoration: "none",
-        }}>Explore the feed →</Link>
+        }}>Explore the feed â†’</Link>
       </div>
     );
   }
@@ -310,7 +310,7 @@ function PathsTab({ overview, userId }: { overview: OverviewResult | undefined; 
       <AuthoredPathsRail userId={userId} />
       {overview.goals.length > 0 && (
         <div style={{ marginTop: 6 }}>
-          <h3 style={{ margin: "8px 0", fontSize: 12.5, color: "#9ba3cc", letterSpacing: 1.2, textTransform: "uppercase" }}>Goals</h3>
+          <h3 style={{ margin: "8px 0", fontSize: 12.5, color: "var(--lh-text-2)", letterSpacing: 1.2, textTransform: "uppercase" }}>Goals</h3>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {overview.goals.map((g) => (
               <div key={g.id as unknown as string} style={{
@@ -318,12 +318,12 @@ function PathsTab({ overview, userId }: { overview: OverviewResult | undefined; 
                 background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)",
                 display: "flex", alignItems: "center", gap: 10,
               }}>
-                <span style={{ fontSize: 16 }}>{g.completedAt ? "✅" : "🎯"}</span>
-                <span style={{ flex: 1, fontSize: 13, color: "#e8eaff", textDecoration: g.completedAt ? "line-through" : "none" }}>
+                <span style={{ fontSize: 16 }}>{g.completedAt ? "âœ…" : "ðŸŽ¯"}</span>
+                <span style={{ flex: 1, fontSize: 13, color: "var(--lh-text)", textDecoration: g.completedAt ? "line-through" : "none" }}>
                   {g.title}
                 </span>
                 {g.deadline && (
-                  <span style={{ fontSize: 11, color: "#9ba3cc" }}>
+                  <span style={{ fontSize: 11, color: "var(--lh-text-2)" }}>
                     {formatDistanceToNow(g.deadline, { addSuffix: true })}
                   </span>
                 )}
@@ -333,14 +333,14 @@ function PathsTab({ overview, userId }: { overview: OverviewResult | undefined; 
                       href={`/learnhub/learning-path/${g.pathId}`}
                       style={{ fontSize: 11, fontWeight: 600, color: INDIGO, textDecoration: "none", padding: "4px 10px", borderRadius: 99, border: `1px solid rgba(91,108,255,0.3)`, whiteSpace: "nowrap" }}
                     >
-                      Continue →
+                      Continue â†’
                     </Link>
                   ) : (
                     <Link
                       href={`/learnhub/learning-path/create?goalId=${g._id}`}
                       style={{ fontSize: 11, fontWeight: 600, color: ORANGE, textDecoration: "none", padding: "4px 10px", borderRadius: 99, border: `1px solid rgba(249,115,22,0.3)`, whiteSpace: "nowrap" }}
                     >
-                      Create path →
+                      Create path â†’
                     </Link>
                   )
                 )}
@@ -362,7 +362,7 @@ function AuthoredPathsRail({ userId }: { userId: Id<"learnhub_users"> }) {
   return (
     <div style={{ marginTop: 6 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "8px 0" }}>
-        <h3 style={{ margin: 0, fontSize: 12.5, color: "#9ba3cc", letterSpacing: 1.2, textTransform: "uppercase" }}>Authored</h3>
+        <h3 style={{ margin: 0, fontSize: 12.5, color: "var(--lh-text-2)", letterSpacing: 1.2, textTransform: "uppercase" }}>Authored</h3>
         <Link href="/learnhub/learning-path/create" style={{ fontSize: 11, color: INDIGO, textDecoration: "none" }}>+ New path</Link>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -373,15 +373,15 @@ function AuthoredPathsRail({ userId }: { userId: Id<"learnhub_users"> }) {
             style={{
               padding: "10px 14px", borderRadius: 10,
               background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)",
-              display: "flex", alignItems: "center", gap: 10, textDecoration: "none", color: "#e8eaff",
+              display: "flex", alignItems: "center", gap: 10, textDecoration: "none", color: "var(--lh-text)",
             }}
           >
-            <span style={{ fontSize: 16 }}>{p.coverEmoji ?? "📚"}</span>
+            <span style={{ fontSize: 16 }}>{p.coverEmoji ?? "ðŸ“š"}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 600 }}>{p.title}</div>
-              <div style={{ fontSize: 11, color: "#9ba3cc" }}>
-                {p.moduleCount} modules · {p.visibility}{!p.published ? " · draft" : ""}
-                {p.enrollmentCount > 0 && ` · ${p.enrollmentCount} enrolled`}
+              <div style={{ fontSize: 11, color: "var(--lh-text-2)" }}>
+                {p.moduleCount} modules Â· {p.visibility}{!p.published ? " Â· draft" : ""}
+                {p.enrollmentCount > 0 && ` Â· ${p.enrollmentCount} enrolled`}
               </div>
             </div>
             {!p.published && (
@@ -423,9 +423,9 @@ function PathCard({ path, userId }: { path: OverviewResult["paths"][number]; use
       if (!result.advanced) {
         setGateMessage(result.reason ?? "Unable to advance");
       } else if (result.bayanihan) {
-        setGateMessage(`✓ Advanced +${result.xp} XP (bayanihan boost)`);
+        setGateMessage(`âœ“ Advanced +${result.xp} XP (bayanihan boost)`);
       } else {
-        setGateMessage(`✓ Advanced +${result.xp} XP`);
+        setGateMessage(`âœ“ Advanced +${result.xp} XP`);
       }
     } catch (e) {
       setGateMessage((e as Error).message);
@@ -457,12 +457,12 @@ function PathCard({ path, userId }: { path: OverviewResult["paths"][number]; use
           )}
         </div>
         <h3 style={{
-          margin: 0, fontSize: 17, fontWeight: 700, color: "#e8eaff",
+          margin: 0, fontSize: 17, fontWeight: 700, color: "var(--lh-text)",
           fontFamily: "var(--font-sora, 'Plus Jakarta Sans', sans-serif)",
           letterSpacing: "-0.01em",
         }}>{path.title}</h3>
         <p style={{
-          margin: "4px 0 10px", fontSize: 12.5, color: "#9ba3cc", lineHeight: 1.5,
+          margin: "4px 0 10px", fontSize: 12.5, color: "var(--lh-text-2)", lineHeight: 1.5,
           maxWidth: 600, overflow: "hidden", textOverflow: "ellipsis",
           display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 2,
         }}>{path.description}</p>
@@ -471,7 +471,7 @@ function PathCard({ path, userId }: { path: OverviewResult["paths"][number]; use
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
           <div style={{
             flex: 1, height: 8, borderRadius: 99,
-            background: "rgba(255,255,255,0.06)", overflow: "hidden",
+            background: "var(--lh-border)", overflow: "hidden",
           }}>
             <div style={{
               width: `${path.progressPct}%`, height: "100%",
@@ -480,17 +480,17 @@ function PathCard({ path, userId }: { path: OverviewResult["paths"][number]; use
             }} />
           </div>
           <span style={{ fontSize: 11.5, fontWeight: 700, color: isComplete ? GREEN : ORANGE, minWidth: 70, textAlign: "right" }}>
-            {path.completedModules} / {path.totalModules} · {path.progressPct}%
+            {path.completedModules} / {path.totalModules} Â· {path.progressPct}%
           </span>
         </div>
 
         {!isComplete && path.currentModuleTitle && (
-          <p style={{ margin: 0, fontSize: 12, color: "#9ba3cc" }}>
+          <p style={{ margin: 0, fontSize: 12, color: "var(--lh-text-2)" }}>
             <span style={{ color: "#cdd2e6", fontWeight: 600 }}>Next:</span> {path.currentModuleTitle}
           </p>
         )}
         {gateMessage && (
-          <p style={{ margin: "6px 0 0", fontSize: 11, color: gateMessage.startsWith("✓") ? GREEN : "#fca5a5" }}>
+          <p style={{ margin: "6px 0 0", fontSize: 11, color: gateMessage.startsWith("âœ“") ? GREEN : "#fca5a5" }}>
             {gateMessage}
           </p>
         )}
@@ -499,8 +499,8 @@ function PathCard({ path, userId }: { path: OverviewResult["paths"][number]; use
       <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "stretch" }}>
         <Link href={continueHref} style={{
           padding: "10px 16px", borderRadius: 999, textDecoration: "none",
-          background: isComplete ? "rgba(255,255,255,0.05)" : `linear-gradient(135deg, ${ORANGE}, #ea580c)`,
-          color: isComplete ? "#9ba3cc" : "white",
+          background: isComplete ? "var(--lh-card-3)" : `linear-gradient(135deg, ${ORANGE}, #ea580c)`,
+          color: isComplete ? "var(--lh-text-2)" : "white",
           border: isComplete ? "1px solid rgba(255,255,255,0.08)" : "none",
           fontSize: 12.5, fontWeight: 700,
           display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
@@ -520,7 +520,7 @@ function PathCard({ path, userId }: { path: OverviewResult["paths"][number]; use
               whiteSpace: "nowrap",
             }}
           >
-            {attempting ? "Checking…" : `Mark M${enrollment.currentModuleIndex + 1} complete`}
+            {attempting ? "Checkingâ€¦" : `Mark M${enrollment.currentModuleIndex + 1} complete`}
           </button>
         )}
       </div>
@@ -528,9 +528,9 @@ function PathCard({ path, userId }: { path: OverviewResult["paths"][number]; use
   );
 }
 
-// ────────────────────────────────────────────────────────────────────────
-// Courses tab — user-built playlists + raw in-progress video sessions
-// ────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Courses tab â€” user-built playlists + raw in-progress video sessions
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type CoursesResult = NonNullable<ReturnType<typeof useQuery<typeof api.learnhub_video_courses.getCoursesForUser>>>;
 type Session = OverviewResult["sessionsInProgress"][number];
@@ -545,10 +545,10 @@ function CoursesTab({ courses, sessions, completed }: {
       <div style={{
         padding: 40, textAlign: "center", borderRadius: 16,
         background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.1)",
-        color: "#9ba3cc",
+        color: "var(--lh-text-2)",
       }}>
-        <div style={{ fontSize: 38, marginBottom: 10 }}>📺</div>
-        <p style={{ margin: 0, fontWeight: 700, color: "#e8eaff", fontFamily: "var(--font-sora)" }}>Loading your courses…</p>
+        <div style={{ fontSize: 38, marginBottom: 10 }}>ðŸ“º</div>
+        <p style={{ margin: 0, fontWeight: 700, color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}>Loading your coursesâ€¦</p>
       </div>
     );
   }
@@ -559,10 +559,10 @@ function CoursesTab({ courses, sessions, completed }: {
       <div style={{
         padding: 40, textAlign: "center", borderRadius: 16,
         background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.1)",
-        color: "#9ba3cc",
+        color: "var(--lh-text-2)",
       }}>
-        <div style={{ fontSize: 38, marginBottom: 10 }}>📚</div>
-        <p style={{ margin: 0, fontWeight: 700, color: "#e8eaff", fontFamily: "var(--font-sora)" }}>No active courses yet</p>
+        <div style={{ fontSize: 38, marginBottom: 10 }}>ðŸ“š</div>
+        <p style={{ margin: 0, fontWeight: 700, color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}>No active courses yet</p>
         <p style={{ margin: "6px auto 14px", fontSize: 13, maxWidth: 460 }}>
           Start a video on the feed, group videos into a playlist on <Link href="/learnhub/video-flow" style={{ color: INDIGO }}>Video Flow</Link>, or watch a curated short on <Link href="/learnhub/watch" style={{ color: ORANGE }}>Watch</Link>.
         </p>
@@ -574,7 +574,7 @@ function CoursesTab({ courses, sessions, completed }: {
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       {sessions.length > 0 && (
         <section>
-          <h3 style={{ margin: "0 0 10px", fontSize: 12.5, color: "#9ba3cc", letterSpacing: 1.2, textTransform: "uppercase" }}>
+          <h3 style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--lh-text-2)", letterSpacing: 1.2, textTransform: "uppercase" }}>
             Pick up where you left off
           </h3>
           <div style={{
@@ -590,7 +590,7 @@ function CoursesTab({ courses, sessions, completed }: {
 
       {courses && courses.length > 0 && (
         <section>
-          <h3 style={{ margin: "0 0 10px", fontSize: 12.5, color: "#9ba3cc", letterSpacing: 1.2, textTransform: "uppercase" }}>
+          <h3 style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--lh-text-2)", letterSpacing: 1.2, textTransform: "uppercase" }}>
             Your playlists
           </h3>
           <div style={{
@@ -606,7 +606,7 @@ function CoursesTab({ courses, sessions, completed }: {
 
       {completed.length > 0 && (
         <section>
-          <h3 style={{ margin: "0 0 10px", fontSize: 12.5, color: "#9ba3cc", letterSpacing: 1.2, textTransform: "uppercase" }}>
+          <h3 style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--lh-text-2)", letterSpacing: 1.2, textTransform: "uppercase" }}>
             Recently completed
           </h3>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -616,11 +616,11 @@ function CoursesTab({ courses, sessions, completed }: {
                 background: "rgba(34,211,160,0.06)", border: `1px solid ${GREEN}33`,
                 display: "flex", alignItems: "center", gap: 10,
               }}>
-                <span style={{ fontSize: 16 }}>✅</span>
-                <span style={{ flex: 1, fontSize: 13, color: "#e8eaff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: 16 }}>âœ…</span>
+                <span style={{ flex: 1, fontSize: 13, color: "var(--lh-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {s.title}
                 </span>
-                <span style={{ fontSize: 11, color: "#9ba3cc" }}>
+                <span style={{ fontSize: 11, color: "var(--lh-text-2)" }}>
                   {formatDistanceToNow(s.completedAt, { addSuffix: true })}
                 </span>
               </div>
@@ -648,7 +648,7 @@ function SessionCard({ s }: { s: Session }) {
         {s.thumbnail ? (
           <img src={s.thumbnail} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         ) : (
-          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ba3cc" }}>
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--lh-text-2)" }}>
             <Play size={20} />
           </div>
         )}
@@ -670,13 +670,13 @@ function SessionCard({ s }: { s: Session }) {
       </div>
       <div style={{ minWidth: 0 }}>
         <div style={{
-          fontSize: 13, fontWeight: 600, color: "#e8eaff",
+          fontSize: 13, fontWeight: 600, color: "var(--lh-text)",
           overflow: "hidden", display: "-webkit-box",
           WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
           lineHeight: 1.35,
         }}>{s.title}</div>
         {s.channelName && (
-          <div style={{ fontSize: 11, color: "#9ba3cc", marginTop: 3 }}>{s.channelName}</div>
+          <div style={{ fontSize: 11, color: "var(--lh-text-2)", marginTop: 3 }}>{s.channelName}</div>
         )}
       </div>
     </Link>
@@ -708,15 +708,15 @@ function CourseCard({ c }: { c: CoursesResult[number] }) {
       </div>
       <div>
         <div style={{
-          fontSize: 14, fontWeight: 700, color: "#e8eaff",
+          fontSize: 14, fontWeight: 700, color: "var(--lh-text)",
           fontFamily: "var(--font-sora, 'Plus Jakarta Sans', sans-serif)",
         }}>{c.title}</div>
-        <div style={{ fontSize: 11.5, color: "#9ba3cc", marginTop: 3 }}>
-          {c.completedCount} / {c.itemCount} videos · {c.totalProgress}%
+        <div style={{ fontSize: 11.5, color: "var(--lh-text-2)", marginTop: 3 }}>
+          {c.completedCount} / {c.itemCount} videos Â· {c.totalProgress}%
         </div>
         <div style={{
           marginTop: 6, height: 4, borderRadius: 99,
-          background: "rgba(255,255,255,0.06)", overflow: "hidden",
+          background: "var(--lh-border)", overflow: "hidden",
         }}>
           <div style={{
             width: `${c.totalProgress}%`, height: "100%", background: ORANGE,
@@ -728,9 +728,9 @@ function CourseCard({ c }: { c: CoursesResult[number] }) {
   );
 }
 
-// ────────────────────────────────────────────────────────────────────────
-// Saved tab — preserved Kanban
-// ────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Saved tab â€” preserved Kanban
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type BookmarksResult = NonNullable<ReturnType<typeof useQuery<typeof api.learnhub_bookmarks.listBookmarks>>>;
 
@@ -761,17 +761,17 @@ function SavedTab({ bookmarks, onMove, onRemove }: {
               <span className="text-base">{col.emoji}</span>
               <span className="text-sm font-semibold" style={{ color: col.color, fontFamily: "var(--font-sora)" }}>{col.label}</span>
               <span className="ml-auto text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: col.color + "20", color: col.color }}>
-                {bookmarks === undefined ? "…" : items.length}
+                {bookmarks === undefined ? "â€¦" : items.length}
               </span>
             </div>
             <div className="flex flex-col gap-2 min-h-24 rounded-2xl p-2" style={{ background: "rgba(255,255,255,0.02)", border: `1px dashed ${col.color}25` }}>
               {bookmarks === undefined && Array.from({ length: 2 }).map((_, i) => (
-                <div key={i} className="h-20 rounded-xl animate-pulse" style={{ background: "#131626" }} />
+                <div key={i} className="h-20 rounded-xl animate-pulse" style={{ background: "var(--lh-card)" }} />
               ))}
 
               {bookmarks !== undefined && items.length === 0 && (
                 <div className="flex items-center justify-center h-20">
-                  <p className="text-xs text-center" style={{ color: "#5c6490" }}>
+                  <p className="text-xs text-center" style={{ color: "var(--lh-text-3)" }}>
                     {col.id === "want_to_learn"
                       ? "Bookmark posts from the Feed"
                       : `Move cards here when ${col.id === "in_progress" ? "you start" : "complete"}`}
@@ -784,21 +784,21 @@ function SavedTab({ bookmarks, onMove, onRemove }: {
                 if (!post) return null;
                 const otherStatuses = BOOKMARK_COLUMNS.filter((c) => c.id !== col.id);
                 return (
-                  <div key={bookmark._id as unknown as string} className="rounded-xl p-3 flex flex-col gap-2" style={{ background: "#131626", border: "1px solid rgba(255,255,255,0.06)" }}>
-                    <p className="text-xs font-medium line-clamp-2" style={{ color: "#e8eaff" }}>
-                      {(post.content as string)?.slice(0, 80)}{(post.content as string)?.length > 80 ? "…" : ""}
+                  <div key={bookmark._id as unknown as string} className="rounded-xl p-3 flex flex-col gap-2" style={{ background: "var(--lh-card)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                    <p className="text-xs font-medium line-clamp-2" style={{ color: "var(--lh-text)" }}>
+                      {(post.content as string)?.slice(0, 80)}{(post.content as string)?.length > 80 ? "â€¦" : ""}
                     </p>
                     <div className="flex items-center gap-1 flex-wrap">
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full capitalize" style={{ background: "rgba(255,255,255,0.05)", color: "#9ba3cc" }}>{post.type as string}</span>
-                      <span className="text-[10px]" style={{ color: "#5c6490" }}>{formatDistanceToNow(bookmark.updatedAt, { addSuffix: true })}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full capitalize" style={{ background: "var(--lh-card-3)", color: "var(--lh-text-2)" }}>{post.type as string}</span>
+                      <span className="text-[10px]" style={{ color: "var(--lh-text-3)" }}>{formatDistanceToNow(bookmark.updatedAt, { addSuffix: true })}</span>
                     </div>
                     <div className="flex gap-1">
                       {otherStatuses.map((s) => (
                         <button key={s.id} onClick={() => onMove(bookmark.postId as unknown as string, s.id)} className="flex-1 text-[10px] py-1 rounded-lg font-medium" style={{ background: s.color + "15", color: s.color, border: `1px solid ${s.color}25` }}>
-                          → {s.label.split(" ")[0]}
+                          â†’ {s.label.split(" ")[0]}
                         </button>
                       ))}
-                      <button onClick={() => onRemove(bookmark._id as unknown as string)} className="px-2 py-1 rounded-lg text-[10px]" style={{ color: "#5c6490" }} title="Remove bookmark">✕</button>
+                      <button onClick={() => onRemove(bookmark._id as unknown as string)} className="px-2 py-1 rounded-lg text-[10px]" style={{ color: "var(--lh-text-3)" }} title="Remove bookmark">âœ•</button>
                     </div>
                   </div>
                 );

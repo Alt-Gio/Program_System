@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 /**
- * Org Partner / Coordinator — full mentor-verification queue.
+ * Org Partner / Coordinator â€” full mentor-verification queue.
  * Deep-linked from the dashboard's "Review all" link.
  */
 
@@ -28,13 +28,13 @@ export default function OrgMentorsPage() {
   const [doneIds, setDoneIds] = useState<Record<string, "approved" | "rejected">>({});
 
   if (loading || summary === undefined) {
-    return <div style={{ padding: 24, color: "#fff" }}>Loading mentor queue…</div>;
+    return <div style={{ padding: 24, color: "#fff" }}>Loading mentor queueâ€¦</div>;
   }
   if (!userId || (role !== "org_partner" && role !== "coordinator" && role !== "admin")) {
     return (
       <div style={{ padding: 24, color: "#fff" }}>
         Mentor verification is restricted to Org Partners, Coordinators, and Admins.{" "}
-        <Link href="/learnhub/feed" style={{ color: "#5b6cff", marginLeft: 8 }}>← Back</Link>
+        <Link href="/learnhub/feed" style={{ color: "#5b6cff", marginLeft: 8 }}>â† Back</Link>
       </div>
     );
   }
@@ -42,7 +42,7 @@ export default function OrgMentorsPage() {
 
   const items = summary.pendingMentors;
   return (
-    <div style={{ color: "#fff", background: "#06060f", minHeight: "100%", padding: "24px 20px", fontFamily: "'Inter', sans-serif" }}>
+    <div style={{ color: "#fff", background: "var(--lh-bg)", minHeight: "100%", padding: "24px 20px", fontFamily: "'Inter', sans-serif" }}>
       <Link href="/learnhub/org" style={{
         fontFamily: "'JetBrains Mono', monospace", fontSize: 11,
         color: "rgba(255,255,255,0.6)", letterSpacing: 1.2, textTransform: "uppercase",
@@ -74,7 +74,7 @@ export default function OrgMentorsPage() {
                 <div style={{ fontSize: 15, fontWeight: 700 }}>{mentor.name}</div>
                 <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "rgba(255,255,255,0.55)", marginTop: 4 }}>
                   {(p.designation ?? mentor.designation) || "Mentor"}
-                  {mentor.regionalOffice ? ` · ${mentor.regionalOffice}` : ""}
+                  {mentor.regionalOffice ? ` Â· ${mentor.regionalOffice}` : ""}
                 </div>
                 {mentor.expertiseTags.length > 0 && (
                   <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 8 }}>
@@ -88,12 +88,12 @@ export default function OrgMentorsPage() {
                 {p.verificationDocUrl && (
                   <a href={p.verificationDocUrl} target="_blank" rel="noopener" style={{
                     display: "inline-block", marginTop: 8, fontSize: 11.5, color: "#0ea5e9", textDecoration: "underline",
-                  }}>View verification document →</a>
+                  }}>View verification document â†’</a>
                 )}
               </div>
               {status ? (
                 <span style={{ alignSelf: "center", color: status === "approved" ? GREEN : "#ef4444", fontWeight: 700, fontSize: 13 }}>
-                  {status === "approved" ? "Approved ✓" : "Rejected ✕"}
+                  {status === "approved" ? "Approved âœ“" : "Rejected âœ•"}
                 </span>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, alignSelf: "center" }}>
@@ -105,7 +105,7 @@ export default function OrgMentorsPage() {
                     } finally { setBusy(null); }
                   }} style={{
                     padding: "8px 14px", borderRadius: 10,
-                    background: `linear-gradient(135deg, ${GREEN}, #06b6d4)`, color: "#06060f", border: 0,
+                    background: `linear-gradient(135deg, ${GREEN}, #06b6d4)`, color: "var(--lh-bg)", border: 0,
                     fontWeight: 700, display: "inline-flex", gap: 6, alignItems: "center", cursor: busy ? "wait" : "pointer",
                   }}><CheckCircle2 size={14} /> Approve</button>
                   <button type="button" disabled={!!busy} onClick={async () => {

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -48,7 +48,7 @@ function InviteContent() {
       background: "#0d1025", padding: 20,
     }}>
       <div style={{
-        maxWidth: 460, width: "100%", background: "#131626",
+        maxWidth: 460, width: "100%", background: "var(--lh-card)",
         borderRadius: 24, border: "1px solid rgba(255,255,255,0.1)",
         overflow: "hidden",
       }}>
@@ -57,32 +57,32 @@ function InviteContent() {
           background: "linear-gradient(135deg,#5b6cff 0%,#22d3a0 100%)",
           padding: "28px 28px 24px", textAlign: "center",
         }}>
-          <p style={{ fontSize: 36, marginBottom: 8 }}>🎓</p>
+          <p style={{ fontSize: 36, marginBottom: 8 }}>ðŸŽ“</p>
           <h1 style={{ color: "#fff", fontSize: 20, fontWeight: 800, margin: 0 }}>ILCDB LearnHub</h1>
-          <p style={{ color: "rgba(255,255,255,0.8)", fontSize: 12, marginTop: 4 }}>DICT Region V · Mentor Invitation</p>
+          <p style={{ color: "rgba(255,255,255,0.8)", fontSize: 12, marginTop: 4 }}>DICT Region V Â· Mentor Invitation</p>
         </div>
 
         <div style={{ padding: 28 }}>
           {state === "loading" && (
             <div style={{ textAlign: "center", padding: "24px 0" }}>
               <div style={{ width: 32, height: 32, borderRadius: "50%", border: "3px solid #5b6cff", borderTopColor: "transparent", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
-              <p style={{ color: "#9ba3cc" }}>Validating invite...</p>
+              <p style={{ color: "var(--lh-text-2)" }}>Validating invite...</p>
             </div>
           )}
 
           {state === "error" && (
             <div style={{ textAlign: "center" }}>
-              <p style={{ fontSize: 36, marginBottom: 12 }}>❌</p>
-              <h2 style={{ color: "#e8eaff", fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Invite Invalid</h2>
-              <p style={{ color: "#9ba3cc", fontSize: 14 }}>{errorMsg}</p>
+              <p style={{ fontSize: 36, marginBottom: 12 }}>âŒ</p>
+              <h2 style={{ color: "var(--lh-text)", fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Invite Invalid</h2>
+              <p style={{ color: "var(--lh-text-2)", fontSize: 14 }}>{errorMsg}</p>
             </div>
           )}
 
           {state === "declined" && (
             <div style={{ textAlign: "center" }}>
-              <p style={{ fontSize: 36, marginBottom: 12 }}>👋</p>
-              <h2 style={{ color: "#e8eaff", fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Invitation Declined</h2>
-              <p style={{ color: "#9ba3cc", fontSize: 14 }}>
+              <p style={{ fontSize: 36, marginBottom: 12 }}>ðŸ‘‹</p>
+              <h2 style={{ color: "var(--lh-text)", fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Invitation Declined</h2>
+              <p style={{ color: "var(--lh-text-2)", fontSize: 14 }}>
                 The invitation has been declined. The DICT Region V team has been notified.
               </p>
             </div>
@@ -90,8 +90,8 @@ function InviteContent() {
 
           {state === "ready" && invite && (
             <>
-              <p style={{ color: "#9ba3cc", fontSize: 13, marginBottom: 20, textAlign: "center" }}>
-                You've been invited to join as a <strong style={{ color: "#e8eaff" }}>Mentor</strong> on ILCDB LearnHub.
+              <p style={{ color: "var(--lh-text-2)", fontSize: 13, marginBottom: 20, textAlign: "center" }}>
+                You've been invited to join as a <strong style={{ color: "var(--lh-text)" }}>Mentor</strong> on ILCDB LearnHub.
               </p>
 
               {/* Profile preview */}
@@ -99,8 +99,8 @@ function InviteContent() {
                 background: "rgba(91,108,255,0.08)", border: "1px solid rgba(91,108,255,0.2)",
                 borderRadius: 14, padding: "16px 18px", marginBottom: 20,
               }}>
-                <p style={{ color: "#e8eaff", fontWeight: 700, fontSize: 15, margin: "0 0 4px" }}>{invite.invitedName}</p>
-                <p style={{ color: "#9ba3cc", fontSize: 12, margin: "0 0 10px" }}>{invite.dictDesignation}</p>
+                <p style={{ color: "var(--lh-text)", fontWeight: 700, fontSize: 15, margin: "0 0 4px" }}>{invite.invitedName}</p>
+                <p style={{ color: "var(--lh-text-2)", fontSize: 12, margin: "0 0 10px" }}>{invite.dictDesignation}</p>
                 {invite.programs.length > 0 && (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
                     {invite.programs.map((p) => (
@@ -119,8 +119,8 @@ function InviteContent() {
                 </p>
               )}
 
-              <p style={{ color: "#9ba3cc", fontSize: 12, textAlign: "center", marginBottom: 16 }}>
-                Sign in with the Google account associated with <strong style={{ color: "#e8eaff" }}>{invite.invitedEmail}</strong>
+              <p style={{ color: "var(--lh-text-2)", fontSize: 12, textAlign: "center", marginBottom: 16 }}>
+                Sign in with the Google account associated with <strong style={{ color: "var(--lh-text)" }}>{invite.invitedEmail}</strong>
               </p>
 
               <button
@@ -145,7 +145,7 @@ function InviteContent() {
                 onClick={handleDecline}
                 style={{
                   width: "100%", padding: "10px", borderRadius: 12, fontSize: 13,
-                  background: "transparent", color: "#9ba3cc",
+                  background: "transparent", color: "var(--lh-text-2)",
                   border: "1px solid rgba(255,255,255,0.08)", cursor: "pointer",
                 }}
               >

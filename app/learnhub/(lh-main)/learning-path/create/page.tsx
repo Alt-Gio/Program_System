@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 /**
- * Phase 9.A.4 — Create a Learning Path.
+ * Phase 9.A.4 â€” Create a Learning Path.
  *
  * Single-page form: metadata + modules (orderable) + post picker.
  * - Students see visibility forced to Private (UI + mutation guard).
@@ -17,13 +17,13 @@ import { useLearnhubSession } from "@/lib/learnhub/hooks";
 import { ORG_CONFIG, programColor } from "@/lib/learnhub/org-config";
 import type { Id } from "@/convex/_generated/dataModel";
 
-const BG = "#090b18";
-const CARD = "#111323";
-const CARD2 = "#161929";
-const BORDER = "rgba(255,255,255,0.06)";
-const BORDER2 = "rgba(255,255,255,0.1)";
-const TEXT = "#e8eaf4";
-const MUTED = "rgba(185,190,230,0.6)";
+const BG = "var(--lh-bg)";
+const CARD = "var(--lh-card)";
+const CARD2 = "var(--lh-card-2)";
+const BORDER = "var(--lh-border)";
+const BORDER2 = "var(--lh-border-strong)";
+const TEXT = "var(--lh-text)";
+const MUTED = "var(--lh-text-2)";
 const INDIGO = "#5b6cff";
 const GREEN = "#22d3a0";
 const ORANGE = "#f97316";
@@ -62,7 +62,7 @@ function PathCreatorInner() {
     return overview.goals.find((g) => g._id === goalIdParam) ?? null;
   }, [goalIdParam, overview]);
 
-  // Edit mode — load the existing path.
+  // Edit mode â€” load the existing path.
   const editPath = useQuery(
     api.learnhub_learning_paths.getPath,
     isEditMode ? { pathId: editPathIdParam as Id<"learnhub_learning_paths"> } : "skip",
@@ -79,7 +79,7 @@ function PathCreatorInner() {
   const [description, setDescription] = useState("");
   const [programType, setProgramType] = useState<string>(ORG_CONFIG.programs[0] ?? "");
   const [estimatedWeeks, setEstimatedWeeks] = useState<number>(8);
-  const [coverEmoji, setCoverEmoji] = useState("📚");
+  const [coverEmoji, setCoverEmoji] = useState("ðŸ“š");
   const [coverColor, setCoverColor] = useState<string>(programColor(ORG_CONFIG.programs[0] ?? ""));
   const [visibility, setVisibility] = useState<Visibility>("private");
 
@@ -116,7 +116,7 @@ function PathCreatorInner() {
     setDescription(editPath.description);
     setProgramType(editPath.programType);
     setEstimatedWeeks(editPath.estimatedWeeks);
-    setCoverEmoji(editPath.coverEmoji ?? "📚");
+    setCoverEmoji(editPath.coverEmoji ?? "ðŸ“š");
     if (editPath.coverColor) setCoverColor(editPath.coverColor);
     setVisibility((editPath.visibility ?? "public") as Visibility);
     setModules(
@@ -135,7 +135,7 @@ function PathCreatorInner() {
   const [pickerSearch, setPickerSearch] = useState("");
   const [pickerType, setPickerType] = useState<string>("");
 
-  // Rec #1 — inline URL composer state (per module)
+  // Rec #1 â€” inline URL composer state (per module)
   const [urlComposerForModule, setUrlComposerForModule] = useState<number | null>(null);
   const [composerUrl, setComposerUrl] = useState("");
   const [composerTitle, setComposerTitle] = useState("");
@@ -247,7 +247,7 @@ function PathCreatorInner() {
           try {
             await publishPath({ actorId: uid, pathId });
           } catch (e) {
-            // Surface but don't block — the patch already saved.
+            // Surface but don't block â€” the patch already saved.
             setErr(`Saved, but publish failed: ${(e as Error).message}`);
           }
         }
@@ -433,21 +433,21 @@ function PathCreatorInner() {
                   disabled={i === 0}
                   style={miniBtn}
                   title="Move up"
-                >▲</button>
+                >â–²</button>
                 <button
                   type="button"
                   onClick={() => moveModule(i, 1)}
                   disabled={i === modules.length - 1}
                   style={miniBtn}
                   title="Move down"
-                >▼</button>
+                >â–¼</button>
                 <button
                   type="button"
                   onClick={() => removeModule(i)}
                   disabled={modules.length === 1}
                   style={{ ...miniBtn, color: "#fca5a5" }}
                   title="Remove"
-                >✕</button>
+                >âœ•</button>
               </div>
 
               <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
@@ -523,7 +523,7 @@ function PathCreatorInner() {
                         type="button"
                         onClick={() => removePostFromModule(i, pid)}
                         style={{ background: "transparent", border: "none", color: INDIGO, cursor: "pointer", fontSize: 12 }}
-                      >×</button>
+                      >Ã—</button>
                     </span>
                   ))}
                 </div>
@@ -579,7 +579,7 @@ function PathCreatorInner() {
                         disabled={composerSaving || !composerUrl.trim() || !composerTitle.trim()}
                         style={{ ...miniBtn, padding: "6px 14px", background: "#5b6cff", color: "#fff", borderColor: "transparent", fontWeight: 600 }}
                       >
-                        {composerSaving ? "Adding…" : "Add to module"}
+                        {composerSaving ? "Addingâ€¦" : "Add to module"}
                       </button>
                     </div>
                   </div>
@@ -608,7 +608,7 @@ function PathCreatorInner() {
                   </div>
                   <div style={{ maxHeight: 250, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
                     {pickerPosts === undefined ? (
-                      <p style={{ color: MUTED, fontSize: 12 }}>Loading…</p>
+                      <p style={{ color: MUTED, fontSize: 12 }}>Loadingâ€¦</p>
                     ) : pickerPosts.length === 0 ? (
                       <p style={{ color: MUTED, fontSize: 12 }}>No posts match.</p>
                     ) : (
@@ -636,7 +636,7 @@ function PathCreatorInner() {
                                 {p.type}
                               </span>
                               <span style={{ color: TEXT, opacity: 0.9 }}>{p.contentSnippet || "(no content)"}</span>
-                              {already && <span style={{ marginLeft: "auto", color: GREEN }}>✓ added</span>}
+                              {already && <span style={{ marginLeft: "auto", color: GREEN }}>âœ“ added</span>}
                             </div>
                           </button>
                         );
@@ -662,7 +662,7 @@ function PathCreatorInner() {
           disabled={!canSubmit || saving}
           style={{ padding: "10px 18px", borderRadius: 99, background: "transparent", color: TEXT, border: `1px solid ${BORDER2}`, fontWeight: 600, fontSize: 13, cursor: "pointer" }}
         >
-          {saving ? "Saving…" : "Save as draft"}
+          {saving ? "Savingâ€¦" : "Save as draft"}
         </button>
         <button
           type="button"
@@ -670,7 +670,7 @@ function PathCreatorInner() {
           disabled={!canSubmit || saving || (visibility === "public" && !canPublishPublic)}
           style={{ padding: "10px 18px", borderRadius: 99, background: `linear-gradient(135deg, ${ORANGE}, #ea580c)`, color: "#fff", border: "none", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
         >
-          {saving ? "Publishing…" : "Save & Publish"}
+          {saving ? "Publishingâ€¦" : "Save & Publish"}
         </button>
       </div>
     </div>
@@ -691,7 +691,7 @@ const inputStyle: React.CSSProperties = {
 const miniBtn: React.CSSProperties = {
   padding: "4px 10px",
   borderRadius: 6,
-  background: "rgba(255,255,255,0.05)",
+  background: "var(--lh-card-3)",
   border: `1px solid ${BORDER2}`,
   color: TEXT,
   fontSize: 12,

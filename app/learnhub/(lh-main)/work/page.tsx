@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Suspense, useState, useMemo } from "react";
 import { format } from "date-fns";
@@ -9,15 +9,15 @@ import { useLearnhubSession } from "@/lib/learnhub/hooks";
 import { orgHeadlineLabel } from "@/lib/learnhub/org-config";
 import type { Id } from "@/convex/_generated/dataModel";
 
-// ── Design tokens ────────────────────────────────────────────
-const BG = "#090b18";
-const CARD = "#111323";
-const CARD2 = "#161929";
-const BORDER = "rgba(255,255,255,0.06)";
-const BORDER2 = "rgba(255,255,255,0.1)";
-const TEXT = "#e8eaf4";
-const MUTED = "rgba(185,190,230,0.6)";
-const DIM = "rgba(100,110,165,0.5)";
+// â”€â”€ Design tokens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const BG = "var(--lh-bg)";
+const CARD = "var(--lh-card)";
+const CARD2 = "var(--lh-card-2)";
+const BORDER = "var(--lh-border)";
+const BORDER2 = "var(--lh-border-strong)";
+const TEXT = "var(--lh-text)";
+const MUTED = "var(--lh-text-2)";
+const DIM = "var(--lh-text-3)";
 const ORANGE = "#f97316";
 const GREEN = "#22c55e";
 const SKY = "#38bdf8";
@@ -25,7 +25,7 @@ const INDIGO = "#6366f1";
 
 const ACCENT_CYCLE = [GREEN, INDIGO, ORANGE, "#a855f7", SKY, "#ec4899", "#fbbf24"] as const;
 
-// ── Types ─────────────────────────────────────────────────────
+// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 type Opportunity = {
   _id: string;
   orgName: string;
@@ -54,14 +54,14 @@ type Opportunity = {
   isSeed?: boolean;
 };
 
-// ── Seed fallback ─────────────────────────────────────────────
+// â”€â”€ Seed fallback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Domain-diverse examples shown when no real opportunities are live, so new
 // learners from any field see the platform supports them.
 const SEED_OPPORTUNITIES: Opportunity[] = [
   {
     _id: "w1", orgName: "TechCorp Philippines", title: "Remote IT Support Specialist",
     description: "Join our helpdesk team providing technical support to corporate clients across Luzon.",
-    workType: "remote", payType: "paid", payAmount: "₱18,000/mo", slots: 3,
+    workType: "remote", payType: "paid", payAmount: "â‚±18,000/mo", slots: 3,
     deadline: Date.now() + 7 * 86400000, duration: "6 months",
     requiredCertTypes: [], requiredSkills: ["IT support", "Troubleshooting"],
     minXp: 500, eligibilityMode: "guided", status: "open", isSeed: true,
@@ -69,7 +69,7 @@ const SEED_OPPORTUNITIES: Opportunity[] = [
   {
     _id: "w2", orgName: "Bicol Regional Hospital", title: "Community Health Volunteer",
     description: "Support outreach clinics and health education campaigns across rural barangays.",
-    workType: "onsite", payType: "stipend", payAmount: "₱6,000/mo", slots: 8,
+    workType: "onsite", payType: "stipend", payAmount: "â‚±6,000/mo", slots: 8,
     deadline: Date.now() + 14 * 86400000, duration: "3 months",
     requiredCertTypes: [], requiredSkills: ["First Aid", "Communication"],
     preferredSkills: ["Public Health"], minXp: 200, eligibilityMode: "open",
@@ -78,7 +78,7 @@ const SEED_OPPORTUNITIES: Opportunity[] = [
   {
     _id: "w3", orgName: "Sorsogon Coop Farms", title: "Apprentice Field Technician (Agriculture)",
     description: "Learn modern sustainable-farming practices and assist farmer cooperatives in Sorsogon.",
-    workType: "onsite", payType: "stipend", payAmount: "₱7,500/mo", slots: 4,
+    workType: "onsite", payType: "stipend", payAmount: "â‚±7,500/mo", slots: 4,
     deadline: Date.now() + 21 * 86400000, duration: "6 months",
     requiredCertTypes: [], requiredSkills: ["Agriculture"],
     preferredSkills: ["Communication"], minXp: 100, eligibilityMode: "open",
@@ -87,7 +87,7 @@ const SEED_OPPORTUNITIES: Opportunity[] = [
   {
     _id: "w4", orgName: "Bicol E-Commerce Hub", title: "Social Media Content Creator",
     description: "Create digital content promoting local MSMEs and their products online.",
-    workType: "remote", payType: "paid", payAmount: "₱15,000/mo", slots: 1,
+    workType: "remote", payType: "paid", payAmount: "â‚±15,000/mo", slots: 1,
     deadline: Date.now() + 5 * 86400000, duration: "4 months",
     requiredCertTypes: [], requiredSkills: ["Content creation"],
     preferredSkills: ["Graphic Design", "Writing"], minXp: 800, eligibilityMode: "guided",
@@ -104,7 +104,7 @@ const SEED_OPPORTUNITIES: Opportunity[] = [
   {
     _id: "w6", orgName: "Camarines Crafts Co.", title: "Bookkeeping Assistant",
     description: "Help local artisans track inventory, expenses, and small-business finances each week.",
-    workType: "hybrid", payType: "paid", payAmount: "₱12,000/mo", slots: 2,
+    workType: "hybrid", payType: "paid", payAmount: "â‚±12,000/mo", slots: 2,
     deadline: Date.now() + 14 * 86400000, duration: "Ongoing",
     requiredCertTypes: [], requiredSkills: ["Accounting"],
     preferredSkills: ["Communication"], minXp: 300, eligibilityMode: "guided",
@@ -112,7 +112,7 @@ const SEED_OPPORTUNITIES: Opportunity[] = [
   },
 ];
 
-// ── Helpers ───────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function orgInitials(name: string): string {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
 }
@@ -127,19 +127,19 @@ function matchColor(score: number): string {
 const WORK_LABEL: Record<string, string> = { remote: "Remote", hybrid: "Hybrid", onsite: "On-site" };
 const PAY_LABEL: Record<string, string> = { volunteer: "Volunteer", stipend: "Stipend", paid: "Paid" };
 function salaryStr(opp: Opportunity): string {
-  return opp.payAmount ? `${PAY_LABEL[opp.payType]} · ${opp.payAmount}` : PAY_LABEL[opp.payType];
+  return opp.payAmount ? `${PAY_LABEL[opp.payType]} Â· ${opp.payAmount}` : PAY_LABEL[opp.payType];
 }
 
-// ── Progress Bar ──────────────────────────────────────────────
+// â”€â”€ Progress Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function ProgressBar({ pct, color }: { pct: number; color: string }) {
   return (
-    <div style={{ height: 4, borderRadius: 2, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
+    <div style={{ height: 4, borderRadius: 2, background: "var(--lh-border-strong)", overflow: "hidden" }}>
       <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 2, transition: "width 0.6s ease" }} />
     </div>
   );
 }
 
-// ── Band ─────────────────────────────────────────────────────
+// â”€â”€ Band â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function Band({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 24 }}>
@@ -154,7 +154,7 @@ function Band({ title, subtitle, children }: { title: string; subtitle: string; 
   );
 }
 
-// ── Opportunity Card ──────────────────────────────────────────
+// â”€â”€ Opportunity Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function OppCard({ opp, idx, applied, onClick }: { opp: Opportunity; idx: number; applied: boolean; onClick: () => void }) {
   const [hov, setHov] = useState(false);
   const accent = ac(idx);
@@ -205,7 +205,7 @@ function OppCard({ opp, idx, applied, onClick }: { opp: Opportunity; idx: number
         <span style={{ padding: "3px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700, background: `${accent}1a`, color: accent, border: `1px solid ${accent}33` }}>
           {WORK_LABEL[opp.workType]}
         </span>
-        <span style={{ padding: "3px 8px", borderRadius: 6, fontSize: 10, fontWeight: 600, background: "rgba(255,255,255,0.04)", color: MUTED, border: `1px solid ${BORDER}` }}>
+        <span style={{ padding: "3px 8px", borderRadius: 6, fontSize: 10, fontWeight: 600, background: "var(--lh-card-3)", color: MUTED, border: `1px solid ${BORDER}` }}>
           {opp.duration}
         </span>
         {opp.requiredCertTypes.slice(0, 2).map((c) => (
@@ -225,7 +225,7 @@ function OppCard({ opp, idx, applied, onClick }: { opp: Opportunity; idx: number
         <div>
           <ProgressBar pct={score} color={mc} />
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 5, fontSize: 10.5, color: DIM }}>
-            <span>{eligible ? "✓ Requirements met" : "⚠ Missing required certificate"}</span>
+            <span>{eligible ? "âœ“ Requirements met" : "âš  Missing required certificate"}</span>
             <span>{salaryStr(opp)}</span>
           </div>
         </div>
@@ -235,20 +235,20 @@ function OppCard({ opp, idx, applied, onClick }: { opp: Opportunity; idx: number
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 10, borderTop: `1px solid ${BORDER}` }}>
         <div style={{ fontSize: 11, color: MUTED }}>
           <span style={{ color: isExpired ? "#fb7185" : MUTED }}>
-            {isExpired ? "⏰ Closed" : `⏰ Apply by ${format(opp.deadline, "MMM d")}`}
+            {isExpired ? "â° Closed" : `â° Apply by ${format(opp.deadline, "MMM d")}`}
           </span>
-          <span style={{ color: DIM }}> · </span>
+          <span style={{ color: DIM }}> Â· </span>
           <span>{opp.slots - (opp.filledSlots ?? 0)}/{opp.slots} slots</span>
         </div>
         <div style={{ padding: "5px 12px", borderRadius: 14, fontSize: 11, fontWeight: 700, background: applied ? `${GREEN}1c` : `${accent}1c`, color: applied ? GREEN : accent, border: `1px solid ${applied ? GREEN : accent}44` }}>
-          {applied ? "✓ Applied" : "View →"}
+          {applied ? "âœ“ Applied" : "View â†’"}
         </div>
       </div>
     </div>
   );
 }
 
-// ── Job Detail Modal ──────────────────────────────────────────
+// â”€â”€ Job Detail Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function JobDetailModal({
   opp, idx, applied, isMine, isStudent,
   onClose, onApply, onApplyWithNote, onClosePosting,
@@ -277,7 +277,7 @@ function JobDetailModal({
 
         {/* Banner */}
         <div style={{ position: "relative", padding: "22px 26px 18px", background: `linear-gradient(135deg,${accent}26,${orgCol}1a 55%,${CARD} 100%)`, borderBottom: `1px solid ${BORDER}` }}>
-          <button onClick={onClose} style={{ position: "absolute", top: 14, right: 14, width: 30, height: 30, borderRadius: "50%", border: "none", cursor: "pointer", background: "rgba(0,0,0,0.4)", color: TEXT, fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+          <button onClick={onClose} style={{ position: "absolute", top: 14, right: 14, width: 30, height: 30, borderRadius: "50%", border: "none", cursor: "pointer", background: "rgba(0,0,0,0.4)", color: TEXT, fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>Ã—</button>
           <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
             <div style={{ width: 54, height: 54, borderRadius: 12, background: `${orgCol}22`, border: `1px solid ${orgCol}55`, display: "flex", alignItems: "center", justifyContent: "center", color: orgCol, fontSize: 16, fontWeight: 800, flexShrink: 0 }}>{ini}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -285,10 +285,10 @@ function JobDetailModal({
               <div style={{ fontSize: 13, color: MUTED, marginTop: 4 }}><span style={{ fontWeight: 600, color: TEXT }}>{opp.orgName}</span></div>
               <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
                 <span style={{ padding: "4px 10px", borderRadius: 8, fontSize: 11, fontWeight: 700, background: `${accent}1c`, color: accent, border: `1px solid ${accent}44` }}>{WORK_LABEL[opp.workType]}</span>
-                <span style={{ padding: "4px 10px", borderRadius: 8, fontSize: 11, fontWeight: 600, background: "rgba(255,255,255,0.05)", color: MUTED, border: `1px solid ${BORDER}` }}>{opp.duration}</span>
-                <span style={{ padding: "4px 10px", borderRadius: 8, fontSize: 11, fontWeight: 600, background: "rgba(255,255,255,0.05)", color: MUTED, border: `1px solid ${BORDER}` }}>💰 {salaryStr(opp)}</span>
-                <span style={{ padding: "4px 10px", borderRadius: 8, fontSize: 11, fontWeight: 600, background: "rgba(255,255,255,0.05)", color: isExpired ? "#fb7185" : MUTED, border: `1px solid ${BORDER}` }}>
-                  📅 {isExpired ? "Closed" : `Apply by ${format(opp.deadline, "MMM d, yyyy")}`}
+                <span style={{ padding: "4px 10px", borderRadius: 8, fontSize: 11, fontWeight: 600, background: "var(--lh-card-3)", color: MUTED, border: `1px solid ${BORDER}` }}>{opp.duration}</span>
+                <span style={{ padding: "4px 10px", borderRadius: 8, fontSize: 11, fontWeight: 600, background: "var(--lh-card-3)", color: MUTED, border: `1px solid ${BORDER}` }}>ðŸ’° {salaryStr(opp)}</span>
+                <span style={{ padding: "4px 10px", borderRadius: 8, fontSize: 11, fontWeight: 600, background: "var(--lh-card-3)", color: isExpired ? "#fb7185" : MUTED, border: `1px solid ${BORDER}` }}>
+                  ðŸ“… {isExpired ? "Closed" : `Apply by ${format(opp.deadline, "MMM d, yyyy")}`}
                 </span>
               </div>
             </div>
@@ -316,7 +316,7 @@ function JobDetailModal({
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {opp.match.missingRequirements.map((r, i) => (
                     <span key={i} style={{ padding: "4px 10px", borderRadius: 14, fontSize: 10.5, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(251,113,133,0.08)", color: "#fb7185", border: "1px solid rgba(251,113,133,0.25)" }}>
-                      ○ {r}
+                      â—‹ {r}
                     </span>
                   ))}
                 </div>
@@ -339,8 +339,8 @@ function JobDetailModal({
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {opp.requiredCertTypes.map((c) => (
-                    <div key={c} style={{ padding: "7px 10px", borderRadius: 8, background: "rgba(255,255,255,0.04)", border: `1px solid ${BORDER}`, fontSize: 12, color: MUTED, display: "flex", alignItems: "center", gap: 7 }}>
-                      ○ {c}
+                    <div key={c} style={{ padding: "7px 10px", borderRadius: 8, background: "var(--lh-card-3)", border: `1px solid ${BORDER}`, fontSize: 12, color: MUTED, display: "flex", alignItems: "center", gap: 7 }}>
+                      â—‹ {c}
                     </div>
                   ))}
                 </div>
@@ -350,7 +350,7 @@ function JobDetailModal({
               <div style={{ fontSize: 12, fontWeight: 700, color: DIM, letterSpacing: 1, marginBottom: 9 }}>KEY SKILLS</div>
               <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
                 {(opp.requiredSkills ?? []).map((s) => (
-                  <span key={s} style={{ padding: "4px 9px", borderRadius: 14, fontSize: 11, background: "rgba(255,255,255,0.05)", color: MUTED, border: `1px solid ${BORDER}` }}>{s}</span>
+                  <span key={s} style={{ padding: "4px 9px", borderRadius: 14, fontSize: 11, background: "var(--lh-card-3)", color: MUTED, border: `1px solid ${BORDER}` }}>{s}</span>
                 ))}
                 {(opp.preferredSkills ?? []).map((s) => (
                   <span key={s} style={{ padding: "4px 9px", borderRadius: 14, fontSize: 11, background: "rgba(255,255,255,0.03)", color: DIM, border: `1px solid ${BORDER}` }}>{s} (preferred)</span>
@@ -371,7 +371,7 @@ function JobDetailModal({
             {opp.minXp && (
               <div>
                 <div style={{ fontSize: 9.5, color: DIM, letterSpacing: 0.6, fontWeight: 600, marginBottom: 2 }}>MIN XP</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: TEXT }}>⚡ {opp.minXp.toLocaleString()}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: TEXT }}>âš¡ {opp.minXp.toLocaleString()}</div>
               </div>
             )}
             <div>
@@ -390,7 +390,7 @@ function JobDetailModal({
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 rows={4}
-                placeholder="Explain your related experience, motivation, or why the poster should still consider you…"
+                placeholder="Explain your related experience, motivation, or why the poster should still consider youâ€¦"
                 style={{ width: "100%", background: CARD2, border: `1px solid ${BORDER2}`, borderRadius: 10, color: TEXT, padding: "10px 12px", fontSize: 13, resize: "vertical", outline: "none", fontFamily: "inherit" }}
               />
             </div>
@@ -402,17 +402,17 @@ function JobDetailModal({
           {isMine ? (
             <>
               <button onClick={onClose} style={{ padding: "10px 18px", borderRadius: 10, border: `1px solid ${BORDER2}`, background: "transparent", color: MUTED, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Close</button>
-              <button onClick={() => { onClosePosting(); onClose(); }} style={{ flex: 1, padding: 10, borderRadius: 10, border: "1px solid #fb7185aa", background: "rgba(251,113,133,0.1)", color: "#fb7185", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>🗑 Close this posting</button>
+              <button onClick={() => { onClosePosting(); onClose(); }} style={{ flex: 1, padding: 10, borderRadius: 10, border: "1px solid #fb7185aa", background: "rgba(251,113,133,0.1)", color: "#fb7185", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>ðŸ—‘ Close this posting</button>
             </>
           ) : (
             <>
-              <button onClick={onClose} style={{ padding: "10px 18px", borderRadius: 10, border: `1px solid ${BORDER2}`, background: "transparent", color: TEXT, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>💬 Message</button>
+              <button onClick={onClose} style={{ padding: "10px 18px", borderRadius: 10, border: `1px solid ${BORDER2}`, background: "transparent", color: TEXT, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>ðŸ’¬ Message</button>
               <button
                 onClick={() => { if (canApply) { needsNote ? onApplyWithNote(note) : onApply(); } }}
                 disabled={applyDisabled}
                 style={{
                   flex: 1, padding: 10, borderRadius: 10, border: "none",
-                  background: applied ? `${GREEN}22` : !canApply ? "rgba(255,255,255,0.06)" : `linear-gradient(135deg,${accent},${accent}cc)`,
+                  background: applied ? `${GREEN}22` : !canApply ? "var(--lh-border)" : `linear-gradient(135deg,${accent},${accent}cc)`,
                   color: applied ? GREEN : !canApply ? DIM : "white",
                   fontSize: 13, fontWeight: 700,
                   cursor: applyDisabled ? "not-allowed" : "pointer",
@@ -421,7 +421,7 @@ function JobDetailModal({
                   transition: "opacity 0.2s",
                 }}
               >
-                {applied ? "✓ Application submitted" : opp.isSeed ? "Preview only" : isExpired ? "Applications closed" : !isStudent ? "Log in as student to apply" : needsNote ? "Submit for Review →" : "Apply now →"}
+                {applied ? "âœ“ Application submitted" : opp.isSeed ? "Preview only" : isExpired ? "Applications closed" : !isStudent ? "Log in as student to apply" : needsNote ? "Submit for Review â†’" : "Apply now â†’"}
               </button>
             </>
           )}
@@ -431,11 +431,11 @@ function JobDetailModal({
   );
 }
 
-// ── Empty state ───────────────────────────────────────────────
+// â”€â”€ Empty state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function EmptyState({ tab, onBrowse }: { tab: string; onBrowse: () => void }) {
   return (
     <div style={{ textAlign: "center", padding: "72px 0", color: DIM }}>
-      <div style={{ fontSize: 38, marginBottom: 10 }}>{tab === "applied" ? "📨" : tab === "mine" ? "📌" : "🔍"}</div>
+      <div style={{ fontSize: 38, marginBottom: 10 }}>{tab === "applied" ? "ðŸ“¨" : tab === "mine" ? "ðŸ“Œ" : "ðŸ”"}</div>
       <div style={{ fontSize: 14, color: MUTED, fontWeight: 600 }}>
         {tab === "applied" ? "You haven't applied to anything yet" : tab === "mine" ? "You haven't posted any opportunities yet" : "No matching opportunities"}
       </div>
@@ -443,7 +443,7 @@ function EmptyState({ tab, onBrowse }: { tab: string; onBrowse: () => void }) {
         {tab === "applied" ? `Browse "For You" to find roles that fit your profile.` : tab === "mine" ? `Click "Post a job order" to publish your first opportunity.` : "Try a different keyword or filter."}
       </div>
       {tab === "applied" && (
-        <button onClick={onBrowse} style={{ marginTop: 16, padding: "9px 18px", borderRadius: 20, border: "none", background: ORANGE, color: "white", fontWeight: 700, fontSize: 12.5, cursor: "pointer" }}>✨ See For You</button>
+        <button onClick={onBrowse} style={{ marginTop: 16, padding: "9px 18px", borderRadius: 20, border: "none", background: ORANGE, color: "white", fontWeight: 700, fontSize: 12.5, cursor: "pointer" }}>âœ¨ See For You</button>
       )}
       {tab === "mine" && (
         <Link href="/learnhub/work/post" style={{ display: "inline-block", marginTop: 16, padding: "9px 18px", borderRadius: 20, background: `linear-gradient(135deg,${ORANGE},#ea580c)`, color: "white", fontWeight: 700, fontSize: 12.5, textDecoration: "none", boxShadow: `0 4px 14px ${ORANGE}55` }}>
@@ -454,7 +454,7 @@ function EmptyState({ tab, onBrowse }: { tab: string; onBrowse: () => void }) {
   );
 }
 
-// ── Main page ─────────────────────────────────────────────────
+// â”€â”€ Main page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function WorkPageInner() {
   const [tab, setTab] = useState<"foryou" | "all" | "applied" | "mine">("foryou");
   const [query, setQuery] = useState("");
@@ -510,7 +510,7 @@ function WorkPageInner() {
       } else {
         await applyMutation({ opportunityId: opp._id as Id<"learnhub_work_opportunities">, studentId: userId as Id<"learnhub_users">, actorId: userId as Id<"learnhub_users">, note: note?.trim() || undefined, reasoningNote: note?.trim() || undefined });
       }
-      showToast(`Application submitted to ${opp.orgName} ✓`);
+      showToast(`Application submitted to ${opp.orgName} âœ“`);
       setOpenOpp(null);
     } catch (err) {
       setApplied((s) => { const n = new Set(s); n.delete(opp._id); return n; });
@@ -522,34 +522,34 @@ function WorkPageInner() {
 
   type TabId = "foryou" | "all" | "applied" | "mine";
   const TABS: { id: TabId; label: string; count: number | null }[] = [
-    { id: "foryou",  label: "✨ For You",     count: isStudent ? scored.length : null },
-    { id: "all",     label: "📋 All",          count: source.length },
-    ...(isStudent ? [{ id: "applied" as TabId, label: "📨 Applied",     count: myApps.length }] : []),
-    ...(canPost    ? [{ id: "mine"    as TabId, label: "📌 My Postings", count: 0 }] : []),
+    { id: "foryou",  label: "âœ¨ For You",     count: isStudent ? scored.length : null },
+    { id: "all",     label: "ðŸ“‹ All",          count: source.length },
+    ...(isStudent ? [{ id: "applied" as TabId, label: "ðŸ“¨ Applied",     count: myApps.length }] : []),
+    ...(canPost    ? [{ id: "mine"    as TabId, label: "ðŸ“Œ My Postings", count: 0 }] : []),
   ];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", background: BG }}>
 
-      {/* ── Header ── */}
+      {/* â”€â”€ Header â”€â”€ */}
       <div style={{ padding: "20px 24px 0", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14, marginBottom: 16 }}>
           <div>
             <div style={{ fontSize: 11, fontWeight: 700, color: ORANGE, letterSpacing: 1.4, marginBottom: 4, fontFamily: "var(--font-dm-sans, sans-serif)" }}>
-              WORK BOARD · {orgHeadlineLabel()}
+              WORK BOARD Â· {orgHeadlineLabel()}
             </div>
             <h1 style={{ fontSize: 26, fontWeight: 700, color: TEXT, lineHeight: 1.2, fontFamily: "var(--font-dm-serif, serif)", margin: 0 }}>
               Opportunities matched to your{" "}
               <em style={{ color: ORANGE }}>learning</em>
             </h1>
             <p style={{ fontSize: 13, color: MUTED, marginTop: 6, lineHeight: 1.5, maxWidth: 520 }}>
-              Real opportunities posted by mentors and partner organizations — personalized to your certificates, courses, and interests.
+              Real opportunities posted by mentors and partner organizations â€” personalized to your certificates, courses, and interests.
             </p>
           </div>
           {canPost && (
             <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "center", paddingTop: 4 }}>
               <Link href="/learnhub/work/manage" style={{ padding: "9px 14px", borderRadius: 11, border: `1px solid ${BORDER2}`, background: "transparent", color: MUTED, fontSize: 12, fontWeight: 600, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}>
-                📋 Manage
+                ðŸ“‹ Manage
               </Link>
               <Link href="/learnhub/work/post" style={{ padding: "9px 16px", borderRadius: 11, background: `linear-gradient(135deg,${ORANGE},#ea580c)`, color: "white", fontSize: 12.5, fontWeight: 700, boxShadow: `0 6px 18px ${ORANGE}55`, display: "inline-flex", alignItems: "center", gap: 7, textDecoration: "none" }}>
                 <span style={{ fontSize: 14, fontWeight: 800 }}>+</span> Post a job order
@@ -561,7 +561,7 @@ function WorkPageInner() {
         {/* Personalized banner */}
         {isStudent && tab === "foryou" && strong.length > 0 && (
           <div style={{ marginBottom: 14, padding: "12px 15px", borderRadius: 12, background: `linear-gradient(120deg,${GREEN}1c,${INDIGO}10 70%,transparent)`, border: `1px solid ${GREEN}33`, display: "flex", alignItems: "center", gap: 11 }}>
-            <div style={{ fontSize: 22 }}>✨</div>
+            <div style={{ fontSize: 22 }}>âœ¨</div>
             <div style={{ flex: 1, fontSize: 12.5, color: TEXT, lineHeight: 1.45 }}>
               <strong>{strong.length} strong match{strong.length !== 1 ? "es" : ""}</strong> found based on your profile. Eligible roles are ready to apply now.
             </div>
@@ -569,12 +569,12 @@ function WorkPageInner() {
         )}
 
         {/* Tabs */}
-        <div style={{ display: "flex", gap: 4, background: "rgba(255,255,255,0.04)", borderRadius: 10, padding: 4, marginBottom: 12 }}>
+        <div style={{ display: "flex", gap: 4, background: "var(--lh-card-3)", borderRadius: 10, padding: 4, marginBottom: 12 }}>
           {TABS.map((t) => (
             <button key={t.id} onClick={() => setTab(t.id)} style={{ flex: 1, padding: "8px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, background: tab === t.id ? CARD2 : "transparent", color: tab === t.id ? TEXT : DIM, transition: "all 0.18s", boxShadow: tab === t.id ? "0 2px 8px rgba(0,0,0,0.3)" : "none", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
               {t.label}
               {t.count !== null && (
-                <span style={{ padding: "1px 7px", borderRadius: 8, fontSize: 10, fontWeight: 700, background: tab === t.id ? `${ORANGE}26` : "rgba(255,255,255,0.05)", color: tab === t.id ? ORANGE : DIM }}>{t.count}</span>
+                <span style={{ padding: "1px 7px", borderRadius: 8, fontSize: 10, fontWeight: 700, background: tab === t.id ? `${ORANGE}26` : "var(--lh-card-3)", color: tab === t.id ? ORANGE : DIM }}>{t.count}</span>
               )}
             </button>
           ))}
@@ -582,11 +582,11 @@ function WorkPageInner() {
 
         {/* Search */}
         <div style={{ marginBottom: 14, position: "relative" }}>
-          <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: DIM, pointerEvents: "none" }}>🔍</span>
+          <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: DIM, pointerEvents: "none" }}>ðŸ”</span>
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by role, skill or organization…"
+            placeholder="Search by role, skill or organizationâ€¦"
             style={{ width: "100%", padding: "10px 13px 10px 36px", borderRadius: 10, background: CARD2, border: `1px solid ${BORDER2}`, color: TEXT, fontSize: 13, outline: "none", fontFamily: "inherit" }}
           />
         </div>
@@ -605,22 +605,22 @@ function WorkPageInner() {
         </div>
       )}
 
-      {/* ── Card list ── */}
+      {/* â”€â”€ Card list â”€â”€ */}
       <div style={{ flex: 1, overflowY: "auto", padding: "4px 24px 28px", scrollbarWidth: "thin" }}>
         {showBands ? (
           <>
             {strong.length > 0 && (
-              <Band title="✨ Strong matches" subtitle={`${strong.length} role${strong.length !== 1 ? "s" : ""} match your profile`}>
+              <Band title="âœ¨ Strong matches" subtitle={`${strong.length} role${strong.length !== 1 ? "s" : ""} match your profile`}>
                 {strong.map((o, i) => <OppCard key={o._id} opp={o} idx={i} applied={applied.has(o._id) || Boolean(o.myApplication)} onClick={() => setOpenOpp({ opp: o, idx: i })} />)}
               </Band>
             )}
             {exploring.length > 0 && (
-              <Band title="🎯 Worth exploring" subtitle="Partial fit — close some skill gaps to improve match">
+              <Band title="ðŸŽ¯ Worth exploring" subtitle="Partial fit â€” close some skill gaps to improve match">
                 {exploring.map((o, i) => <OppCard key={o._id} opp={o} idx={strong.length + i} applied={applied.has(o._id) || Boolean(o.myApplication)} onClick={() => setOpenOpp({ opp: o, idx: strong.length + i })} />)}
               </Band>
             )}
             {stretch.length > 0 && (
-              <Band title="🚀 Stretch goals" subtitle="Aim here once you complete the required certificates">
+              <Band title="ðŸš€ Stretch goals" subtitle="Aim here once you complete the required certificates">
                 {stretch.map((o, i) => <OppCard key={o._id} opp={o} idx={strong.length + exploring.length + i} applied={applied.has(o._id) || Boolean(o.myApplication)} onClick={() => setOpenOpp({ opp: o, idx: strong.length + exploring.length + i })} />)}
               </Band>
             )}
@@ -636,7 +636,7 @@ function WorkPageInner() {
         )}
       </div>
 
-      {/* ── Modal ── */}
+      {/* â”€â”€ Modal â”€â”€ */}
       {openOpp && (
         <JobDetailModal
           opp={openOpp.opp} idx={openOpp.idx}
@@ -649,7 +649,7 @@ function WorkPageInner() {
         />
       )}
 
-      {/* ── Toast ── */}
+      {/* â”€â”€ Toast â”€â”€ */}
       {toast && (
         <div style={{ position: "fixed", bottom: 32, left: "50%", transform: "translateX(-50%)", background: CARD2, border: `1px solid ${GREEN}44`, borderRadius: 12, padding: "12px 20px", fontSize: 13, fontWeight: 600, color: GREEN, boxShadow: "0 8px 24px rgba(0,0,0,0.4)", zIndex: 200, whiteSpace: "nowrap" }}>
           {toast}

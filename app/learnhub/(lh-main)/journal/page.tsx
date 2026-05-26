@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * /learnhub/journal — prompted reflection with today's-activity context.
+ * /learnhub/journal â€” prompted reflection with today's-activity context.
  *
  * Three columns on desktop:
  *   • Left:  recent-entries list + 12-week heatmap
- *   • Middle: rotating prompt cards → markdown editor → "Today's activity" panel
+ *   • Middle: rotating prompt cards â†’ markdown editor â†’ "Today's activity" panel
  *   • Right:  mood / energy / confidence stack + "Weekly insight" button
  *
  * Reads `getEntry`, `listEntries`, and `getDayContext` from the extended
@@ -34,26 +34,26 @@ const TODAY = () => new Date().toISOString().split("T")[0];
 type Mood = "low" | "ok" | "good" | "great";
 
 const MOOD_OPTIONS: { id: Mood; label: string; emoji: string; color: string }[] = [
-  { id: "low",   label: "Low",   emoji: "😞", color: "#fb7185" },
-  { id: "ok",    label: "OK",    emoji: "😐", color: "#9ba3cc" },
-  { id: "good",  label: "Good",  emoji: "🙂", color: GREEN },
-  { id: "great", label: "Great", emoji: "🤩", color: ORANGE },
+  { id: "low",   label: "Low",   emoji: "ðŸ˜ž", color: "#fb7185" },
+  { id: "ok",    label: "OK",    emoji: "ðŸ˜", color: "var(--lh-text-2)" },
+  { id: "good",  label: "Good",  emoji: "ðŸ™‚", color: GREEN },
+  { id: "great", label: "Great", emoji: "ðŸ¤©", color: ORANGE },
 ];
 
 function extractTags(text: string): string[] {
-  const matches = text.match(/#[\wÀ-ɏ]+/g) ?? [];
+  const matches = text.match(/#[\wÀ-ɏ]+/g) ?? [];
   return Array.from(new Set(matches.map((t) => t.slice(1).toLowerCase())));
 }
 
-// Lightweight markdown → HTML (same rules as the previous page; kept
+// Lightweight markdown â†’ HTML (same rules as the previous page; kept
 // inline to avoid pulling in a markdown library for one preview pane).
 function renderMarkdown(text: string): string {
   return text
-    .replace(/^# (.+)$/gm, '<h1 style="font-size:1.5em;font-weight:700;color:#e8eaff;margin:0.5em 0">$1</h1>')
-    .replace(/^## (.+)$/gm, '<h2 style="font-size:1.2em;font-weight:600;color:#e8eaff;margin:0.4em 0">$1</h2>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong style="color:#e8eaff">$1</strong>')
+    .replace(/^# (.+)$/gm, '<h1 style="font-size:1.5em;font-weight:700;color:var(--lh-text);margin:0.5em 0">$1</h1>')
+    .replace(/^## (.+)$/gm, '<h2 style="font-size:1.2em;font-weight:600;color:var(--lh-text);margin:0.4em 0">$1</h2>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong style="color:var(--lh-text)">$1</strong>')
     .replace(/\*(.+?)\*/g, '<em style="color:#c8caf0">$1</em>')
-    .replace(/#([\wÀ-ɏ]+)/g, '<span style="color:#5b6cff">#$1</span>')
+    .replace(/#([\wÀ-ɏ]+)/g, '<span style="color:#5b6cff">#$1</span>')
     .replace(/\n/g, "<br/>");
 }
 
@@ -151,7 +151,7 @@ export default function JournalPage() {
       ? `${content}\n\n${heading}\n`
       : `${heading}\n`;
     setContent(next);
-    // Note: promptResponses persistence is a follow-up — for now the
+    // Note: promptResponses persistence is a follow-up â€” for now the
     // prompt text lives inline in `content` like a markdown heading. Slug
     // is kept here so a future structured-response form can wire it.
     void slug;
@@ -173,14 +173,14 @@ export default function JournalPage() {
 
   if (!uid) {
     return (
-      <div className="px-4 py-6" style={{ color: "#e8eaff" }}>
+      <div className="px-4 py-6" style={{ color: "var(--lh-text)" }}>
         <p>Sign in to use your journal.</p>
-        <Link href="/learnhub/login" style={{ color: INDIGO }}>← Sign in</Link>
+        <Link href="/learnhub/login" style={{ color: INDIGO }}>â† Sign in</Link>
       </div>
     );
   }
 
-  // 12-week heatmap data — group recentEntries by date and bucket
+  // 12-week heatmap data â€” group recentEntries by date and bucket
   // intensity by wordCount.
   const heatmap = useMemo(() => {
     if (!recentEntries) return [] as Array<{ date: string; intensity: number; mood?: Mood }>;
@@ -203,7 +203,7 @@ export default function JournalPage() {
 
   return (
     <div style={{
-      padding: "20px 16px", color: "#e8eaff",
+      padding: "20px 16px", color: "var(--lh-text)",
       fontFamily: "var(--font-dm-sans, 'Inter', sans-serif)",
       display: "grid",
       gridTemplateColumns: "260px 1fr 220px",
@@ -212,10 +212,10 @@ export default function JournalPage() {
       maxWidth: 1280, margin: "0 auto",
     }} className="lh-journal-grid">
 
-      {/* ── Left rail ── */}
+      {/* â”€â”€ Left rail â”€â”€ */}
       <aside style={{ display: "flex", flexDirection: "column", gap: 18 }} className="lh-journal-side">
         <section>
-          <h2 style={{ margin: "0 0 8px", fontSize: 11, color: "#9ba3cc", letterSpacing: 1.4, textTransform: "uppercase", fontWeight: 800 }}>
+          <h2 style={{ margin: "0 0 8px", fontSize: 11, color: "var(--lh-text-2)", letterSpacing: 1.4, textTransform: "uppercase", fontWeight: 800 }}>
             12-week heatmap
           </h2>
           <div className="lh-journal-heatmap" style={{
@@ -228,12 +228,12 @@ export default function JournalPage() {
                 {Array.from({ length: 7 }).map((_, dayIdx) => {
                   const cell = heatmap[weekIdx * 7 + dayIdx];
                   if (!cell) return <span key={dayIdx} style={{ width: 12, height: 12 }} />;
-                  const colorByIntensity = ["rgba(255,255,255,0.05)", "#1e2240", "#3a3e6e", ORANGE];
+                  const colorByIntensity = ["var(--lh-card-3)", "#1e2240", "#3a3e6e", ORANGE];
                   return (
                     <button
                       key={dayIdx}
                       onClick={() => setDate(cell.date)}
-                      title={`${cell.date} · ${cell.intensity > 0 ? "wrote" : "skipped"}`}
+                      title={`${cell.date} Â· ${cell.intensity > 0 ? "wrote" : "skipped"}`}
                       style={{
                         width: 12, height: 12, padding: 0, borderRadius: 3, cursor: "pointer",
                         border: cell.date === date ? `1.5px solid ${ORANGE}` : "1px solid transparent",
@@ -248,15 +248,15 @@ export default function JournalPage() {
         </section>
 
         <section>
-          <h2 style={{ margin: "0 0 8px", fontSize: 11, color: "#9ba3cc", letterSpacing: 1.4, textTransform: "uppercase", fontWeight: 800 }}>
+          <h2 style={{ margin: "0 0 8px", fontSize: 11, color: "var(--lh-text-2)", letterSpacing: 1.4, textTransform: "uppercase", fontWeight: 800 }}>
             Recent entries
           </h2>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 360, overflowY: "auto" }}>
             {recentEntries === undefined && (
-              <div style={{ color: "#5c6490", fontSize: 12 }}>Loading…</div>
+              <div style={{ color: "var(--lh-text-3)", fontSize: 12 }}>Loading…</div>
             )}
             {recentEntries && recentEntries.length === 0 && (
-              <div style={{ color: "#5c6490", fontSize: 12 }}>No entries yet</div>
+              <div style={{ color: "var(--lh-text-3)", fontSize: 12 }}>No entries yet</div>
             )}
             {recentEntries?.map((e) => {
               const isActive = e.date === date;
@@ -267,12 +267,12 @@ export default function JournalPage() {
                   border: isActive ? "1px solid rgba(91,108,255,0.35)" : "1px solid transparent",
                   cursor: "pointer",
                 }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 700, color: isActive ? "#cdd2e6" : "#e8eaff", fontFamily: "var(--font-sora, 'Plus Jakarta Sans', sans-serif)" }}>
-                    {format(new Date(e.date + "T12:00:00"), "EEE · MMM d")}
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: isActive ? "#cdd2e6" : "var(--lh-text)", fontFamily: "var(--font-sora, 'Plus Jakarta Sans', sans-serif)" }}>
+                    {format(new Date(e.date + "T12:00:00"), "EEE Â· MMM d")}
                   </div>
-                  <div style={{ marginTop: 2, fontSize: 10.5, color: "#5c6490", display: "flex", gap: 6, alignItems: "center" }}>
+                  <div style={{ marginTop: 2, fontSize: 10.5, color: "var(--lh-text-3)", display: "flex", gap: 6, alignItems: "center" }}>
                     <span>{e.wordCount} words</span>
-                    {e.mood && <span>· {MOOD_OPTIONS.find((m) => m.id === e.mood)?.emoji}</span>}
+                    {e.mood && <span>Â· {MOOD_OPTIONS.find((m) => m.id === e.mood)?.emoji}</span>}
                   </div>
                 </button>
               );
@@ -281,7 +281,7 @@ export default function JournalPage() {
         </section>
       </aside>
 
-      {/* ── Middle column ── */}
+      {/* â”€â”€ Middle column â”€â”€ */}
       <main style={{ display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
         {/* Date navigation */}
         <div style={{
@@ -289,30 +289,30 @@ export default function JournalPage() {
           padding: "8px 12px", borderRadius: 12,
           background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
         }}>
-          <button onClick={() => navigate(-1)} style={navBtnStyle()}>‹</button>
+          <button onClick={() => navigate(-1)} style={navBtnStyle()}>â€¹</button>
           <div style={{ flex: 1, textAlign: "center" }}>
             <input
               type="date" value={date} onChange={(e) => setDate(e.target.value)} max={TODAY()}
               style={{
-                background: "transparent", color: "#e8eaff",
+                background: "transparent", color: "var(--lh-text)",
                 border: 0, outline: "none", fontSize: 14, fontWeight: 700,
                 fontFamily: "var(--font-sora, 'Plus Jakarta Sans', sans-serif)",
                 cursor: "pointer",
               }}
             />
-            <div style={{ fontSize: 11, color: "#9ba3cc", marginTop: 2 }}>
+            <div style={{ fontSize: 11, color: "var(--lh-text-2)", marginTop: 2 }}>
               {format(new Date(date + "T12:00:00"), "EEEE")}
             </div>
           </div>
           <button onClick={() => navigate(1)} disabled={date >= TODAY()} style={{
             ...navBtnStyle(),
             opacity: date >= TODAY() ? 0.3 : 1,
-          }}>›</button>
+          }}>â€º</button>
         </div>
 
         {/* Prompts */}
         <section>
-          <h2 style={{ margin: "0 0 8px", fontSize: 11, color: "#9ba3cc", letterSpacing: 1.4, textTransform: "uppercase", fontWeight: 800, display: "flex", alignItems: "center", gap: 6 }}>
+          <h2 style={{ margin: "0 0 8px", fontSize: 11, color: "var(--lh-text-2)", letterSpacing: 1.4, textTransform: "uppercase", fontWeight: 800, display: "flex", alignItems: "center", gap: 6 }}>
             <Sparkles size={12} /> Today&rsquo;s prompts
           </h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 8 }}>
@@ -347,14 +347,14 @@ export default function JournalPage() {
             <button onClick={() => setPreview((p) => !p)} style={{
               fontSize: 12, padding: "5px 10px", borderRadius: 8, cursor: "pointer",
               background: preview ? "rgba(91,108,255,0.18)" : "transparent",
-              color: preview ? "#cdd2e6" : "#9ba3cc",
+              color: preview ? "#cdd2e6" : "var(--lh-text-2)",
               border: preview ? "1px solid rgba(91,108,255,0.35)" : "1px solid transparent",
               display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 600,
             }}>
               {preview ? <Eye size={12} /> : <EyeOff size={12} />} {preview ? "Preview" : "Edit"}
             </button>
             <div style={{ flex: 1 }} />
-            <span style={{ fontSize: 11, color: "#5c6490" }}>{wordCount} words</span>
+            <span style={{ fontSize: 11, color: "var(--lh-text-3)" }}>{wordCount} words</span>
             {tags.length > 0 && (
               <div style={{ display: "flex", gap: 4 }}>
                 {tags.slice(0, 3).map((t) => (
@@ -380,7 +380,7 @@ export default function JournalPage() {
               placeholder={`What did you learn today?\n\nTip: Use #hashtags to tag topics, **bold** or *italic* for emphasis, # Heading for sections. Click a prompt above to jumpstart your entry.`}
               style={{
                 width: "100%", minHeight: 280, padding: "14px 18px",
-                background: "transparent", color: "#e8eaff", outline: "none",
+                background: "transparent", color: "var(--lh-text)", outline: "none",
                 border: 0, resize: "vertical", fontSize: 14, lineHeight: 1.65,
                 fontFamily: "var(--font-dm-sans, 'Inter', sans-serif)",
               }}
@@ -390,9 +390,9 @@ export default function JournalPage() {
             display: "flex", alignItems: "center", justifyContent: "space-between",
             padding: "10px 14px", borderTop: "1px solid rgba(255,255,255,0.06)",
           }}>
-            <span style={{ fontSize: 11, color: "#5c6490" }}>
+            <span style={{ fontSize: 11, color: "var(--lh-text-3)" }}>
               {date < TODAY() ? `Entry for ${format(new Date(date + "T12:00:00"), "MMM d")}` : "Today's entry"}
-              {linkedSessionIds.length > 0 && ` · ${linkedSessionIds.length} video${linkedSessionIds.length === 1 ? "" : "s"} linked`}
+              {linkedSessionIds.length > 0 && ` Â· ${linkedSessionIds.length} video${linkedSessionIds.length === 1 ? "" : "s"} linked`}
             </span>
             <button onClick={save} disabled={saving} style={{
               padding: "8px 16px", borderRadius: 999, border: 0,
@@ -407,11 +407,11 @@ export default function JournalPage() {
 
         {/* Today's activity */}
         <section>
-          <h2 style={{ margin: "0 0 8px", fontSize: 11, color: "#9ba3cc", letterSpacing: 1.4, textTransform: "uppercase", fontWeight: 800, display: "flex", alignItems: "center", gap: 6 }}>
+          <h2 style={{ margin: "0 0 8px", fontSize: 11, color: "var(--lh-text-2)", letterSpacing: 1.4, textTransform: "uppercase", fontWeight: 800, display: "flex", alignItems: "center", gap: 6 }}>
             <Calendar size={12} /> Today&rsquo;s activity
             {dayContext && dayContext.sessions.length === 0 && dayContext.bookmarks.length === 0 && (
-              <span style={{ color: "#5c6490", letterSpacing: 0, textTransform: "none", fontWeight: 500, marginLeft: 6 }}>
-                · nothing yet
+              <span style={{ color: "var(--lh-text-3)", letterSpacing: 0, textTransform: "none", fontWeight: 500, marginLeft: 6 }}>
+                Â· nothing yet
               </span>
             )}
           </h2>
@@ -424,11 +424,11 @@ export default function JournalPage() {
                 <span style={{ width: 64, aspectRatio: "16/9", borderRadius: 4, overflow: "hidden", background: "#10121e", flexShrink: 0 }}>
                   {s.thumbnail ? (
                     <img src={s.thumbnail} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  ) : <Play size={14} style={{ color: "#9ba3cc" }} />}
+                  ) : <Play size={14} style={{ color: "var(--lh-text-2)" }} />}
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12.5, color: "#e8eaff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.title}</div>
-                  <div style={{ fontSize: 10.5, color: "#9ba3cc", marginTop: 2 }}>{s.progressPct}% watched</div>
+                  <div style={{ fontSize: 12.5, color: "var(--lh-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.title}</div>
+                  <div style={{ fontSize: 10.5, color: "var(--lh-text-2)", marginTop: 2 }}>{s.progressPct}% watched</div>
                 </div>
               </div>
             ))}
@@ -438,20 +438,20 @@ export default function JournalPage() {
                 background: "rgba(91,108,255,0.06)", border: `1px solid ${INDIGO}22`, fontSize: 12, color: "#cdd2e6",
               }}>
                 <BookMarked size={12} style={{ color: INDIGO }} />
-                Saved a post · {b.status.replace("_", " ")}
+                Saved a post Â· {b.status.replace("_", " ")}
               </div>
             ))}
           </div>
         </section>
       </main>
 
-      {/* ── Right rail ── */}
+      {/* â”€â”€ Right rail â”€â”€ */}
       <aside style={{ display: "flex", flexDirection: "column", gap: 14 }} className="lh-journal-side">
         <section style={{
           padding: 14, borderRadius: 12,
           background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)",
         }}>
-          <h2 style={{ margin: "0 0 8px", fontSize: 11, color: "#9ba3cc", letterSpacing: 1.4, textTransform: "uppercase", fontWeight: 800 }}>
+          <h2 style={{ margin: "0 0 8px", fontSize: 11, color: "var(--lh-text-2)", letterSpacing: 1.4, textTransform: "uppercase", fontWeight: 800 }}>
             How was today?
           </h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 4 }}>
@@ -460,9 +460,9 @@ export default function JournalPage() {
               return (
                 <button key={m.id} onClick={() => setMood(active ? undefined : m.id)} title={m.label} style={{
                   padding: "10px 4px", borderRadius: 10,
-                  background: active ? `${m.color}1c` : "rgba(255,255,255,0.04)",
+                  background: active ? `${m.color}1c` : "var(--lh-card-3)",
                   border: active ? `1px solid ${m.color}66` : "1px solid rgba(255,255,255,0.06)",
-                  color: active ? m.color : "#9ba3cc",
+                  color: active ? m.color : "var(--lh-text-2)",
                   cursor: "pointer", fontSize: 20,
                   display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
                 }}>
@@ -485,29 +485,29 @@ export default function JournalPage() {
           <h2 style={{ margin: "0 0 4px", fontSize: 11, color: AMBER, letterSpacing: 1.4, textTransform: "uppercase", fontWeight: 800 }}>
             Weekly insight
           </h2>
-          <p style={{ margin: "0 0 10px", fontSize: 11.5, color: "#9ba3cc", lineHeight: 1.45 }}>
-            Ask the coach to summarize this week&rsquo;s journal — themes, wins, and one suggestion.
+          <p style={{ margin: "0 0 10px", fontSize: 11.5, color: "var(--lh-text-2)", lineHeight: 1.45 }}>
+            Ask the coach to summarize this week&rsquo;s journal â€” themes, wins, and one suggestion.
           </p>
           <button onClick={runWeeklyInsight} disabled={insightLoading} style={{
             width: "100%", padding: "9px 12px", borderRadius: 10,
-            background: AMBER, color: "#06060f", border: 0,
+            background: AMBER, color: "var(--lh-bg)", border: 0,
             fontWeight: 700, fontSize: 12, cursor: insightLoading ? "wait" : "pointer",
             display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
           }}>
             <Sparkles size={12} /> {insightLoading ? "Generating…" : "Generate insight"}
           </button>
           {insight && (
-            <div style={{ marginTop: 10, padding: 10, borderRadius: 8, background: "rgba(0,0,0,0.3)", fontSize: 12, color: "#e8eaff", lineHeight: 1.55 }}>
+            <div style={{ marginTop: 10, padding: 10, borderRadius: 8, background: "rgba(0,0,0,0.3)", fontSize: 12, color: "var(--lh-text)", lineHeight: 1.55 }}>
               {insight.status === "ok" && (insight.text ?? "").split("\n").map((line, i) => (
                 <p key={i} style={{ margin: "0 0 4px" }}>{line}</p>
               ))}
               {insight.status === "not_configured" && (
-                <span style={{ color: "#9ba3cc" }}>
+                <span style={{ color: "var(--lh-text-2)" }}>
                   Insights aren&rsquo;t configured for this deployment. Ask an admin to set <code style={{ color: AMBER }}>LEARNHUB_GROQ_API_KEY</code>.
                 </span>
               )}
               {insight.status === "no_entries" && (
-                <span style={{ color: "#9ba3cc" }}>Write a few entries first — there&rsquo;s nothing to summarize yet.</span>
+                <span style={{ color: "var(--lh-text-2)" }}>Write a few entries first â€” there&rsquo;s nothing to summarize yet.</span>
               )}
               {insight.status === "error" && (
                 <span style={{ color: "#fb7185" }}>{insight.message ?? "Insight failed."}</span>
@@ -531,8 +531,8 @@ export default function JournalPage() {
 function navBtnStyle(): React.CSSProperties {
   return {
     width: 28, height: 28, borderRadius: 8, padding: 0,
-    background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)",
-    color: "#9ba3cc", cursor: "pointer", fontSize: 16, fontWeight: 700,
+    background: "var(--lh-card-3)", border: "1px solid rgba(255,255,255,0.06)",
+    color: "var(--lh-text-2)", cursor: "pointer", fontSize: 16, fontWeight: 700,
   };
 }
 
@@ -549,9 +549,9 @@ function UnitSlider({
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
         <span style={{ color: hue }}>{icon}</span>
-        <span style={{ fontSize: 11, color: "#9ba3cc", letterSpacing: 1.2, textTransform: "uppercase", fontWeight: 800 }}>{label}</span>
-        <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, color: value ? hue : "#5c6490" }}>
-          {value ?? "—"}
+        <span style={{ fontSize: 11, color: "var(--lh-text-2)", letterSpacing: 1.2, textTransform: "uppercase", fontWeight: 800 }}>{label}</span>
+        <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, color: value ? hue : "var(--lh-text-3)" }}>
+          {value ?? "â€”"}
         </span>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 4 }}>
@@ -560,9 +560,9 @@ function UnitSlider({
           return (
             <button key={n} onClick={() => onChange(value === n ? undefined : n)} style={{
               padding: 8, borderRadius: 8, cursor: "pointer",
-              background: filled ? `${hue}28` : "rgba(255,255,255,0.04)",
+              background: filled ? `${hue}28` : "var(--lh-card-3)",
               border: filled ? `1px solid ${hue}66` : "1px solid rgba(255,255,255,0.06)",
-              color: filled ? hue : "#5c6490",
+              color: filled ? hue : "var(--lh-text-3)",
               fontSize: 11, fontWeight: 700,
             }}>{n}</button>
           );

@@ -14,12 +14,12 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { ORG_CONFIG, programColor } from "@/lib/learnhub/org-config";
 
-const BG = "#090b18";
-const CARD = "#111323";
-const BORDER = "rgba(255,255,255,0.06)";
-const BORDER2 = "rgba(255,255,255,0.1)";
-const TEXT = "#e8eaf4";
-const MUTED = "rgba(185,190,230,0.6)";
+const BG = "var(--lh-bg)";
+const CARD = "var(--lh-card)";
+const BORDER = "var(--lh-border)";
+const BORDER2 = "var(--lh-border-strong)";
+const TEXT = "var(--lh-text)";
+const MUTED = "var(--lh-text-2)";
 const INDIGO = "#5b6cff";
 const GREEN = "#22d3a0";
 

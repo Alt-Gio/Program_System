@@ -11,7 +11,7 @@ export function FormProgress({ current, total, showLabel = true }: FormProgressP
   return (
     <div className="w-full">
       {showLabel && (
-        <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: "#9ba3cc" }}>
+        <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: "var(--lh-text-2)" }}>
           <span>Question {current} of {total}</span>
           <span>{pct}% complete</span>
         </div>

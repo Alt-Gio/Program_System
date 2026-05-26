@@ -1,12 +1,12 @@
-"use client";
+﻿"use client";
 
 /**
- * /learnhub/certificates — learner-facing wall of earned certificates.
+ * /learnhub/certificates â€” learner-facing wall of earned certificates.
  *
  * Reads `getCertsByEmail` keyed off the signed-in session email. Now
  * surfaces the Gmail-ingested attachment image when present
  * (`imageStorageId` + `sourceEmail`) so learners see the actual cert PNG
- * the trusted sender mailed them — not just metadata.
+ * the trusted sender mailed them â€” not just metadata.
  */
 
 import { useState } from "react";
@@ -57,22 +57,22 @@ function CertAttachment({ storageId, alt, onOpen }: { storageId: Id<"_storage">;
   const url = useQuery(api.learnhub_cert_ingest.getStorageUrl, { storageId });
   if (url === undefined) {
     return (
-      <div style={{ height: 160, borderRadius: 10, background: "#0d0f1a", animation: "pulse 1.4s infinite" }} />
+      <div style={{ height: 160, borderRadius: 10, background: "var(--lh-input-bg)", animation: "pulse 1.4s infinite" }} />
     );
   }
   if (!url) {
     return (
       <div style={{
-        height: 120, borderRadius: 10, background: "#0d0f1a",
+        height: 120, borderRadius: 10, background: "var(--lh-input-bg)",
         display: "flex", alignItems: "center", justifyContent: "center",
-        color: "#5c6490", fontSize: 12,
+        color: "var(--lh-text-3)", fontSize: 12,
       }}>Attachment unavailable</div>
     );
   }
   return (
     <button onClick={onOpen} style={{
       width: "100%", padding: 0, border: 0, cursor: "pointer",
-      borderRadius: 10, overflow: "hidden", background: "#0d0f1a",
+      borderRadius: 10, overflow: "hidden", background: "var(--lh-input-bg)",
     }} title="Open full size">
       <img src={url} alt={alt} style={{
         width: "100%", maxHeight: 220, objectFit: "cover", display: "block",
@@ -91,7 +91,7 @@ function Lightbox({ url, name, onClose }: { url: string; name: string; onClose: 
       <button onClick={onClose} aria-label="Close" style={{
         position: "absolute", top: 14, right: 14,
         width: 36, height: 36, borderRadius: 999, border: 0,
-        background: "rgba(255,255,255,0.08)", color: "white",
+        background: "var(--lh-border-strong)", color: "white",
         cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center",
       }}><X size={18} /></button>
       <img onClick={(e) => e.stopPropagation()} src={url} alt={name} style={{
@@ -121,7 +121,7 @@ function CertCard({ cert, onClaim, onOpenAttachment }: {
 
   return (
     <div style={{
-      background: "#131626", border: `1px solid ${color}30`,
+      background: "var(--lh-card)", border: `1px solid ${color}30`,
       borderRadius: 18, overflow: "hidden",
       display: "flex", flexDirection: "column",
     }}>
@@ -141,7 +141,7 @@ function CertCard({ cert, onClaim, onOpenAttachment }: {
           </svg>
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#e8eaff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "var(--lh-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {cert.courseTitle}
           </p>
           <span style={{
@@ -170,7 +170,7 @@ function CertCard({ cert, onClaim, onOpenAttachment }: {
           {cert.sourceEmail && (
             <Row label="From email" value={cert.sourceEmail.senderEmail} icon={<Mail size={11} />} />
           )}
-          <Row label="Status" value={isClaimed ? "✓ Claimed" : "Pending Claim"} valueColor={isClaimed ? "#22d3a0" : "#ff8c42"} bold />
+          <Row label="Status" value={isClaimed ? "âœ“ Claimed" : "Pending Claim"} valueColor={isClaimed ? "#22d3a0" : "#ff8c42"} bold />
         </div>
 
         <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
@@ -183,8 +183,8 @@ function CertCard({ cert, onClaim, onOpenAttachment }: {
           )}
           <a href={`/learnhub/verify/${cert.verificationId}`} target="_blank" rel="noopener noreferrer" style={{
             flex: 1, textAlign: "center", padding: "9px 14px", borderRadius: 999,
-            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-            color: "#9ba3cc", fontSize: 13, fontWeight: 600, textDecoration: "none",
+            background: "var(--lh-card-3)", border: "1px solid rgba(255,255,255,0.08)",
+            color: "var(--lh-text-2)", fontSize: 13, fontWeight: 600, textDecoration: "none",
           }}>Verify</a>
           {isClaimed && (
             <button onClick={shareLinkedIn} style={{
@@ -202,8 +202,8 @@ function CertCard({ cert, onClaim, onOpenAttachment }: {
 function Row({ label, value, valueColor, bold, icon }: { label: string; value: string; valueColor?: string; bold?: boolean; icon?: React.ReactNode }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-      <span style={{ color: "#5c6490" }}>{label}</span>
-      <span style={{ color: valueColor ?? "#e8eaff", fontWeight: bold ? 700 : 400, display: "inline-flex", alignItems: "center", gap: 4 }}>
+      <span style={{ color: "var(--lh-text-3)" }}>{label}</span>
+      <span style={{ color: valueColor ?? "var(--lh-text)", fontWeight: bold ? 700 : 400, display: "inline-flex", alignItems: "center", gap: 4 }}>
         {icon}{value}
       </span>
     </div>
@@ -235,33 +235,33 @@ export default function CertificatesPage() {
     <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 16px" }}>
       <div style={{ marginBottom: 22, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#e8eaff", fontFamily: "var(--font-sora, 'Plus Jakarta Sans', sans-serif)" }}>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "var(--lh-text)", fontFamily: "var(--font-sora, 'Plus Jakarta Sans', sans-serif)" }}>
             My Certificates
           </h1>
-          <p style={{ margin: "4px 0 0", fontSize: 13, color: "#9ba3cc" }}>
+          <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--lh-text-2)" }}>
             {certs === undefined
-              ? "Loading…"
+              ? "Loadingâ€¦"
               : `${certs.length} certificate${certs.length === 1 ? "" : "s"} earned`}
-            {hasCerts ? " · click the image to view full size" : ""}
+            {hasCerts ? " Â· click the image to view full size" : ""}
           </p>
         </div>
-        {hasCerts && <div style={{ fontSize: 28 }}>🎓</div>}
+        {hasCerts && <div style={{ fontSize: 28 }}>ðŸŽ“</div>}
       </div>
 
       {certs === undefined && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} style={{ height: 240, borderRadius: 18, background: "#131626", opacity: 0.6 }} />
+            <div key={i} style={{ height: 240, borderRadius: 18, background: "var(--lh-card)", opacity: 0.6 }} />
           ))}
         </div>
       )}
 
       {certs && certs.length === 0 && (
-        <div style={{ padding: 60, textAlign: "center", color: "#9ba3cc" }}>
-          <div style={{ fontSize: 38, marginBottom: 10 }}>🏅</div>
-          <p style={{ margin: 0, fontWeight: 700, color: "#e8eaff", fontFamily: "var(--font-sora, 'Plus Jakarta Sans', sans-serif)" }}>No certificates yet</p>
+        <div style={{ padding: 60, textAlign: "center", color: "var(--lh-text-2)" }}>
+          <div style={{ fontSize: 38, marginBottom: 10 }}>ðŸ…</div>
+          <p style={{ margin: 0, fontWeight: 700, color: "var(--lh-text)", fontFamily: "var(--font-sora, 'Plus Jakarta Sans', sans-serif)" }}>No certificates yet</p>
           <p style={{ margin: "6px 0 0", fontSize: 13 }}>
-            Complete an ILCDB program to earn your first one — or, if your program issues certs by email,
+            Complete an ILCDB program to earn your first one â€” or, if your program issues certs by email,
             ask your coordinator to enable the Gmail auto-ingest on this deployment.
           </p>
         </div>

@@ -1,10 +1,10 @@
-"use client";
+﻿"use client";
 
 /**
  * Route-level error boundary for /learnhub/org and its sub-pages.
  *
  * The most common failure here is "Could not find public function for
- * 'learnhub_org:getOrgSummary'" — surfaced when the Convex backend hasn't
+ * 'learnhub_org:getOrgSummary'" â€” surfaced when the Convex backend hasn't
  * yet received the new module after a deploy. The previous behaviour was
  * an unhandled Server Error that blanked the page. Now we show a clear
  * "deployment lagging" panel with a Retry button.
@@ -36,7 +36,7 @@ export default function OrgError({
     <div
       style={{
         color: "#fff",
-        background: "#06060f",
+        background: "var(--lh-bg)",
         minHeight: "100%",
         padding: 28,
         fontFamily: "'Inter', sans-serif",
@@ -52,7 +52,7 @@ export default function OrgError({
           border: `1px solid ${ORANGE}44`,
         }}
       >
-        <div style={{ fontSize: 32, marginBottom: 6 }}>🚧</div>
+        <div style={{ fontSize: 32, marginBottom: 6 }}>ðŸš§</div>
         <h2 style={{ margin: 0, fontWeight: 800, letterSpacing: "-0.02em" }}>
           {isMissingFunction ? "Org Console deployment lagging" : "Org Console hit an error"}
         </h2>
@@ -102,7 +102,7 @@ export default function OrgError({
             padding: "9px 16px",
             borderRadius: 10,
             background: ORANGE,
-            color: "#06060f",
+            color: "var(--lh-bg)",
             border: 0,
             fontWeight: 700,
             fontSize: 13,
@@ -117,7 +117,7 @@ export default function OrgError({
           style={{
             padding: "9px 16px",
             borderRadius: 10,
-            background: "rgba(255,255,255,0.06)",
+            background: "var(--lh-border)",
             border: "1px solid rgba(255,255,255,0.12)",
             color: "#fff",
             fontSize: 13,
@@ -126,7 +126,7 @@ export default function OrgError({
             display: "inline-block",
           }}
         >
-          Back to feed →
+          Back to feed â†’
         </a>
       </div>
     </div>

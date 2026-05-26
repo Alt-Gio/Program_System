@@ -16,8 +16,8 @@ const ChartTooltip = ({
 }: { active?: boolean; payload?: Array<{ value: number }>; label?: string }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div style={{ background: "#1a1f3a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "8px 14px" }}>
-      {label && <p style={{ color: "#9ba3cc", fontSize: 11, margin: 0 }}>{label}</p>}
+    <div style={{ background: "var(--lh-card-2)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "8px 14px" }}>
+      {label && <p style={{ color: "var(--lh-text-2)", fontSize: 11, margin: 0 }}>{label}</p>}
       <p style={{ color: "#fff", fontSize: 14, fontWeight: 700, margin: 0 }}>{payload[0].value}</p>
     </div>
   );
@@ -35,7 +35,7 @@ export function ModalityPieChart({ data }: { data: Array<{ name: string; value: 
           {data.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
         </Pie>
         <Tooltip content={<ChartTooltip />} />
-        <Legend formatter={(v) => <span style={{ color: "#9ba3cc", fontSize: 12 }}>{v}</span>} />
+        <Legend formatter={(v) => <span style={{ color: "var(--lh-text-2)", fontSize: 12 }}>{v}</span>} />
       </PieChart>
     </ResponsiveContainer>
   );
@@ -51,8 +51,8 @@ export function ProvinceBarChart({
   return (
     <ResponsiveContainer width="100%" height={180}>
       <BarChart data={data} barSize={22}>
-        <XAxis dataKey="province" tick={{ fill: "#9ba3cc", fontSize: 10 }} tickFormatter={(v) => abbrMap[v] ?? v} />
-        <YAxis tick={{ fill: "#9ba3cc", fontSize: 10 }} />
+        <XAxis dataKey="province" tick={{ fill: "var(--lh-text-2)", fontSize: 10 }} tickFormatter={(v) => abbrMap[v] ?? v} />
+        <YAxis tick={{ fill: "var(--lh-text-2)", fontSize: 10 }} />
         <Tooltip content={<ChartTooltip />} />
         <Bar dataKey="count" radius={[4, 4, 0, 0]}>
           {data.map((_, i) => (
@@ -73,7 +73,7 @@ export function SectorPieChart({ data }: { data: Array<{ name: string; value: nu
           {data.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
         </Pie>
         <Tooltip content={<ChartTooltip />} />
-        <Legend formatter={(v) => <span style={{ color: "#9ba3cc", fontSize: 11 }}>{v}</span>} />
+        <Legend formatter={(v) => <span style={{ color: "var(--lh-text-2)", fontSize: 11 }}>{v}</span>} />
       </PieChart>
     </ResponsiveContainer>
   );
@@ -84,8 +84,8 @@ export function CategoryBarChart({ data }: { data: Array<{ category: string; cou
   return (
     <ResponsiveContainer width="100%" height={180}>
       <BarChart data={data} layout="vertical" barSize={16}>
-        <XAxis type="number" tick={{ fill: "#9ba3cc", fontSize: 10 }} />
-        <YAxis type="category" dataKey="category" tick={{ fill: "#9ba3cc", fontSize: 10 }} width={100} />
+        <XAxis type="number" tick={{ fill: "var(--lh-text-2)", fontSize: 10 }} />
+        <YAxis type="category" dataKey="category" tick={{ fill: "var(--lh-text-2)", fontSize: 10 }} width={100} />
         <Tooltip content={<ChartTooltip />} />
         <Bar dataKey="count" radius={[0, 4, 4, 0]}>
           {data.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}

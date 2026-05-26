@@ -70,7 +70,7 @@ function Avatar({ author }: { author: MockAuthor }) {
         width={38}
         height={38}
         className="rounded-full object-cover"
-        style={{ background: "#1a1d30" }}
+        style={{ background: "var(--lh-card-2)" }}
         onError={(e) => {
           (e.currentTarget as HTMLImageElement).src = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(author.name)}`;
         }}

@@ -34,6 +34,22 @@
   --lh-shadow-lg:    0 8px 32px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06);
   --lh-shadow-accent:0 4px 16px rgba(255,107,53,0.25);
 
+  /* Semantic tokens for inline-styled LearnHub pages. Light-mode
+     defaults here; dark-mode overrides below. These cover the literal
+     hex codes pages previously hard-coded (e.g. #111323, #131626,
+     rgba(255,255,255,0.06)) so a single CSS variable now flips with
+     the theme attribute. */
+  --lh-card:         #FFFFFF;          /* alt surface for cards (lh-surface-2 fallback) */
+  --lh-card-2:       #F5F6FB;          /* deeper card surface */
+  --lh-card-3:       #ECEEF6;          /* deepest card / inset */
+  --lh-border:       rgba(15,23,42,0.08);
+  --lh-border-strong:rgba(15,23,42,0.14);
+  --lh-text-soft:    #6B7280;          /* between text-2 and text-3 */
+  --lh-input-bg:     #FFFFFF;          /* form fields */
+  --lh-overlay:      rgba(15,23,42,0.42);
+  --lh-tint-indigo:  rgba(91,108,255,0.12);
+  --lh-tint-orange:  rgba(249,115,22,0.10);
+
   --lh-r-sm:   8px;
   --lh-r-md:   12px;
   --lh-r-lg:   16px;
@@ -74,6 +90,19 @@
   --lh-shadow-md:    0 4px 16px rgba(0,0,0,0.4);
   --lh-shadow-lg:    0 8px 32px rgba(0,0,0,0.5);
   --lh-shadow-accent:0 4px 16px rgba(255,112,67,0.3);
+
+  /* Dark-mode semantic tokens — same names, matched to the previously
+     hard-coded literals so flipping data-theme just works. */
+  --lh-card:         #131626;
+  --lh-card-2:       #1A1D30;
+  --lh-card-3:       #20243A;
+  --lh-border:       rgba(255,255,255,0.06);
+  --lh-border-strong:rgba(255,255,255,0.12);
+  --lh-text-soft:    rgba(155,163,204,0.85);
+  --lh-input-bg:     #0D0F1A;
+  --lh-overlay:      rgba(6,6,15,0.72);
+  --lh-tint-indigo:  rgba(91,108,255,0.16);
+  --lh-tint-orange:  rgba(249,115,22,0.14);
 }
 
 /* ── Global smooth theme transitions ─────────────────────────────── */

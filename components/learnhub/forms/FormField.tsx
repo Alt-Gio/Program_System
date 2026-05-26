@@ -28,7 +28,7 @@ const INPUT_STYLE: React.CSSProperties = {
   background: "rgba(255,255,255,0.05)",
   border: "1px solid rgba(255,255,255,0.1)",
   borderRadius: 10,
-  color: "#e8eaff",
+  color: "var(--lh-text)",
   padding: "10px 14px",
   fontSize: 14,
   outline: "none",
@@ -54,13 +54,13 @@ export function FormField({ field, value, onChange, error }: FormFieldProps) {
   const inputStyle = { ...INPUT_STYLE, border: `1px solid ${borderColor}` };
 
   const labelEl = (
-    <label style={{ display: "block", color: "#e8eaff", fontWeight: 600, fontSize: 15, marginBottom: 6 }}>
+    <label style={{ display: "block", color: "var(--lh-text)", fontWeight: 600, fontSize: 15, marginBottom: 6 }}>
       {field.label}
       {field.required && <span style={{ color: "#ff5f6d", marginLeft: 3 }}>*</span>}
     </label>
   );
   const helpEl = field.helpText && (
-    <p style={{ color: "#9ba3cc", fontSize: 12, marginTop: 4, marginBottom: 8 }}>{field.helpText}</p>
+    <p style={{ color: "var(--lh-text-2)", fontSize: 12, marginTop: 4, marginBottom: 8 }}>{field.helpText}</p>
   );
   const errEl = error && (
     <p style={{ color: "#ff5f6d", fontSize: 12, marginTop: 4 }}>{error}</p>
@@ -75,7 +75,7 @@ export function FormField({ field, value, onChange, error }: FormFieldProps) {
     );
   }
   if (field.type === "info") {
-    return <p style={{ color: "#9ba3cc", fontSize: 14, lineHeight: 1.6 }}>{field.label}</p>;
+    return <p style={{ color: "var(--lh-text-2)", fontSize: 14, lineHeight: 1.6 }}>{field.label}</p>;
   }
 
   // ── Yes / No ────────────────────────────────────────────────────────────────
@@ -98,7 +98,7 @@ export function FormField({ field, value, onChange, error }: FormFieldProps) {
                 cursor: "pointer",
                 border: `2px solid ${value === opt ? "#5b6cff" : "rgba(255,255,255,0.08)"}`,
                 background: value === opt ? "rgba(91,108,255,0.15)" : "rgba(255,255,255,0.03)",
-                color: value === opt ? "#a0acff" : "#9ba3cc",
+                color: value === opt ? "#a0acff" : "var(--lh-text-2)",
                 transition: "all 150ms",
               }}
             >{opt}</button>
@@ -151,7 +151,7 @@ export function FormField({ field, value, onChange, error }: FormFieldProps) {
                 width: 38, height: 38, borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: "pointer",
                 border: `1px solid ${cur === n ? "#5b6cff" : "rgba(255,255,255,0.1)"}`,
                 background: cur === n ? "rgba(91,108,255,0.2)" : "rgba(255,255,255,0.03)",
-                color: cur === n ? "#a0acff" : "#9ba3cc",
+                color: cur === n ? "#a0acff" : "var(--lh-text-2)",
               }}
             >{n}</button>
           ))}
@@ -190,7 +190,7 @@ export function FormField({ field, value, onChange, error }: FormFieldProps) {
               }}>
                 {selected && <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#5b6cff" }} />}
               </div>
-              <span style={{ color: selected ? "#e8eaff" : "#c8caf0" }}>{opt}</span>
+              <span style={{ color: selected ? "var(--lh-text)" : "#c8caf0" }}>{opt}</span>
             </div>
           );
         })}
@@ -228,7 +228,7 @@ export function FormField({ field, value, onChange, error }: FormFieldProps) {
               }}>
                 {checked && <span style={{ color: "#fff", fontSize: 11, fontWeight: 700 }}>✓</span>}
               </div>
-              <span style={{ color: checked ? "#e8eaff" : "#c8caf0" }}>{opt}</span>
+              <span style={{ color: checked ? "var(--lh-text)" : "#c8caf0" }}>{opt}</span>
             </div>
           );
         })}

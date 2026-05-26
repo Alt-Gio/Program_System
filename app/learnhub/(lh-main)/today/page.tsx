@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 /**
- * /learnhub/today — the cohesion headline.
+ * /learnhub/today â€” the cohesion headline.
  *
  * One screen that pulls from every subsystem (habits, flashcards, journal,
  * learning paths, mentors, feed) so the learner experiences LearnHub as
@@ -41,29 +41,29 @@ export default function TodayPage() {
   const dismissCalendarPrompt = useMutation(api.learnhub_today.dismissCalendarPrompt);
 
   if (loading) {
-    return <div className="px-4 py-10" style={{ color: "#9ba3cc" }}>Loading…</div>;
+    return <div className="px-4 py-10" style={{ color: "var(--lh-text-2)" }}>Loadingâ€¦</div>;
   }
   if (!uid) {
     return (
-      <div className="px-4 py-10 max-w-md mx-auto text-center" style={{ color: "#e8eaff" }}>
-        <p className="text-4xl mb-3">👋</p>
+      <div className="px-4 py-10 max-w-md mx-auto text-center" style={{ color: "var(--lh-text)" }}>
+        <p className="text-4xl mb-3">ðŸ‘‹</p>
         <p className="text-lg font-bold">Sign in to see your day</p>
         <Link href="/learnhub/login" className="text-sm font-semibold mt-3 inline-block" style={{ color: "#7c8bff" }}>
-          Sign in →
+          Sign in â†’
         </Link>
       </div>
     );
   }
   if (dashboard === undefined) {
-    return <div className="px-4 py-10" style={{ color: "#9ba3cc" }}>Pulling your day together…</div>;
+    return <div className="px-4 py-10" style={{ color: "var(--lh-text-2)" }}>Pulling your day togetherâ€¦</div>;
   }
   if (dashboard === null) {
-    return <div className="px-4 py-10" style={{ color: "#9ba3cc" }}>Couldn't load your dashboard.</div>;
+    return <div className="px-4 py-10" style={{ color: "var(--lh-text-2)" }}>Couldn't load your dashboard.</div>;
   }
 
   const firstName = dashboard.user.name.split(" ")[0];
 
-  // Phase 9.C — show calendar banner if not connected AND not dismissed in last 14 days.
+  // Phase 9.C â€” show calendar banner if not connected AND not dismissed in last 14 days.
   const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
   const calendarDismissed =
     dashboard.calendarPromptDismissedAt &&
@@ -73,9 +73,9 @@ export default function TodayPage() {
   return (
     <div
       className="px-4 py-6 max-w-3xl mx-auto"
-      style={{ color: "#e8eaff", fontFamily: "var(--font-dm-sans, 'Inter', sans-serif)" }}
+      style={{ color: "var(--lh-text)", fontFamily: "var(--font-dm-sans, 'Inter', sans-serif)" }}
     >
-      {/* Phase 9.C — Calendar connect banner */}
+      {/* Phase 9.C â€” Calendar connect banner */}
       {showCalendarBanner && (
         <div
           className="mb-4 rounded-2xl p-4 flex items-center gap-3"
@@ -84,12 +84,12 @@ export default function TodayPage() {
             border: "1px solid rgba(91,108,255,0.3)",
           }}
         >
-          <span style={{ fontSize: 22 }}>📅</span>
+          <span style={{ fontSize: 22 }}>ðŸ“…</span>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold" style={{ color: "#e8eaff" }}>
+            <p className="text-sm font-semibold" style={{ color: "var(--lh-text)" }}>
               Connect Google Calendar
             </p>
-            <p className="text-xs mt-0.5" style={{ color: "#9ba3cc" }}>
+            <p className="text-xs mt-0.5" style={{ color: "var(--lh-text-2)" }}>
               See and create real Calendar events with Meet links from inside LearnHub.
             </p>
           </div>
@@ -103,10 +103,10 @@ export default function TodayPage() {
           <button
             onClick={() => dismissCalendarPrompt({ userId: uid })}
             className="text-xs opacity-50 hover:opacity-100"
-            style={{ background: "transparent", border: "none", color: "#9ba3cc", cursor: "pointer" }}
+            style={{ background: "transparent", border: "none", color: "var(--lh-text-2)", cursor: "pointer" }}
             title="Dismiss for 14 days"
           >
-            ✕
+            âœ•
           </button>
         </div>
       )}
@@ -122,9 +122,9 @@ export default function TodayPage() {
           </p>
           <h1
             className="text-2xl font-bold mt-0.5"
-            style={{ color: "#e8eaff", fontFamily: "var(--font-sora)", letterSpacing: "-0.02em" }}
+            style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)", letterSpacing: "-0.02em" }}
           >
-            {greeting()}, {firstName} <span aria-hidden>👋</span>
+            {greeting()}, {firstName} <span aria-hidden>ðŸ‘‹</span>
           </h1>
         </div>
         {dashboard.streak.current > 0 && (
@@ -145,7 +145,7 @@ export default function TodayPage() {
       {/* Habits today */}
       <Section title="Habits today">
         {dashboard.habitsToday.length === 0 ? (
-          <EmptyRow href="/learnhub/calendar" cta="Set up daily habits →">
+          <EmptyRow href="/learnhub/calendar" cta="Set up daily habits â†’">
             No habits yet. Add a few to start a streak.
           </EmptyRow>
         ) : (
@@ -163,9 +163,9 @@ export default function TodayPage() {
                 }
                 className="rounded-xl px-3 py-2 text-xs font-semibold flex items-center gap-2 transition-colors"
                 style={{
-                  background: h.countToday > 0 ? "rgba(34,211,160,0.14)" : "rgba(255,255,255,0.04)",
-                  border: `1px solid ${h.countToday > 0 ? GREEN + "55" : "rgba(255,255,255,0.08)"}`,
-                  color: h.countToday > 0 ? GREEN : "#e8eaff",
+                  background: h.countToday > 0 ? "rgba(34,211,160,0.14)" : "var(--lh-card-3)",
+                  border: `1px solid ${h.countToday > 0 ? GREEN + "55" : "var(--lh-border-strong)"}`,
+                  color: h.countToday > 0 ? GREEN : "var(--lh-text)",
                   cursor: "pointer",
                 }}
               >
@@ -173,7 +173,7 @@ export default function TodayPage() {
                 <span>{h.label}</span>
                 <span
                   className="text-[10px] px-1.5 py-0.5 rounded-full font-bold"
-                  style={{ background: "rgba(0,0,0,0.3)", color: "#9ba3cc" }}
+                  style={{ background: "rgba(0,0,0,0.3)", color: "var(--lh-text-2)" }}
                 >
                   {h.countToday}/{h.targetPerWeek}
                 </span>
@@ -187,12 +187,12 @@ export default function TodayPage() {
       <Section title="Due flashcards">
         {dashboard.flashcardsDue.count === 0 ? (
           <p className="text-xs" style={{ color: GREEN }}>
-            ✓ All caught up. New cards become due as you space them out.
+            âœ“ All caught up. New cards become due as you space them out.
           </p>
         ) : (
           <div className="flex flex-col gap-2">
-            <p className="text-sm" style={{ color: "#e8eaff" }}>
-              <strong>{dashboard.flashcardsDue.count}</strong> due — keep your spaced-repetition streak alive.
+            <p className="text-sm" style={{ color: "var(--lh-text)" }}>
+              <strong>{dashboard.flashcardsDue.count}</strong> due â€” keep your spaced-repetition streak alive.
             </p>
             <div className="flex flex-col gap-1.5">
               {dashboard.flashcardsDue.previews.map((p) => (
@@ -211,7 +211,7 @@ export default function TodayPage() {
                 className="self-start mt-1 text-xs font-bold px-3 py-1.5 rounded-full"
                 style={{ background: `linear-gradient(135deg, ${ORANGE}, #ef4444)`, color: "#fff" }}
               >
-                Review now →
+                Review now â†’
               </Link>
             )}
           </div>
@@ -221,7 +221,7 @@ export default function TodayPage() {
       {/* Today's prompt */}
       {dashboard.prompt && (
         <Section title="Today's reflection prompt">
-          <p className="text-sm italic" style={{ color: "#e8eaff", lineHeight: 1.5 }}>
+          <p className="text-sm italic" style={{ color: "var(--lh-text)", lineHeight: 1.5 }}>
             "{dashboard.prompt.text}"
           </p>
           <Link
@@ -245,18 +245,18 @@ export default function TodayPage() {
             <div className="flex items-center gap-3">
               <GraduationCap size={18} color={INDIGO} />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold truncate" style={{ color: "#e8eaff" }}>
+                <p className="text-sm font-bold truncate" style={{ color: "var(--lh-text)" }}>
                   {dashboard.continueLearning.pathTitle}
                 </p>
-                <p className="text-xs mt-0.5" style={{ color: "#9ba3cc" }}>
+                <p className="text-xs mt-0.5" style={{ color: "var(--lh-text-2)" }}>
                   {dashboard.continueLearning.completedModules}/{dashboard.continueLearning.totalModules} modules complete
                 </p>
               </div>
-              <ArrowRight size={16} color="#9ba3cc" />
+              <ArrowRight size={16} color="var(--lh-text-2)" />
             </div>
           </Link>
         ) : (
-          <EmptyRow href="/learnhub/learning-path" cta="Browse paths →">
+          <EmptyRow href="/learnhub/learning-path" cta="Browse paths â†’">
             Not enrolled in any path yet.
           </EmptyRow>
         )}
@@ -283,18 +283,18 @@ export default function TodayPage() {
                   width={36}
                   height={36}
                   className="rounded-full object-cover"
-                  style={{ background: "#1a1d30" }}
+                  style={{ background: "var(--lh-card-2)" }}
                   onError={(e) => {
                     (e.currentTarget as HTMLImageElement).src =
                       `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(m.name)}`;
                   }}
                 />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold truncate" style={{ color: "#e8eaff" }}>
+                  <p className="text-sm font-bold truncate" style={{ color: "var(--lh-text)" }}>
                     {m.name}
                   </p>
-                  <p className="text-xs truncate" style={{ color: "#9ba3cc" }}>
-                    {m.designation ?? "Mentor"} · {m.overlap} matching interest{m.overlap === 1 ? "" : "s"}
+                  <p className="text-xs truncate" style={{ color: "var(--lh-text-2)" }}>
+                    {m.designation ?? "Mentor"} Â· {m.overlap} matching interest{m.overlap === 1 ? "" : "s"}
                   </p>
                 </div>
                 <Sparkles size={14} color={AMBER} />
@@ -307,7 +307,7 @@ export default function TodayPage() {
       {/* Fresh in feed */}
       <Section title="Fresh in your feed">
         {dashboard.freshPosts.length === 0 ? (
-          <EmptyRow href="/learnhub/feed" cta="Open feed →">
+          <EmptyRow href="/learnhub/feed" cta="Open feed â†’">
             Nothing new yet. The community will surface here as posts come in.
           </EmptyRow>
         ) : (
@@ -329,17 +329,17 @@ export default function TodayPage() {
                   width={32}
                   height={32}
                   className="rounded-full object-cover"
-                  style={{ background: "#1a1d30" }}
+                  style={{ background: "var(--lh-card-2)" }}
                   onError={(e) => {
                     (e.currentTarget as HTMLImageElement).src =
                       `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(p.authorName)}`;
                   }}
                 />
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold" style={{ color: "#e8eaff" }}>
+                  <p className="text-xs font-bold" style={{ color: "var(--lh-text)" }}>
                     {p.authorName}
                   </p>
-                  <p className="text-xs mt-0.5" style={{ color: "#9ba3cc", lineHeight: 1.4 }}>
+                  <p className="text-xs mt-0.5" style={{ color: "var(--lh-text-2)", lineHeight: 1.4 }}>
                     {p.content}
                   </p>
                 </div>
@@ -382,7 +382,7 @@ function EmptyRow({
 }) {
   return (
     <div className="flex items-center justify-between gap-3 flex-wrap">
-      <span className="text-xs" style={{ color: "#9ba3cc" }}>
+      <span className="text-xs" style={{ color: "var(--lh-text-2)" }}>
         {children}
       </span>
       <Link href={href} className="text-xs font-semibold" style={{ color: "#7c8bff" }}>

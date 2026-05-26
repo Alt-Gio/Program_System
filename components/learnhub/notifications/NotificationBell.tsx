@@ -34,7 +34,7 @@ export function NotificationBell() {
       <button
         onClick={() => setOpen((o) => !o)}
         className="relative rounded-lg p-2 transition-colors"
-        style={{ color: "#9ba3cc" }}
+        style={{ color: "var(--lh-text-2)" }}
         aria-label="Notifications"
       >
         <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
@@ -60,7 +60,7 @@ export function NotificationBell() {
         <div
           className="absolute right-0 top-10 w-80 rounded-2xl overflow-hidden z-50"
           style={{
-            background: "#131626",
+            background: "var(--lh-card)",
             border: "1px solid rgba(255,255,255,0.08)",
             boxShadow: "0 16px 48px rgba(0,0,0,0.5)",
           }}
@@ -72,7 +72,7 @@ export function NotificationBell() {
           >
             <span
               className="text-sm font-semibold"
-              style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}
+              style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}
             >
               Notifications
             </span>
@@ -92,7 +92,7 @@ export function NotificationBell() {
             {notifications.length === 0 ? (
               <p
                 className="text-sm text-center py-8"
-                style={{ color: "#5c6490" }}
+                style={{ color: "var(--lh-text-3)" }}
               >
                 No notifications yet
               </p>
@@ -119,17 +119,17 @@ export function NotificationBell() {
                   <div className="flex-1 min-w-0">
                     <p
                       className="text-sm font-medium truncate"
-                      style={{ color: "#e8eaff" }}
+                      style={{ color: "var(--lh-text)" }}
                     >
                       {notif.title}
                     </p>
                     <p
                       className="text-xs mt-0.5 line-clamp-2"
-                      style={{ color: "#9ba3cc" }}
+                      style={{ color: "var(--lh-text-2)" }}
                     >
                       {notif.body}
                     </p>
-                    <p className="text-[10px] mt-1" style={{ color: "#5c6490" }}>
+                    <p className="text-[10px] mt-1" style={{ color: "var(--lh-text-3)" }}>
                       {formatDistanceToNow(notif.createdAt, { addSuffix: true })}
                     </p>
                   </div>
@@ -139,7 +139,7 @@ export function NotificationBell() {
                       clearNotif(notif.id);
                     }}
                     className="shrink-0 text-xs mt-0.5 opacity-40 hover:opacity-100"
-                    style={{ color: "#9ba3cc" }}
+                    style={{ color: "var(--lh-text-2)" }}
                   >
                     ✕
                   </button>

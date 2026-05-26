@@ -156,11 +156,11 @@ export function AvatarMenu() {
                 borderRadius: "50%",
                 overflow: "hidden",
                 flexShrink: 0,
-                background: "#1a1d30",
+                background: "var(--lh-card-2)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "#e8eaff",
+                color: "var(--lh-text)",
                 fontWeight: 700,
               }}
             >

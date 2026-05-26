@@ -139,7 +139,7 @@ export function FormRenderer({ form, initialValues, onSubmit, onAutoSave, classN
         {currentField && (
           <FormStepWrapper step={step} direction={direction}>
             <div style={{
-              background: "#131626", borderRadius: 20, padding: "28px 24px",
+              background: "var(--lh-card)", borderRadius: 20, padding: "28px 24px",
               border: "1px solid rgba(255,255,255,0.07)", marginBottom: 20,
             }}>
               <FormField
@@ -159,7 +159,7 @@ export function FormRenderer({ form, initialValues, onSubmit, onAutoSave, classN
             disabled={step === 0}
             style={{
               padding: "11px 22px", borderRadius: 12, fontWeight: 600, fontSize: 14,
-              background: "rgba(255,255,255,0.06)", color: "#9ba3cc",
+              background: "rgba(255,255,255,0.06)", color: "var(--lh-text-2)",
               border: "1px solid rgba(255,255,255,0.1)", cursor: step === 0 ? "not-allowed" : "pointer",
               opacity: step === 0 ? 0.4 : 1,
             }}
@@ -173,7 +173,7 @@ export function FormRenderer({ form, initialValues, onSubmit, onAutoSave, classN
           )}
         </div>
         {onAutoSave && (
-          <p style={{ color: "#9ba3cc", fontSize: 12, textAlign: "center", marginTop: 12 }}>
+          <p style={{ color: "var(--lh-text-2)", fontSize: 12, textAlign: "center", marginTop: 12 }}>
             💾 Auto-saved
           </p>
         )}

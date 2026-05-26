@@ -1,12 +1,12 @@
-"use client";
+﻿"use client";
 
 /**
- * Org Partner / Coordinator — curate content for /learnhub/watch.
+ * Org Partner / Coordinator â€” curate content for /learnhub/watch.
  *
  * Three add modes:
- *   • VIDEO   — paste a long-form YouTube video URL. Renders 16:9.
- *   • SHORT   — paste a YouTube Shorts URL. Renders 9:16.
- *   • CHANNEL — bookmark a channel. Watch surfaces a deep-link card to
+ *   â€¢ VIDEO   â€” paste a long-form YouTube video URL. Renders 16:9.
+ *   â€¢ SHORT   â€” paste a YouTube Shorts URL. Renders 9:16.
+ *   â€¢ CHANNEL â€” bookmark a channel. Watch surfaces a deep-link card to
  *     YouTube's channel page (videos or shorts), since auto-pulling a
  *     channel's content needs a YouTube API key we don't have yet.
  *
@@ -41,27 +41,27 @@ const SKY = "#38bdf8";
 const AMBER = "#fbbf24";
 
 const WATCH_INTEREST_TAGS = [
-  { id: "Cybersecurity", label: "Security",    emoji: "🔒" },
-  { id: "CLOUD",         label: "Cloud",       emoji: "☁️" },
-  { id: "AI",            label: "AI",          emoji: "🤖" },
-  { id: "Data",          label: "Data",        emoji: "📊" },
-  { id: "PROGRAMMING",   label: "Programming", emoji: "⌨️" },
-  { id: "UX",            label: "Design",      emoji: "🎨" },
-  { id: "Health",        label: "Health",      emoji: "🏥" },
-  { id: "Business",      label: "Business",    emoji: "💼" },
-  { id: "Languages",     label: "Languages",   emoji: "🗣️" },
-  { id: "Sciences",      label: "Sciences",    emoji: "🧪" },
-  { id: "Arts",          label: "Arts",        emoji: "🎭" },
-  { id: "Trades",        label: "Trades",      emoji: "🔧" },
-  { id: "LEADERSHIP",    label: "Leadership",  emoji: "🧭" },
-  { id: "NEUROSCIENCE",  label: "Learning",    emoji: "🧠" },
+  { id: "Cybersecurity", label: "Security",    emoji: "ðŸ”’" },
+  { id: "CLOUD",         label: "Cloud",       emoji: "â˜ï¸" },
+  { id: "AI",            label: "AI",          emoji: "ðŸ¤–" },
+  { id: "Data",          label: "Data",        emoji: "ðŸ“Š" },
+  { id: "PROGRAMMING",   label: "Programming", emoji: "âŒ¨ï¸" },
+  { id: "UX",            label: "Design",      emoji: "ðŸŽ¨" },
+  { id: "Health",        label: "Health",      emoji: "ðŸ¥" },
+  { id: "Business",      label: "Business",    emoji: "ðŸ’¼" },
+  { id: "Languages",     label: "Languages",   emoji: "ðŸ—£ï¸" },
+  { id: "Sciences",      label: "Sciences",    emoji: "ðŸ§ª" },
+  { id: "Arts",          label: "Arts",        emoji: "ðŸŽ­" },
+  { id: "Trades",        label: "Trades",      emoji: "ðŸ”§" },
+  { id: "LEADERSHIP",    label: "Leadership",  emoji: "ðŸ§­" },
+  { id: "NEUROSCIENCE",  label: "Learning",    emoji: "ðŸ§ " },
 ] as const;
 
 type AddMode = "video" | "short" | "channel";
 type ChannelFocus = "videos" | "shorts" | "both";
 
 export default function OrgCuratePage() {
-  // ── Hooks (ALL at the top, before any conditional return) ──
+  // â”€â”€ Hooks (ALL at the top, before any conditional return) â”€â”€
   const { userId, role, loading } = useLearnhubSession();
   const items = useQuery(
     api.learnhub_curated.orgListCurated,
@@ -107,7 +107,7 @@ export default function OrgCuratePage() {
     }
   }, [videoId, channelParsed, mode, displayName]);
 
-  // Pre-compute sortedItems regardless of items being defined — the hook
+  // Pre-compute sortedItems regardless of items being defined â€” the hook
   // must always run so React's hook-count is stable across renders.
   const safeItems = items ?? [];
   const sortedItems = useMemo(() => {
@@ -134,11 +134,11 @@ export default function OrgCuratePage() {
     return { videos, shorts, channels, featured };
   }, [safeItems]);
 
-  // ── Conditional renders happen ONLY after all hooks above ──
+  // â”€â”€ Conditional renders happen ONLY after all hooks above â”€â”€
   if (loading || items === undefined) {
     return (
       <div style={{ padding: 24, color: "#fff", background: "#06070f", minHeight: "100%" }}>
-        Loading curation queue…
+        Loading curation queueâ€¦
       </div>
     );
   }
@@ -146,7 +146,7 @@ export default function OrgCuratePage() {
     return (
       <div style={{ padding: 24, color: "#fff", background: "#06070f", minHeight: "100%" }}>
         Watch Curation is restricted to Org Partners, Coordinators, and Admins.{" "}
-        <Link href="/learnhub/feed" style={{ color: INDIGO }}>← Back</Link>
+        <Link href="/learnhub/feed" style={{ color: INDIGO }}>â† Back</Link>
       </div>
     );
   }
@@ -170,7 +170,7 @@ export default function OrgCuratePage() {
 
     if (mode === "channel") {
       if (!channelParsed) {
-        setError("Paste a YouTube channel URL — e.g. https://youtube.com/@ChannelName.");
+        setError("Paste a YouTube channel URL â€” e.g. https://youtube.com/@ChannelName.");
         return;
       }
       if (!trimmedName) {
@@ -188,7 +188,7 @@ export default function OrgCuratePage() {
           channelFocus,
         });
         resetForm();
-        setToast(`Saved — ${trimmedName} now appears on /learnhub/watch.`);
+        setToast(`Saved â€” ${trimmedName} now appears on /learnhub/watch.`);
         setTimeout(() => setToast(null), 3000);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not save.");
@@ -202,8 +202,8 @@ export default function OrgCuratePage() {
     if (!videoId) {
       setError(
         mode === "short"
-          ? "Paste a YouTube Shorts URL — e.g. https://youtube.com/shorts/abc123."
-          : "Paste a YouTube video URL — e.g. https://youtu.be/abc123 or https://youtube.com/watch?v=abc123.",
+          ? "Paste a YouTube Shorts URL â€” e.g. https://youtube.com/shorts/abc123."
+          : "Paste a YouTube video URL â€” e.g. https://youtu.be/abc123 or https://youtube.com/watch?v=abc123.",
       );
       return;
     }
@@ -223,7 +223,7 @@ export default function OrgCuratePage() {
         format: mode === "short" ? "short" : "video",
       });
       resetForm();
-      setToast(`Saved — “${trimmedName}” is live on /learnhub/watch.`);
+      setToast(`Saved â€” â€œ${trimmedName}â€ is live on /learnhub/watch.`);
       setTimeout(() => setToast(null), 3000);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save.");
@@ -382,7 +382,7 @@ export default function OrgCuratePage() {
                 return (
                   <button key={f} type="button" onClick={() => setChannelFocus(f)} style={{
                     padding: "7px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600,
-                    background: on ? `${SKY}1c` : "rgba(255,255,255,0.04)",
+                    background: on ? `${SKY}1c` : "var(--lh-card-3)",
                     color: on ? SKY : "rgba(255,255,255,0.7)",
                     border: on ? `1px solid ${SKY}55` : "1px solid rgba(255,255,255,0.08)",
                     cursor: "pointer", textTransform: "capitalize",
@@ -412,7 +412,7 @@ export default function OrgCuratePage() {
 
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", marginBottom: 6, letterSpacing: 0.4 }}>
-            Interest tags <span style={{ color: "rgba(255,255,255,0.35)" }}>· pick what this helps learners with</span>
+            Interest tags <span style={{ color: "rgba(255,255,255,0.35)" }}>Â· pick what this helps learners with</span>
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
             {WATCH_INTEREST_TAGS.map((t) => {
@@ -420,7 +420,7 @@ export default function OrgCuratePage() {
               return (
                 <button key={t.id} type="button" onClick={() => toggleTag(t.id)} style={{
                   padding: "6px 10px", borderRadius: 999, fontSize: 11.5,
-                  background: on ? `${ORANGE}1c` : "rgba(255,255,255,0.04)",
+                  background: on ? `${ORANGE}1c` : "var(--lh-card-3)",
                   color: on ? ORANGE : "rgba(255,255,255,0.7)",
                   border: on ? `1px solid ${ORANGE}55` : "1px solid rgba(255,255,255,0.08)",
                   cursor: "pointer", display: "inline-flex", gap: 5, alignItems: "center",
@@ -447,7 +447,7 @@ export default function OrgCuratePage() {
           boxShadow: `0 6px 18px ${ORANGE}44`,
         }}>
           <PlusCircle size={14} />
-          {busy ? "Saving…"
+          {busy ? "Savingâ€¦"
             : mode === "channel" ? "Post channel"
             : mode === "short" ? "Post Short to Watch"
             : "Post video to Watch"}
@@ -467,9 +467,9 @@ export default function OrgCuratePage() {
       <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 10, flexWrap: "wrap" }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>Your curated picks</h2>
         <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>
-          {counts.videos} video{counts.videos === 1 ? "" : "s"} · {counts.shorts} short{counts.shorts === 1 ? "" : "s"}
-          {" · "}{counts.channels} channel{counts.channels === 1 ? "" : "s"}
-          {counts.featured > 0 ? ` · ${counts.featured} featured` : ""}
+          {counts.videos} video{counts.videos === 1 ? "" : "s"} Â· {counts.shorts} short{counts.shorts === 1 ? "" : "s"}
+          {" Â· "}{counts.channels} channel{counts.channels === 1 ? "" : "s"}
+          {counts.featured > 0 ? ` Â· ${counts.featured} featured` : ""}
         </span>
       </div>
 
@@ -479,7 +479,7 @@ export default function OrgCuratePage() {
           background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.1)",
           color: "rgba(255,255,255,0.5)", maxWidth: 760,
         }}>
-          Nothing yet — add a video, short, or channel above.
+          Nothing yet â€” add a video, short, or channel above.
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10, maxWidth: 760 }}>
@@ -514,7 +514,7 @@ export default function OrgCuratePage() {
       }}>
         <Info size={12} style={{ marginTop: 2, flexShrink: 0 }} />
         <span>
-          Channels can&rsquo;t be embedded directly — learners see a card linking to the
+          Channels can&rsquo;t be embedded directly â€” learners see a card linking to the
           channel&rsquo;s YouTube videos/shorts page. To put playable content on Watch,
           add individual videos or shorts.
         </span>
@@ -532,7 +532,7 @@ function ModeButton({
   return (
     <button type="button" onClick={onClick} style={{
       padding: "8px 14px", borderRadius: 10, cursor: "pointer",
-      background: active ? `${hue}1c` : "rgba(255,255,255,0.04)",
+      background: active ? `${hue}1c` : "var(--lh-card-3)",
       color: active ? hue : "rgba(255,255,255,0.75)",
       border: active ? `1px solid ${hue}66` : "1px solid rgba(255,255,255,0.08)",
       display: "inline-flex", alignItems: "center", gap: 8,
@@ -596,7 +596,7 @@ function CuratedRow({
     isFeatured ? `${AMBER}55`
     : isChannel ? "rgba(56,189,248,0.18)"
     : isShort ? `${AMBER}33`
-    : "rgba(255,255,255,0.08)";
+    : "var(--lh-border-strong)";
   const bgColor =
     isFeatured ? `${AMBER}10`
     : isChannel ? "rgba(56,189,248,0.04)"
@@ -625,7 +625,7 @@ function CuratedRow({
       {item.thumbnailUrl ? (
         <img src={item.thumbnailUrl} alt="" style={{
           width: 82, height: isShort ? 110 : 56, borderRadius: 6, objectFit: "cover",
-          background: "rgba(255,255,255,0.04)",
+          background: "var(--lh-card-3)",
         }} />
       ) : (
         <div style={{
@@ -634,7 +634,7 @@ function CuratedRow({
           display: "flex", alignItems: "center", justifyContent: "center",
           color: isChannel ? SKY : isShort ? AMBER : ORANGE, fontSize: 22,
         }}>
-          {isChannel ? "📺" : isShort ? "⚡" : "▶"}
+          {isChannel ? "ðŸ“º" : isShort ? "âš¡" : "â–¶"}
         </div>
       )}
 
@@ -651,7 +651,7 @@ function CuratedRow({
               background: "rgba(56,189,248,0.14)", color: SKY,
               border: "1px solid rgba(56,189,248,0.3)",
             }}>
-              {item.channelFocus === "shorts" ? "CHANNEL · SHORTS" : item.channelFocus === "both" ? "CHANNEL · BOTH" : "CHANNEL"}
+              {item.channelFocus === "shorts" ? "CHANNEL Â· SHORTS" : item.channelFocus === "both" ? "CHANNEL Â· BOTH" : "CHANNEL"}
             </span>
           )}
           {isShort && (
@@ -670,8 +670,8 @@ function CuratedRow({
           color: "rgba(255,255,255,0.5)", marginTop: 3,
         }}>
           {item.kind === "video"
-            ? `${isShort ? "⚡" : "▶"} ${item.youtubeVideoId ?? "—"}${item.durationLabel ? ` · ${item.durationLabel}` : ""}`
-            : `📺 ${item.youtubeChannelId ?? "—"}`}
+            ? `${isShort ? "âš¡" : "â–¶"} ${item.youtubeVideoId ?? "â€”"}${item.durationLabel ? ` Â· ${item.durationLabel}` : ""}`
+            : `ðŸ“º ${item.youtubeChannelId ?? "â€”"}`}
         </div>
         {item.description && (
           <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 4, lineHeight: 1.4 }}>
@@ -684,7 +684,7 @@ function CuratedRow({
               <span key={t} style={{
                 fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
                 padding: "2px 7px", borderRadius: 999,
-                background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.65)",
+                background: "var(--lh-card-3)", color: "rgba(255,255,255,0.65)",
                 border: "1px solid rgba(255,255,255,0.08)",
               }}>{t}</span>
             ))}
@@ -703,7 +703,7 @@ function CuratedRow({
               <input
                 value={convertUrl}
                 onChange={(e) => setConvertUrl(e.target.value)}
-                placeholder="https://youtu.be/…"
+                placeholder="https://youtu.be/â€¦"
                 style={{
                   flex: 1, padding: "8px 10px", borderRadius: 8,
                   border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.45)",
@@ -725,11 +725,11 @@ function CuratedRow({
                 }
               }} style={{
                 padding: "8px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700,
-                background: convertId ? SKY : "rgba(255,255,255,0.06)",
+                background: convertId ? SKY : "var(--lh-border)",
                 color: convertId ? "#06070f" : "rgba(255,255,255,0.4)",
                 border: 0, cursor: convertId && !converting ? "pointer" : "not-allowed",
               }}>
-                {converting ? "Saving…" : "Convert"}
+                {converting ? "Savingâ€¦" : "Convert"}
               </button>
             </div>
           </div>
@@ -742,8 +742,8 @@ function CuratedRow({
           onClick={onToggleFeatured}
           style={{
             padding: 8, borderRadius: 8,
-            background: isFeatured ? `${AMBER}1c` : "rgba(255,255,255,0.04)",
-            border: `1px solid ${isFeatured ? `${AMBER}66` : "rgba(255,255,255,0.08)"}`,
+            background: isFeatured ? `${AMBER}1c` : "var(--lh-card-3)",
+            border: `1px solid ${isFeatured ? `${AMBER}66` : "var(--lh-border-strong)"}`,
             color: isFeatured ? AMBER : "#fff", cursor: "pointer",
           }}>
           <Star size={14} fill={isFeatured ? AMBER : "none"} />
@@ -763,7 +763,7 @@ function CuratedRow({
         <button type="button" title={item.isActive ? "Pause from feed" : "Reactivate"}
           onClick={onToggleActive}
           style={{
-            padding: 8, borderRadius: 8, background: "rgba(255,255,255,0.04)",
+            padding: 8, borderRadius: 8, background: "var(--lh-card-3)",
             border: "1px solid rgba(255,255,255,0.08)", color: "#fff", cursor: "pointer",
           }}>
           {item.isActive ? <Eye size={14} /> : <EyeOff size={14} />}

@@ -20,7 +20,7 @@ const WORK_TYPE_LABEL: Record<string, { label: string; color: string }> = {
 };
 
 const PAY_TYPE_LABEL: Record<string, { label: string; color: string }> = {
-  volunteer: { label: "Volunteer", color: "#9ba3cc" },
+  volunteer: { label: "Volunteer", color: "var(--lh-text-2)" },
   stipend: { label: "Stipend", color: "#ff8c42" },
   paid: { label: "Paid", color: "#22d3a0" },
 };
@@ -36,7 +36,7 @@ export function OpportunityPost({ metadata }: { metadata: Record<string, unknown
     <div
       className="rounded-xl overflow-hidden"
       style={{
-        background: "#0d0f1a",
+        background: "var(--lh-input-bg)",
         border: "1px solid rgba(255,140,66,0.25)",
       }}
     >
@@ -61,7 +61,7 @@ export function OpportunityPost({ metadata }: { metadata: Record<string, unknown
         {/* Title */}
         <p
           className="text-base font-bold"
-          style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}
+          style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}
         >
           {m.title ?? "Work Opportunity"}
         </p>
@@ -98,7 +98,7 @@ export function OpportunityPost({ metadata }: { metadata: Record<string, unknown
               className="text-xs font-medium px-2 py-0.5 rounded-full"
               style={{
                 background: "rgba(255,255,255,0.05)",
-                color: "#9ba3cc",
+                color: "var(--lh-text-2)",
                 border: "1px solid rgba(255,255,255,0.08)",
               }}
             >
@@ -110,7 +110,7 @@ export function OpportunityPost({ metadata }: { metadata: Record<string, unknown
               className="text-xs font-medium px-2 py-0.5 rounded-full"
               style={{
                 background: "rgba(255,255,255,0.05)",
-                color: "#9ba3cc",
+                color: "var(--lh-text-2)",
                 border: "1px solid rgba(255,255,255,0.08)",
               }}
             >
@@ -122,7 +122,7 @@ export function OpportunityPost({ metadata }: { metadata: Record<string, unknown
         {/* Required certs */}
         {m.requiredCerts && m.requiredCerts.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5 items-center">
-            <span className="text-xs" style={{ color: "#5c6490" }}>
+            <span className="text-xs" style={{ color: "var(--lh-text-3)" }}>
               Requires:
             </span>
             {m.requiredCerts.map((cert) => (
@@ -142,7 +142,7 @@ export function OpportunityPost({ metadata }: { metadata: Record<string, unknown
 
         {/* Deadline */}
         {m.deadline && (
-          <p className="text-xs mt-2" style={{ color: isExpired ? "#ff5f6d" : "#9ba3cc" }}>
+          <p className="text-xs mt-2" style={{ color: isExpired ? "#ff5f6d" : "var(--lh-text-2)" }}>
             {isExpired
               ? "Application closed"
               : `Apply by ${format(m.deadline, "MMM d, yyyy")}`}
@@ -159,7 +159,7 @@ export function OpportunityPost({ metadata }: { metadata: Record<string, unknown
           className="w-full rounded-xl py-2.5 text-sm font-semibold transition-all disabled:opacity-40"
           style={{
             background: isExpired ? "rgba(255,255,255,0.04)" : "#ff8c42",
-            color: isExpired ? "#9ba3cc" : "#fff",
+            color: isExpired ? "var(--lh-text-2)" : "#fff",
             fontFamily: "var(--font-sora)",
             cursor: isExpired ? "not-allowed" : "pointer",
           }}

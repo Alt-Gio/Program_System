@@ -26,19 +26,19 @@ export default async function VerifyCertPage({ params }: Props) {
   const isValid = cert !== null && cert.status !== "pending";
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center px-4 py-12" style={{ background: "#0d0f1a" }}>
+    <main className="min-h-screen flex flex-col items-center justify-center px-4 py-12" style={{ background: "var(--lh-input-bg)" }}>
       <div className="pointer-events-none fixed inset-0" style={{ background: "radial-gradient(ellipse 50% 40% at 50% 20%, rgba(34,211,160,0.08) 0%, transparent 70%)" }} />
 
       <div className="relative z-10 w-full max-w-md">
         {/* DICT / ILCDB branding */}
         <div className="text-center mb-8">
           <p className="text-xs font-medium tracking-widest uppercase" style={{ color: "#5b6cff", fontFamily: "var(--font-sora)" }}>DICT Region V</p>
-          <p className="text-2xl font-bold mt-1" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>ILCDB LearnHub</p>
-          <p className="text-sm mt-1" style={{ color: "#9ba3cc" }}>Certificate Verification</p>
+          <p className="text-2xl font-bold mt-1" style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}>ILCDB LearnHub</p>
+          <p className="text-sm mt-1" style={{ color: "var(--lh-text-2)" }}>Certificate Verification</p>
         </div>
 
         {/* Status card */}
-        <div className="rounded-2xl p-6 flex flex-col gap-5" style={{ background: "#131626", border: isValid ? "1px solid rgba(34,211,160,0.3)" : "1px solid rgba(255,95,109,0.3)" }}>
+        <div className="rounded-2xl p-6 flex flex-col gap-5" style={{ background: "var(--lh-card)", border: isValid ? "1px solid rgba(34,211,160,0.3)" : "1px solid rgba(255,95,109,0.3)" }}>
           {/* Badge */}
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0" style={{ background: isValid ? "rgba(34,211,160,0.1)" : "rgba(255,95,109,0.1)" }}>
@@ -52,7 +52,7 @@ export default async function VerifyCertPage({ params }: Props) {
               <p className="font-bold text-lg" style={{ color: isValid ? "#22d3a0" : "#ff5f6d", fontFamily: "var(--font-sora)" }}>
                 {isValid ? "Certificate Verified" : cert === null ? "Certificate Not Found" : "Unverified"}
               </p>
-              <p className="text-sm" style={{ color: "#9ba3cc" }}>
+              <p className="text-sm" style={{ color: "var(--lh-text-2)" }}>
                 {isValid ? "This certificate is authentic." : "No matching record found for this ID."}
               </p>
             </div>
@@ -81,16 +81,16 @@ export default async function VerifyCertPage({ params }: Props) {
           )}
 
           {!cert && (
-            <div className="rounded-xl px-4 py-3 text-sm text-center" style={{ background: "rgba(255,95,109,0.06)", color: "#9ba3cc" }}>
+            <div className="rounded-xl px-4 py-3 text-sm text-center" style={{ background: "rgba(255,95,109,0.06)", color: "var(--lh-text-2)" }}>
               If you believe this is an error, contact <span style={{ color: "#5b6cff" }}>ilcdb@dictregion5.gov.ph</span>
             </div>
           )}
         </div>
 
-        <p className="text-center text-xs mt-6" style={{ color: "#5c6490" }}>
+        <p className="text-center text-xs mt-6" style={{ color: "var(--lh-text-3)" }}>
           Verification ID: <span className="font-mono">{params.certId}</span>
         </p>
-        <p className="text-center text-xs mt-1" style={{ color: "#5c6490" }}>
+        <p className="text-center text-xs mt-1" style={{ color: "var(--lh-text-3)" }}>
           DICT Region V · ILCDB LearnHub · dictregion5.gov.ph
         </p>
       </div>
@@ -101,8 +101,8 @@ export default async function VerifyCertPage({ params }: Props) {
 function DetailRow({ label, value, mono = false, highlight = false }: { label: string; value: string; mono?: boolean; highlight?: boolean }) {
   return (
     <div className="flex items-start justify-between gap-4">
-      <span className="text-sm shrink-0" style={{ color: "#5c6490" }}>{label}</span>
-      <span className={`text-sm text-right ${mono ? "font-mono" : "font-medium"}`} style={{ color: highlight ? "#22d3a0" : "#e8eaff" }}>{value}</span>
+      <span className="text-sm shrink-0" style={{ color: "var(--lh-text-3)" }}>{label}</span>
+      <span className={`text-sm text-right ${mono ? "font-mono" : "font-medium"}`} style={{ color: highlight ? "#22d3a0" : "var(--lh-text)" }}>{value}</span>
     </div>
   );
 }

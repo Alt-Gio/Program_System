@@ -39,7 +39,7 @@ export function YouTubePost({ metadata }: { metadata: Record<string, unknown> })
     <div
       className="rounded-xl overflow-hidden cursor-pointer group relative"
       style={{
-        background: "#0d0f1a",
+        background: "var(--lh-input-bg)",
         border: "1px solid rgba(255,255,255,0.08)",
       }}
       onClick={() => setPlaying(true)}
@@ -81,12 +81,12 @@ export function YouTubePost({ metadata }: { metadata: Record<string, unknown> })
           <div className="flex-1 min-w-0">
             <p
               className="text-sm font-medium truncate"
-              style={{ color: "#e8eaff" }}
+              style={{ color: "var(--lh-text)" }}
             >
               {m.title}
             </p>
             {m.channelName && (
-              <p className="text-xs truncate" style={{ color: "#9ba3cc" }}>
+              <p className="text-xs truncate" style={{ color: "var(--lh-text-2)" }}>
                 {m.channelName}
               </p>
             )}

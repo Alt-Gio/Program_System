@@ -37,7 +37,7 @@ export function DrivePost({ metadata }: { metadata: Record<string, unknown> }) {
     <div
       className="rounded-xl overflow-hidden"
       style={{
-        background: "#0d0f1a",
+        background: "var(--lh-input-bg)",
         border: "1px solid rgba(255,255,255,0.08)",
       }}
     >
@@ -47,11 +47,11 @@ export function DrivePost({ metadata }: { metadata: Record<string, unknown> }) {
         <div className="flex-1 min-w-0">
           <p
             className="text-sm font-medium truncate"
-            style={{ color: "#e8eaff" }}
+            style={{ color: "var(--lh-text)" }}
           >
             {m.fileName ?? "Google Drive File"}
           </p>
-          <p className="text-xs mt-0.5" style={{ color: "#9ba3cc" }}>
+          <p className="text-xs mt-0.5" style={{ color: "var(--lh-text-2)" }}>
             Google Drive
           </p>
         </div>
@@ -83,7 +83,7 @@ export function DrivePost({ metadata }: { metadata: Record<string, unknown> }) {
       {m.previewUrl && (
         <div
           className="mx-3 mb-3 rounded-lg overflow-hidden"
-          style={{ height: 220, background: "#131626" }}
+          style={{ height: 220, background: "var(--lh-card)" }}
         >
           <iframe
             src={m.previewUrl}

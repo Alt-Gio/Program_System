@@ -1,22 +1,22 @@
-"use client";
+﻿"use client";
 
 /**
- * LearnHub Watch — Learning Theater.
+ * LearnHub Watch â€” Learning Theater.
  *
  * Implements the LearnHub.html design:
- *   • Desktop: TheaterFeed (16:9 player, max 1380px, scroll-snap, NOW
+ *   â€¢ Desktop: TheaterFeed (16:9 player, max 1380px, scroll-snap, NOW
  *     PLAYING indicator, progress dots, NavArrow up/down, end-of-feed
  *     reflection card) + UpNextRail (380px, interest chips, thumbnail list).
- *   • Mobile: header w/ Interests button + chip strip, then iframe player,
+ *   â€¢ Mobile: header w/ Interests button + chip strip, then iframe player,
  *     title/channel meta, UP NEXT thumbnail list.
- *   • InterestsModal — fullscreen blur backdrop, 560px, 2-col grid.
+ *   â€¢ InterestsModal â€” fullscreen blur backdrop, 560px, 2-col grid.
  *
  * Data: pulled from `api.learnhub_curated.listCuratedFeed` (only `kind ===
  * "video"` items). Each curated row maps to a `WatchItem` the components
  * read.
  *
  * The page calls `useSearchParams()` so the default export wraps the inner
- * component in a Suspense boundary — Next 14 requires this for prerender.
+ * component in a Suspense boundary â€” Next 14 requires this for prerender.
  */
 
 import {
@@ -28,35 +28,35 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 
-// ── Design tokens (mirror LearnHub.html `Design Tokens` block) ──
-const BORDER = "rgba(255,255,255,0.06)";
-const BORDER2 = "rgba(255,255,255,0.1)";
-const TEXT = "#e8eaf4";
-const MUTED = "rgba(185,190,230,0.6)";
-const DIM = "rgba(100,110,165,0.5)";
-const CARD = "#111323";
-const CARD2 = "#161929";
+// â”€â”€ Design tokens (mirror LearnHub.html `Design Tokens` block) â”€â”€
+const BORDER = "var(--lh-border)";
+const BORDER2 = "var(--lh-border-strong)";
+const TEXT = "var(--lh-text)";
+const MUTED = "var(--lh-text-2)";
+const DIM = "var(--lh-text-3)";
+const CARD = "var(--lh-card)";
+const CARD2 = "var(--lh-card-2)";
 const ORANGE = "#f97316";
 const GREEN = "#22c55e";
 const SKY = "#38bdf8";
 const INDIGO = "#6366f1";
 
 const WATCH_INTERESTS = [
-  { id: "All",           label: "All",           emoji: "✨" },
-  { id: "Cybersecurity", label: "Security",      emoji: "🔒" },
-  { id: "CLOUD",         label: "Cloud",         emoji: "☁️" },
-  { id: "AI",            label: "AI",            emoji: "🤖" },
-  { id: "Data",          label: "Data",          emoji: "📊" },
-  { id: "PROGRAMMING",   label: "Programming",   emoji: "⌨️" },
-  { id: "UX",            label: "Design",        emoji: "🎨" },
-  { id: "Health",        label: "Health",        emoji: "🏥" },
-  { id: "Business",      label: "Business",      emoji: "💼" },
-  { id: "Languages",     label: "Languages",     emoji: "🗣️" },
-  { id: "Sciences",      label: "Sciences",      emoji: "🧪" },
-  { id: "Arts",          label: "Arts",          emoji: "🎭" },
-  { id: "Trades",        label: "Trades",        emoji: "🔧" },
-  { id: "LEADERSHIP",    label: "Leadership",    emoji: "🧭" },
-  { id: "NEUROSCIENCE",  label: "Learning",      emoji: "🧠" },
+  { id: "All",           label: "All",           emoji: "âœ¨" },
+  { id: "Cybersecurity", label: "Security",      emoji: "ðŸ”’" },
+  { id: "CLOUD",         label: "Cloud",         emoji: "â˜ï¸" },
+  { id: "AI",            label: "AI",            emoji: "ðŸ¤–" },
+  { id: "Data",          label: "Data",          emoji: "ðŸ“Š" },
+  { id: "PROGRAMMING",   label: "Programming",   emoji: "âŒ¨ï¸" },
+  { id: "UX",            label: "Design",        emoji: "ðŸŽ¨" },
+  { id: "Health",        label: "Health",        emoji: "ðŸ¥" },
+  { id: "Business",      label: "Business",      emoji: "ðŸ’¼" },
+  { id: "Languages",     label: "Languages",     emoji: "ðŸ—£ï¸" },
+  { id: "Sciences",      label: "Sciences",      emoji: "ðŸ§ª" },
+  { id: "Arts",          label: "Arts",          emoji: "ðŸŽ­" },
+  { id: "Trades",        label: "Trades",        emoji: "ðŸ”§" },
+  { id: "LEADERSHIP",    label: "Leadership",    emoji: "ðŸ§­" },
+  { id: "NEUROSCIENCE",  label: "Learning",      emoji: "ðŸ§ " },
 ] as const;
 
 type WatchItemKind = "video" | "short" | "channel";
@@ -92,7 +92,7 @@ function initials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-// Stable hash → hue so each curator/org gets a consistent accent color.
+// Stable hash â†’ hue so each curator/org gets a consistent accent color.
 function colorFromName(name: string): string {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = ((h << 5) - h + name.charCodeAt(i)) | 0;
@@ -158,7 +158,7 @@ export default function WatchPage() {
       <div style={{
         flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
         height: "100%", color: MUTED, fontSize: 13,
-      }}>Loading…</div>
+      }}>Loadingâ€¦</div>
     }>
       <WatchPageInner />
     </Suspense>
@@ -262,13 +262,13 @@ function WatchPageInner() {
     setJumpToken({ idx: i, ts: Date.now() });
   }, []);
 
-  // ─── Empty / loading ───
+  // â”€â”€â”€ Empty / loading â”€â”€â”€
   if (curated === undefined) {
     return <div style={pageWrapperStyle()}>
       <div style={{
         flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
         color: MUTED, fontSize: 13,
-      }}>Loading curated videos…</div>
+      }}>Loading curated videosâ€¦</div>
     </div>;
   }
   if (allVideos.length === 0) {
@@ -359,13 +359,13 @@ function EmptyState() {
       flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
       flexDirection: "column", padding: 40, color: MUTED, textAlign: "center", gap: 14,
     }}>
-      <div style={{ fontSize: 42 }}>🎬</div>
+      <div style={{ fontSize: 42 }}>ðŸŽ¬</div>
       <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 26, color: TEXT }}>
         Nothing curated yet
       </div>
       <p style={{ fontSize: 13, lineHeight: 1.6, maxWidth: 480, color: MUTED }}>
         Org Partners surface YouTube videos here so learners stay in learning
-        mode — not infinite-scroll mode.
+        mode â€” not infinite-scroll mode.
       </p>
       <Link href="/learnhub/org/curate" style={{
         marginTop: 6, padding: "10px 22px", borderRadius: 999,
@@ -373,15 +373,15 @@ function EmptyState() {
         color: "white", fontWeight: 700, fontSize: 13, textDecoration: "none",
         boxShadow: `0 6px 18px ${ORANGE}55`,
       }}>
-        Curate videos →
+        Curate videos â†’
       </Link>
     </div>
   );
 }
 
-// ────────────────────────────────────────────────────────────────
-// TheaterFeed — desktop, one-video-per-screen, snap-scroll
-// ────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// TheaterFeed â€” desktop, one-video-per-screen, snap-scroll
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function TheaterFeed({
   videos, activeIdx, setActiveIdx, jumpToken, onJump, interest, setInterest,
 }: {
@@ -443,14 +443,14 @@ function TheaterFeed({
         <span style={{ color: DIM }}>/ {videos.length}</span>
         {interest !== "All" && (
           <>
-            <span style={{ color: DIM, margin: "0 4px" }}>·</span>
+            <span style={{ color: DIM, margin: "0 4px" }}>Â·</span>
             <button onClick={() => setInterest("All")} style={{
               padding: "3px 10px", borderRadius: 99, border: `1px solid ${ORANGE}55`,
               background: `${ORANGE}1c`, color: ORANGE, fontSize: 11, fontWeight: 700,
               cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
             }}>
-              <span>Filtered · {interestLabelFor(interest)}</span>
-              <span style={{ fontSize: 13, lineHeight: 1 }}>×</span>
+              <span>Filtered Â· {interestLabelFor(interest)}</span>
+              <span style={{ fontSize: 13, lineHeight: 1 }}>Ã—</span>
             </button>
           </>
         )}
@@ -501,19 +501,19 @@ function TheaterFeed({
           display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 84px",
         }}>
           <div style={{ maxWidth: 520, textAlign: "center" }}>
-            <div style={{ fontSize: 42, marginBottom: 14 }}>🎓</div>
+            <div style={{ fontSize: 42, marginBottom: 14 }}>ðŸŽ“</div>
             <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 28, color: TEXT, marginBottom: 10 }}>
               You&rsquo;ve reached the end
             </div>
             <div style={{ fontSize: 14, color: MUTED, marginBottom: 22, lineHeight: 1.6 }}>
               Productive learning beats endless scrolling. Take a moment to
-              reflect on what you watched — or pick a new interest to dive into.
+              reflect on what you watched â€” or pick a new interest to dive into.
             </div>
             <button onClick={() => onJump(0)} style={{
               padding: "10px 20px", borderRadius: 99, border: `1px solid ${ORANGE}55`,
               background: `${ORANGE}1c`, color: ORANGE, fontSize: 13, fontWeight: 700,
               cursor: "pointer",
-            }}>↑ Back to top</button>
+            }}>â†‘ Back to top</button>
           </div>
         </section>
       </div>
@@ -550,9 +550,9 @@ function NavArrow({ dir, onClick, disabled }: { dir: "up" | "down"; onClick: () 
   );
 }
 
-// ────────────────────────────────────────────────────────────────
-// TheaterPlayer — the centered 16:9 player + meta
-// ────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// TheaterPlayer â€” the centered 16:9 player + meta
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function TheaterPlayer({ v, isActive }: { v: WatchItem; isActive: boolean }) {
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -605,11 +605,11 @@ function TheaterPlayer({ v, isActive }: { v: WatchItem; isActive: boolean }) {
               }}>
                 <div style={{
                   width: 84, height: 84, borderRadius: "50%",
-                  background: "rgba(255,255,255,0.08)", backdropFilter: "blur(10px)",
+                  background: "var(--lh-border-strong)", backdropFilter: "blur(10px)",
                   border: "2px solid rgba(255,255,255,0.3)",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 28, color: "white",
-                }}>▶</div>
+                }}>â–¶</div>
               </div>
               {v.duration && (
                 <div style={{
@@ -631,12 +631,12 @@ function TheaterPlayer({ v, isActive }: { v: WatchItem; isActive: boolean }) {
                 fontSize: 9.5, fontWeight: 900, letterSpacing: 1, padding: "3px 9px",
                 borderRadius: 5, background: "#fbbf24", color: "#06070f",
                 display: "inline-flex", alignItems: "center", gap: 4,
-              }}>★ FEATURED</span>
+              }}>â˜… FEATURED</span>
             )}
             {v.tags.map((c) => (
               <span key={c} style={{
                 fontSize: 9.5, fontWeight: 800, letterSpacing: 1, padding: "3px 8px",
-                borderRadius: 5, background: "rgba(255,255,255,0.06)", color: MUTED,
+                borderRadius: 5, background: "var(--lh-border)", color: MUTED,
                 border: `1px solid ${BORDER}`,
               }}>{c}</span>
             ))}
@@ -646,7 +646,7 @@ function TheaterPlayer({ v, isActive }: { v: WatchItem; isActive: boolean }) {
               background: isShort ? "#fbbf241c" : isChannel ? `${SKY}1c` : `${ORANGE}1c`,
               color: isShort ? "#fbbf24" : isChannel ? SKY : ORANGE,
               border: `1px solid ${(isShort ? "#fbbf24" : isChannel ? SKY : ORANGE)}33`,
-            }}>{isShort ? "⚡ SHORT" : isChannel ? "📺 CHANNEL" : `▶ YOUTUBE${v.duration ? ` · ${v.duration}` : ""}`}</span>
+            }}>{isShort ? "âš¡ SHORT" : isChannel ? "ðŸ“º CHANNEL" : `â–¶ YOUTUBE${v.duration ? ` Â· ${v.duration}` : ""}`}</span>
           </div>
           <h2 style={{
             fontSize: 26, fontWeight: 700, color: TEXT, lineHeight: 1.22, margin: "0 0 10px",
@@ -675,14 +675,14 @@ function TheaterPlayer({ v, isActive }: { v: WatchItem; isActive: boolean }) {
               <div style={{ fontSize: 10, color: DIM, fontWeight: 600 }}>Curated by</div>
               <div style={{ fontSize: 12, color: TEXT, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 4 }}>
                 {v.curatorName}
-                {v.curatorIsVerified && <span title="Verified Org" style={{ color: SKY }}>✓</span>}
+                {v.curatorIsVerified && <span title="Verified Org" style={{ color: SKY }}>âœ“</span>}
               </div>
             </div>
           </div>
           <div style={{ display: "flex", gap: 6 }}>
-            <ActionBtn icon="❤" label={liked ? "Liked" : "Like"} active={liked} onClick={() => setLiked(!liked)} hue="#fb7185" />
-            <ActionBtn icon="🔖" label={saved ? "Saved" : "Save"} active={saved} onClick={() => setSaved(!saved)} hue={ORANGE} />
-            <ActionBtn icon="↗" label="Share" onClick={async () => {
+            <ActionBtn icon="â¤" label={liked ? "Liked" : "Like"} active={liked} onClick={() => setLiked(!liked)} hue="#fb7185" />
+            <ActionBtn icon="ðŸ”–" label={saved ? "Saved" : "Save"} active={saved} onClick={() => setSaved(!saved)} hue={ORANGE} />
+            <ActionBtn icon="â†—" label="Share" onClick={async () => {
               const url = typeof window !== "undefined" ? window.location.href : "";
               if (typeof navigator !== "undefined" && navigator.share) {
                 try { await navigator.share({ title: v.title, url }); } catch { /* user dismissed */ }
@@ -698,7 +698,7 @@ function TheaterPlayer({ v, isActive }: { v: WatchItem; isActive: boolean }) {
               fontSize: 11.5, color: DIM, textDecoration: "none",
               display: "flex", alignItems: "center", gap: 5,
             }}>
-            {isChannel ? `Browse on YouTube${v.channelFocus === "shorts" ? " · Shorts" : ""}` : "Open on YouTube"}
+            {isChannel ? `Browse on YouTube${v.channelFocus === "shorts" ? " Â· Shorts" : ""}` : "Open on YouTube"}
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M7 17L17 7M10 7h7v7" />
             </svg>
@@ -710,7 +710,7 @@ function TheaterPlayer({ v, isActive }: { v: WatchItem; isActive: boolean }) {
 }
 
 function ChannelLanding({ v, isActive }: { v: WatchItem; isActive: boolean }) {
-  // We can't iframe an entire YouTube channel — embeds are per-video. So
+  // We can't iframe an entire YouTube channel â€” embeds are per-video. So
   // channel entries surface as a big deep-link card that opens YouTube's
   // /videos or /shorts page for that channel in a new tab.
   const focus = v.channelFocus ?? "videos";
@@ -741,7 +741,7 @@ function ChannelLanding({ v, isActive }: { v: WatchItem; isActive: boolean }) {
           letterSpacing: -0.6,
         }}>{v.title}</div>
         <div style={{ fontSize: 13, color: MUTED, marginTop: 6 }}>
-          Curated channel · focuses on {focus}
+          Curated channel Â· focuses on {focus}
         </div>
       </div>
       {v.description && (
@@ -759,7 +759,7 @@ function ChannelLanding({ v, isActive }: { v: WatchItem; isActive: boolean }) {
           boxShadow: `0 6px 20px ${v.channelColor}66`,
           display: "inline-flex", alignItems: "center", gap: 6,
         }}>
-        {focus === "shorts" ? "Browse Shorts on YouTube" : focus === "both" ? "Browse channel on YouTube" : "Browse videos on YouTube"} →
+        {focus === "shorts" ? "Browse Shorts on YouTube" : focus === "both" ? "Browse channel on YouTube" : "Browse videos on YouTube"} â†’
       </a>
     </div>
   );
@@ -788,7 +788,7 @@ function ActionBtn({
       style={{
         display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 99,
         border: `1px solid ${active ? hue + "66" : BORDER2}`,
-        background: active ? `${hue}1f` : (hov ? "rgba(255,255,255,0.05)" : "transparent"),
+        background: active ? `${hue}1f` : (hov ? "var(--lh-card-3)" : "transparent"),
         color: active ? hue : (hov ? TEXT : MUTED),
         fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.18s",
       }}>
@@ -798,9 +798,9 @@ function ActionBtn({
   );
 }
 
-// ────────────────────────────────────────────────────────────────
-// UpNextRail — right-hand 380px column with interest chips + cards
-// ────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// UpNextRail â€” right-hand 380px column with interest chips + cards
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function UpNextRail({
   videos, activeIdx, onPick, interest, setInterest, pickedInterests, onOpenInterests,
 }: {
@@ -838,7 +838,7 @@ function UpNextRail({
           <div>
             <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.6, color: ORANGE }}>UP NEXT</div>
             <div style={{ fontSize: 13, color: MUTED, marginTop: 3 }}>
-              {videos.length} curated · {interest === "All" ? "all interests" : interestLabelFor(interest)}
+              {videos.length} curated Â· {interest === "All" ? "all interests" : interestLabelFor(interest)}
             </div>
           </div>
           <button onClick={onOpenInterests} style={{
@@ -862,7 +862,7 @@ function UpNextRail({
               <button key={it.id} onClick={() => setInterest(it.id)} style={{
                 flexShrink: 0, padding: "6px 10px", borderRadius: 99,
                 border: `1px solid ${active ? ORANGE + "66" : (pinned ? BORDER2 : BORDER)}`,
-                background: active ? `${ORANGE}1c` : (pinned ? "rgba(255,255,255,0.05)" : "transparent"),
+                background: active ? `${ORANGE}1c` : (pinned ? "var(--lh-card-3)" : "transparent"),
                 color: active ? ORANGE : (pinned ? TEXT : MUTED),
                 fontSize: 11.5, fontWeight: active ? 700 : 600,
                 cursor: "pointer", transition: "all 0.18s",
@@ -920,7 +920,7 @@ function UpNextCard({
         border: `1px solid ${active ? ORANGE + "55" : (hov ? BORDER2 : "transparent")}`,
         background: active
           ? `linear-gradient(135deg, ${ORANGE}1a, ${ORANGE}08)`
-          : (hov ? "rgba(255,255,255,0.04)" : "transparent"),
+          : (hov ? "var(--lh-card-3)" : "transparent"),
         cursor: "pointer", transition: "all 0.18s",
         display: "grid", gridTemplateColumns: "150px 1fr", gap: 11,
         textAlign: "left", alignItems: "start",
@@ -956,7 +956,7 @@ function UpNextCard({
             padding: "1px 6px", borderRadius: 3, fontSize: 9, fontWeight: 900, letterSpacing: 0.6,
             background: v.isFeatured ? "#fbbf24" : isShort ? "#fbbf24cc" : `${SKY}cc`,
             color: "#06070f",
-          }}>{v.isFeatured ? "★ FEATURED" : isShort ? "⚡ SHORT" : "📺 CHANNEL"}</span>
+          }}>{v.isFeatured ? "â˜… FEATURED" : isShort ? "âš¡ SHORT" : "ðŸ“º CHANNEL"}</span>
         )}
         {active && (
           <div style={{
@@ -990,7 +990,7 @@ function UpNextCard({
               border: "1.5px solid rgba(255,255,255,0.35)",
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 11, color: "white",
-            }}>▶</div>
+            }}>â–¶</div>
           </div>
         )}
       </div>
@@ -1002,7 +1002,7 @@ function UpNextCard({
           {v.tags[0] && (
             <span style={{
               fontSize: 9, fontWeight: 800, letterSpacing: 0.8, padding: "1px 6px",
-              borderRadius: 4, background: "rgba(255,255,255,0.06)", color: MUTED,
+              borderRadius: 4, background: "var(--lh-border)", color: MUTED,
             }}>{v.tags[0]}</span>
           )}
         </div>
@@ -1024,9 +1024,9 @@ function UpNextCard({
   );
 }
 
-// ────────────────────────────────────────────────────────────────
-// InterestsModal — fullscreen blur backdrop with a 2-col grid
-// ────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// InterestsModal â€” fullscreen blur backdrop with a 2-col grid
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function InterestsModal({
   picked, setPicked, onClose,
 }: {
@@ -1064,14 +1064,14 @@ function InterestsModal({
             </div>
             <div style={{ fontSize: 13, color: MUTED, lineHeight: 1.5, maxWidth: 420 }}>
               Pick a few interests. We&rsquo;ll surface videos curated by your
-              mentors in those areas — no doom-scrolling, no shorts.
+              mentors in those areas â€” no doom-scrolling, no shorts.
             </div>
           </div>
           <button onClick={onClose} style={{
             width: 32, height: 32, borderRadius: "50%", border: `1px solid ${BORDER2}`,
             background: "transparent", color: MUTED, cursor: "pointer",
             fontSize: 16, lineHeight: 1, flexShrink: 0,
-          }}>×</button>
+          }}>Ã—</button>
         </div>
 
         <div style={{ marginTop: 18, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -1095,7 +1095,7 @@ function InterestsModal({
                   background: on ? ORANGE : "transparent",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   color: "white", fontSize: 11, fontWeight: 900,
-                }}>{on ? "✓" : ""}</span>
+                }}>{on ? "âœ“" : ""}</span>
               </button>
             );
           })}
@@ -1124,9 +1124,9 @@ function InterestsModal({
   );
 }
 
-// ────────────────────────────────────────────────────────────────
-// MobileWatch — single iframe + UP NEXT list, no theater chrome
-// ────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// MobileWatch â€” single iframe + UP NEXT list, no theater chrome
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function MobileWatch({
   videos, interest, setInterest, activeIdx, setActiveIdx, onOpenInterests,
 }: {

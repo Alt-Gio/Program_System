@@ -72,8 +72,8 @@ export default function ProfilePage({ params }: Props) {
   if (user === undefined) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-6">
-        <div className="h-32 rounded-2xl animate-pulse mb-4" style={{ background: "#131626" }} />
-        <div className="h-48 rounded-2xl animate-pulse" style={{ background: "#131626" }} />
+        <div className="h-32 rounded-2xl animate-pulse mb-4" style={{ background: "var(--lh-card)" }} />
+        <div className="h-48 rounded-2xl animate-pulse" style={{ background: "var(--lh-card)" }} />
       </div>
     );
   }
@@ -82,7 +82,7 @@ export default function ProfilePage({ params }: Props) {
     return (
       <div className="max-w-xl mx-auto px-4 py-20 text-center">
         <p className="text-4xl mb-3">👤</p>
-        <p className="text-lg font-semibold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>User not found</p>
+        <p className="text-lg font-semibold" style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}>User not found</p>
         <Link href="/learnhub/feed" className="text-sm mt-4 inline-block" style={{ color: "#5b6cff" }}>← Back to Feed</Link>
       </div>
     );
@@ -137,7 +137,7 @@ export default function ProfilePage({ params }: Props) {
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 flex flex-col gap-4">
       {/* Profile header card */}
-      <div className="rounded-2xl overflow-hidden" style={{ background: "#131626", border: "1px solid rgba(255,255,255,0.06)" }}>
+      <div className="rounded-2xl overflow-hidden" style={{ background: "var(--lh-card)", border: "1px solid rgba(255,255,255,0.06)" }}>
         {/* Cover gradient */}
         <div className="h-20" style={{ background: `linear-gradient(135deg, ${level.color}30 0%, rgba(91,108,255,0.1) 100%)` }} />
 
@@ -150,7 +150,7 @@ export default function ProfilePage({ params }: Props) {
               width={72}
               height={72}
               className="rounded-2xl object-cover"
-              style={{ border: "3px solid #131626", background: "#1a1d30" }}
+              style={{ border: "3px solid var(--lh-card)", background: "var(--lh-card-2)" }}
               onError={(e) => { (e.currentTarget as HTMLImageElement).src = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name)}`; }}
             />
             <div className="flex gap-2 mb-1 items-center">
@@ -173,7 +173,7 @@ export default function ProfilePage({ params }: Props) {
                     className="text-xs font-semibold px-3 py-1.5 rounded-full transition"
                     style={{
                       background: isFollowing ? "rgba(255,255,255,0.06)" : "#5b6cff",
-                      color: isFollowing ? "#9ba3cc" : "#fff",
+                      color: isFollowing ? "var(--lh-text-2)" : "#fff",
                       border: "1px solid " + (isFollowing ? "rgba(255,255,255,0.12)" : "#5b6cff"),
                       opacity: busy ? 0.6 : 1,
                     }}
@@ -238,13 +238,13 @@ export default function ProfilePage({ params }: Props) {
             <>
               {/* Name + level */}
               <div className="flex items-center gap-2 flex-wrap mb-1">
-                <h1 className="text-xl font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>{user.name}</h1>
+                <h1 className="text-xl font-bold" style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}>{user.name}</h1>
                 <span className="text-sm">{level.icon}</span>
                 <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: level.color + "20", color: level.color }}>{level.label}</span>
               </div>
-              {user.bio && <p className="text-sm mb-3" style={{ color: "#9ba3cc" }}>{user.bio}</p>}
+              {user.bio && <p className="text-sm mb-3" style={{ color: "var(--lh-text-2)" }}>{user.bio}</p>}
               {(user.school || user.organization) && (
-                <p className="text-xs mb-3" style={{ color: "#5c6490" }}>
+                <p className="text-xs mb-3" style={{ color: "var(--lh-text-3)" }}>
                   🏫 {user.school ?? user.organization}
                 </p>
               )}
@@ -254,8 +254,8 @@ export default function ProfilePage({ params }: Props) {
           {/* XP bar */}
           <div className="mb-4">
             <div className="flex justify-between text-xs mb-1.5">
-              <span style={{ color: "#9ba3cc" }}>{user.xpPoints.toLocaleString()} XP</span>
-              <span style={{ color: "#5c6490" }}>{level.current} / {level.next} to Lv {level.level + 1}</span>
+              <span style={{ color: "var(--lh-text-2)" }}>{user.xpPoints.toLocaleString()} XP</span>
+              <span style={{ color: "var(--lh-text-3)" }}>{level.current} / {level.next} to Lv {level.level + 1}</span>
             </div>
             <div className="h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
               <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(xpProgress, 100)}%`, background: `linear-gradient(90deg, ${level.color}, ${level.color}80)` }} />
@@ -271,8 +271,8 @@ export default function ProfilePage({ params }: Props) {
               { label: "Following", value: user.followingIds.length.toString(), icon: "👤" },
             ].map((stat) => (
               <div key={stat.label} className="rounded-xl px-2 py-2.5 text-center" style={{ background: "rgba(255,255,255,0.04)" }}>
-                <p className="text-base font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>{stat.value}</p>
-                <p className="text-[10px] mt-0.5" style={{ color: "#9ba3cc" }}>{stat.label}</p>
+                <p className="text-base font-bold" style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}>{stat.value}</p>
+                <p className="text-[10px] mt-0.5" style={{ color: "var(--lh-text-2)" }}>{stat.label}</p>
               </div>
             ))}
           </div>
@@ -281,8 +281,8 @@ export default function ProfilePage({ params }: Props) {
 
       {/* Badges */}
       {user.badges.length > 0 && (
-        <div className="rounded-2xl p-5" style={{ background: "#131626", border: "1px solid rgba(255,255,255,0.06)" }}>
-          <p className="text-sm font-semibold mb-3" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>Badges</p>
+        <div className="rounded-2xl p-5" style={{ background: "var(--lh-card)", border: "1px solid rgba(255,255,255,0.06)" }}>
+          <p className="text-sm font-semibold mb-3" style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}>Badges</p>
           <div className="flex flex-wrap gap-2">
             {user.badges.map((badge, i) => (
               <span key={i} className="text-xs px-3 py-1.5 rounded-full" style={{ background: "rgba(91,108,255,0.1)", color: "#7c8bff", border: "1px solid rgba(91,108,255,0.2)" }}>{badge}</span>
@@ -294,20 +294,20 @@ export default function ProfilePage({ params }: Props) {
       <ActivityTimeline userId={user._id} />
 
       {/* Recent posts */}
-      <div className="rounded-2xl p-5" style={{ background: "#131626", border: "1px solid rgba(255,255,255,0.06)" }}>
-        <p className="text-sm font-semibold mb-3" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>Recent Posts</p>
-        {posts === undefined && <div className="h-24 rounded-xl animate-pulse" style={{ background: "#1a1d30" }} />}
-        {posts?.length === 0 && <p className="text-sm" style={{ color: "#5c6490" }}>No posts yet.</p>}
+      <div className="rounded-2xl p-5" style={{ background: "var(--lh-card)", border: "1px solid rgba(255,255,255,0.06)" }}>
+        <p className="text-sm font-semibold mb-3" style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}>Recent Posts</p>
+        {posts === undefined && <div className="h-24 rounded-xl animate-pulse" style={{ background: "var(--lh-card-2)" }} />}
+        {posts?.length === 0 && <p className="text-sm" style={{ color: "var(--lh-text-3)" }}>No posts yet.</p>}
         <div className="flex flex-col gap-2">
           {posts?.map((post) => (
-            <div key={post._id} className="rounded-xl px-4 py-3 flex items-start justify-between gap-3" style={{ background: "#1a1d30" }}>
+            <div key={post._id} className="rounded-xl px-4 py-3 flex items-start justify-between gap-3" style={{ background: "var(--lh-card-2)" }}>
               <div className="flex-1 min-w-0">
                 <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded mr-2" style={{ background: "rgba(91,108,255,0.1)", color: "#7c8bff" }}>{post.type}</span>
                 <p className="text-sm mt-1.5 line-clamp-2" style={{ color: "#c8caf0" }}>{post.content}</p>
               </div>
               <div className="text-right shrink-0">
-                <p className="text-[10px]" style={{ color: "#5c6490" }}>{formatDistanceToNow(post.createdAt, { addSuffix: true })}</p>
-                <p className="text-xs mt-1" style={{ color: "#9ba3cc" }}>❤ {post.likeCount}</p>
+                <p className="text-[10px]" style={{ color: "var(--lh-text-3)" }}>{formatDistanceToNow(post.createdAt, { addSuffix: true })}</p>
+                <p className="text-xs mt-1" style={{ color: "var(--lh-text-2)" }}>❤ {post.likeCount}</p>
               </div>
             </div>
           ))}
@@ -321,23 +321,23 @@ function ActivityTimeline({ userId }: { userId: Id<"learnhub_users"> }) {
   const rows = useQuery(api.learnhub_users.getUserActivityTimeline, { userId, limit: 12 });
   if (rows === undefined) {
     return (
-      <div className="rounded-2xl p-5" style={{ background: "#131626", border: "1px solid rgba(255,255,255,0.06)" }}>
-        <p className="text-sm font-semibold mb-3" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>Activity</p>
-        <div className="h-16 rounded-xl animate-pulse" style={{ background: "#1a1d30" }} />
+      <div className="rounded-2xl p-5" style={{ background: "var(--lh-card)", border: "1px solid rgba(255,255,255,0.06)" }}>
+        <p className="text-sm font-semibold mb-3" style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}>Activity</p>
+        <div className="h-16 rounded-xl animate-pulse" style={{ background: "var(--lh-card-2)" }} />
       </div>
     );
   }
   if (rows.length === 0) return null;
   return (
-    <div className="rounded-2xl p-5" style={{ background: "#131626", border: "1px solid rgba(255,255,255,0.06)" }}>
-      <p className="text-sm font-semibold mb-3" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>Activity</p>
+    <div className="rounded-2xl p-5" style={{ background: "var(--lh-card)", border: "1px solid rgba(255,255,255,0.06)" }}>
+      <p className="text-sm font-semibold mb-3" style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}>Activity</p>
       <div className="flex flex-col gap-2">
         {rows.map((r) => (
-          <div key={r.id} className="rounded-xl px-3 py-2 flex items-center gap-3" style={{ background: "#1a1d30" }}>
+          <div key={r.id} className="rounded-xl px-3 py-2 flex items-center gap-3" style={{ background: "var(--lh-card-2)" }}>
             <span style={{ fontSize: 18 }}>{r.emoji}</span>
             <div className="flex-1 min-w-0">
               <p className="text-xs" style={{ color: "#c8caf0" }}>{r.title}</p>
-              <p className="text-[10px] mt-0.5" style={{ color: "#5c6490" }}>{r.date}</p>
+              <p className="text-[10px] mt-0.5" style={{ color: "var(--lh-text-3)" }}>{r.date}</p>
             </div>
             <span className="text-xs font-semibold" style={{ color: "#22d3a0" }}>{r.detail}</span>
           </div>

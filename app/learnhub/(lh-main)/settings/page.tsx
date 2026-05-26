@@ -14,12 +14,13 @@ import {
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { LOCALES, type Locale } from "@/lib/i18n/translations";
 import InstallAppButton from "@/components/InstallAppButton";
+import { applyTheme, getStoredTheme, type Theme } from "@/lib/learnhub/theme";
 
 const FEED_COLUMN_OPTIONS: Array<{ value: number; label: string; sub: string }> = [
   { value: 1, label: "1 column", sub: "Single, full-width cards" },
-  { value: 2, label: "2 columns", sub: "Default — masonry pair" },
+  { value: 2, label: "2 columns", sub: "Default â€” masonry pair" },
   { value: 3, label: "3 columns", sub: "Denser, more above the fold" },
-  { value: 4, label: "4 columns", sub: "Compact — best on wide screens" },
+  { value: 4, label: "4 columns", sub: "Compact â€” best on wide screens" },
 ];
 
 type ConvexUserId = Parameters<ReturnType<typeof useMutation<typeof api.learnhub_users.updateNotifPrefs>>>[0]["userId"];
@@ -31,16 +32,16 @@ type Hours = "<5" | "5-10" | "10-20" | "20+";
 const MIN_INTERESTS = 3;
 const MAX_INTERESTS = 5;
 const GOALS: Array<{ value: Goal; label: string; emoji: string }> = [
-  { value: "find_work", label: "Find work", emoji: "💼" },
-  { value: "learn", label: "Learn new skills", emoji: "📚" },
-  { value: "build_portfolio", label: "Build a portfolio", emoji: "🛠️" },
-  { value: "mentor", label: "Mentor others", emoji: "🤝" },
-  { value: "network", label: "Network", emoji: "🌐" },
+  { value: "find_work", label: "Find work", emoji: "ðŸ’¼" },
+  { value: "learn", label: "Learn new skills", emoji: "ðŸ“š" },
+  { value: "build_portfolio", label: "Build a portfolio", emoji: "ðŸ› ï¸" },
+  { value: "mentor", label: "Mentor others", emoji: "ðŸ¤" },
+  { value: "network", label: "Network", emoji: "ðŸŒ" },
 ];
 const HOURS_OPTIONS: Array<{ value: Hours; label: string }> = [
   { value: "<5", label: "Under 5 hrs/week" },
-  { value: "5-10", label: "5–10 hrs/week" },
-  { value: "10-20", label: "10–20 hrs/week" },
+  { value: "5-10", label: "5â€“10 hrs/week" },
+  { value: "10-20", label: "10â€“20 hrs/week" },
   { value: "20+", label: "20+ hrs/week" },
 ];
 const SKILL_LEVELS: Array<{ value: SkillLevel; short: string }> = [
@@ -54,6 +55,14 @@ function SettingsPageInner() {
   const sp = useSearchParams();
   const router = useRouter();
   const { locale, setLocale, t } = useLocale();
+  const [theme, setThemeState] = useState<Theme>("dark");
+  useEffect(() => {
+    setThemeState(getStoredTheme());
+  }, []);
+  const pickTheme = (next: Theme) => {
+    setThemeState(next);
+    applyTheme(next);
+  };
   const [pushEnabled, setPushEnabled] = useState(false);
   const [emailDigest, setEmailDigest] = useState<EmailDigest>("weekly");
   const [quietFrom, setQuietFrom] = useState("");
@@ -120,7 +129,7 @@ function SettingsPageInner() {
       });
       setFeedColsSavedAt(Date.now());
     } catch {
-      // Non-fatal — the feed simply falls back to the default column count.
+      // Non-fatal â€” the feed simply falls back to the default column count.
     }
   };
 
@@ -137,7 +146,7 @@ function SettingsPageInner() {
         throw new Error(data.error ?? "Failed to delete account");
       }
       clearLearnhubSessionCache();
-      // Send the user to the login screen — their next sign-in will run
+      // Send the user to the login screen â€” their next sign-in will run
       // through onboarding again as a fresh account.
       router.replace("/learnhub/login?deleted=1");
     } catch (e) {
@@ -224,7 +233,7 @@ function SettingsPageInner() {
   // Toast on round-trip from /api/learnhub/calendar/connect/callback
   useEffect(() => {
     const status = sp.get("calendar");
-    if (status === "connected") setCalToast("Google Calendar connected ✓");
+    if (status === "connected") setCalToast("Google Calendar connected âœ“");
     else if (status === "error") setCalToast(`Connect failed: ${sp.get("reason") ?? "unknown"}`);
     if (status) {
       const t = setTimeout(() => setCalToast(null), 4000);
@@ -275,8 +284,8 @@ function SettingsPageInner() {
   };
 
   const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div className="rounded-2xl p-5 flex flex-col gap-4" style={{ background: "#131626", border: "1px solid rgba(255,255,255,0.06)" }}>
-      <p className="text-sm font-semibold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>{title}</p>
+    <div className="rounded-2xl p-5 flex flex-col gap-4" style={{ background: "var(--lh-card)", border: "1px solid rgba(255,255,255,0.06)" }}>
+      <p className="text-sm font-semibold" style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}>{title}</p>
       {children}
     </div>
   );
@@ -284,10 +293,10 @@ function SettingsPageInner() {
   const Toggle = ({ checked, onChange, label, sub }: { checked: boolean; onChange: (v: boolean) => void; label: string; sub?: string }) => (
     <div className="flex items-center justify-between gap-4">
       <div>
-        <p className="text-sm" style={{ color: "#e8eaff" }}>{label}</p>
-        {sub && <p className="text-xs mt-0.5" style={{ color: "#9ba3cc" }}>{sub}</p>}
+        <p className="text-sm" style={{ color: "var(--lh-text)" }}>{label}</p>
+        {sub && <p className="text-xs mt-0.5" style={{ color: "var(--lh-text-2)" }}>{sub}</p>}
       </div>
-      <button onClick={() => onChange(!checked)} className="w-11 h-6 rounded-full relative transition-colors shrink-0" style={{ background: checked ? "#5b6cff" : "rgba(255,255,255,0.12)" }}>
+      <button onClick={() => onChange(!checked)} className="w-11 h-6 rounded-full relative transition-colors shrink-0" style={{ background: checked ? "#5b6cff" : "var(--lh-border-strong)" }}>
         <span className="absolute top-0.5 transition-all w-5 h-5 rounded-full" style={{ background: "#fff", left: checked ? "calc(100% - 1.375rem)" : "0.125rem" }} />
       </button>
     </div>
@@ -296,8 +305,8 @@ function SettingsPageInner() {
   return (
     <div className="max-w-xl mx-auto px-4 py-6">
       <div className="mb-6">
-        <h1 className="text-xl font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>{t("settings.title")}</h1>
-        <p className="text-sm mt-0.5" style={{ color: "#9ba3cc" }}>{t("settings.subtitle")}</p>
+        <h1 className="text-xl font-bold" style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}>{t("settings.title")}</h1>
+        <p className="text-sm mt-0.5" style={{ color: "var(--lh-text-2)" }}>{t("settings.subtitle")}</p>
       </div>
 
       {calToast && (
@@ -317,20 +326,20 @@ function SettingsPageInner() {
         {userId && <StreakCard userId={userId as Id<"learnhub_users">} />}
 
         <Section title="Your Preferences">
-          <p className="text-xs" style={{ color: "#9ba3cc" }}>
+          <p className="text-xs" style={{ color: "var(--lh-text-2)" }}>
             These shape what surfaces first in your feed. Update them anytime.
           </p>
 
           <div>
-            <p className="text-xs font-medium mb-2" style={{ color: "#9ba3cc" }}>
-              Interests <span style={{ color: "#5c6490" }}>({MIN_INTERESTS}–{MAX_INTERESTS} · {interests.length} selected)</span>
+            <p className="text-xs font-medium mb-2" style={{ color: "var(--lh-text-2)" }}>
+              Interests <span style={{ color: "var(--lh-text-3)" }}>({MIN_INTERESTS}â€“{MAX_INTERESTS} Â· {interests.length} selected)</span>
             </p>
             <div className="flex flex-col gap-3 max-h-80 overflow-y-auto pr-1">
               {Object.entries(INTEREST_CATEGORIES).map(([cat, tags]) => (
                 <div key={cat}>
                   <p
                     className="text-[10px] uppercase tracking-widest mb-1.5"
-                    style={{ color: "#5c6490" }}
+                    style={{ color: "var(--lh-text-3)" }}
                   >
                     {cat}
                   </p>
@@ -346,9 +355,9 @@ function SettingsPageInner() {
                           disabled={atCap}
                           className="rounded-full px-3 py-1.5 text-xs font-medium transition-all disabled:opacity-40"
                           style={{
-                            background: active ? "rgba(91,108,255,0.18)" : "rgba(255,255,255,0.04)",
+                            background: active ? "rgba(91,108,255,0.18)" : "var(--lh-card-3)",
                             border: active ? "1px solid #5b6cff" : "1px solid rgba(255,255,255,0.08)",
-                            color: active ? "#7c8bff" : "#e8eaff",
+                            color: active ? "#7c8bff" : "var(--lh-text)",
                             cursor: atCap ? "not-allowed" : "pointer",
                           }}
                         >
@@ -378,7 +387,7 @@ function SettingsPageInner() {
                 style={{
                   background: "rgba(0,0,0,0.3)",
                   border: "1px solid rgba(255,255,255,0.08)",
-                  color: "#e8eaff",
+                  color: "var(--lh-text)",
                 }}
               />
               <button
@@ -399,10 +408,10 @@ function SettingsPageInner() {
 
           {interests.length > 0 && (
             <div className="flex flex-col gap-2">
-              <p className="text-xs font-medium" style={{ color: "#9ba3cc" }}>Skill level</p>
+              <p className="text-xs font-medium" style={{ color: "var(--lh-text-2)" }}>Skill level</p>
               {interests.map((tag) => (
                 <div key={tag} className="rounded-xl p-2.5" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}>
-                  <p className="text-xs mb-1.5" style={{ color: "#e8eaff" }}>{tag}</p>
+                  <p className="text-xs mb-1.5" style={{ color: "var(--lh-text)" }}>{tag}</p>
                   <div className="flex gap-1.5">
                     {SKILL_LEVELS.map((lvl) => {
                       const on = skillLevels[tag] === lvl.value;
@@ -415,7 +424,7 @@ function SettingsPageInner() {
                           style={{
                             background: on ? "rgba(91,108,255,0.18)" : "rgba(0,0,0,0.25)",
                             border: on ? "1px solid #5b6cff" : "1px solid rgba(255,255,255,0.06)",
-                            color: on ? "#7c8bff" : "#9ba3cc",
+                            color: on ? "#7c8bff" : "var(--lh-text-2)",
                           }}
                         >
                           {lvl.short}
@@ -429,7 +438,7 @@ function SettingsPageInner() {
           )}
 
           <div>
-            <p className="text-xs font-medium mb-2" style={{ color: "#9ba3cc" }}>Goals</p>
+            <p className="text-xs font-medium mb-2" style={{ color: "var(--lh-text-2)" }}>Goals</p>
             <div className="flex flex-wrap gap-2">
               {GOALS.map((g) => {
                 const on = goals.includes(g.value);
@@ -440,9 +449,9 @@ function SettingsPageInner() {
                     onClick={() => toggleGoal(g.value)}
                     className="rounded-full px-3 py-1.5 text-xs font-medium transition-all flex items-center gap-1.5"
                     style={{
-                      background: on ? "rgba(91,108,255,0.18)" : "rgba(255,255,255,0.04)",
+                      background: on ? "rgba(91,108,255,0.18)" : "var(--lh-card-3)",
                       border: on ? "1px solid #5b6cff" : "1px solid rgba(255,255,255,0.08)",
-                      color: on ? "#7c8bff" : "#e8eaff",
+                      color: on ? "#7c8bff" : "var(--lh-text)",
                     }}
                   >
                     <span>{g.emoji}</span> {g.label}
@@ -453,7 +462,7 @@ function SettingsPageInner() {
           </div>
 
           <div>
-            <p className="text-xs font-medium mb-2" style={{ color: "#9ba3cc" }}>Weekly availability</p>
+            <p className="text-xs font-medium mb-2" style={{ color: "var(--lh-text-2)" }}>Weekly availability</p>
             <div className="grid grid-cols-2 gap-2">
               {HOURS_OPTIONS.map((h) => {
                 const on = hoursPerWeek === h.value;
@@ -464,9 +473,9 @@ function SettingsPageInner() {
                     onClick={() => setHoursPerWeek(on ? "" : h.value)}
                     className="rounded-lg px-3 py-2 text-xs font-medium transition-all text-left"
                     style={{
-                      background: on ? "rgba(91,108,255,0.18)" : "rgba(255,255,255,0.04)",
+                      background: on ? "rgba(91,108,255,0.18)" : "var(--lh-card-3)",
                       border: on ? "1px solid #5b6cff" : "1px solid rgba(255,255,255,0.08)",
-                      color: on ? "#7c8bff" : "#e8eaff",
+                      color: on ? "#7c8bff" : "var(--lh-text)",
                     }}
                   >
                     {h.label}
@@ -477,7 +486,7 @@ function SettingsPageInner() {
           </div>
 
           <div>
-            <p className="text-xs font-medium mb-2" style={{ color: "#9ba3cc" }}>Location</p>
+            <p className="text-xs font-medium mb-2" style={{ color: "var(--lh-text-2)" }}>Location</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <input
                 type="text"
@@ -485,7 +494,7 @@ function SettingsPageInner() {
                 onChange={(e) => setRegion(e.target.value)}
                 placeholder="Region"
                 className="rounded-xl px-3 py-2 text-sm outline-none"
-                style={{ background: "#0d0f1a", border: "1px solid rgba(255,255,255,0.08)", color: "#e8eaff" }}
+                style={{ background: "var(--lh-input-bg)", border: "1px solid rgba(255,255,255,0.08)", color: "var(--lh-text)" }}
               />
               <input
                 type="text"
@@ -493,7 +502,7 @@ function SettingsPageInner() {
                 onChange={(e) => setProvince(e.target.value)}
                 placeholder="Province"
                 className="rounded-xl px-3 py-2 text-sm outline-none"
-                style={{ background: "#0d0f1a", border: "1px solid rgba(255,255,255,0.08)", color: "#e8eaff" }}
+                style={{ background: "var(--lh-input-bg)", border: "1px solid rgba(255,255,255,0.08)", color: "var(--lh-text)" }}
               />
               <input
                 type="text"
@@ -501,7 +510,7 @@ function SettingsPageInner() {
                 onChange={(e) => setMunicipality(e.target.value)}
                 placeholder="Municipality / City"
                 className="rounded-xl px-3 py-2 text-sm outline-none"
-                style={{ background: "#0d0f1a", border: "1px solid rgba(255,255,255,0.08)", color: "#e8eaff" }}
+                style={{ background: "var(--lh-input-bg)", border: "1px solid rgba(255,255,255,0.08)", color: "var(--lh-text)" }}
               />
             </div>
           </div>
@@ -512,11 +521,11 @@ function SettingsPageInner() {
             className="w-full py-2.5 rounded-xl font-semibold text-sm transition-all disabled:opacity-40"
             style={{ background: prefsSaved ? "#22d3a0" : "#5b6cff", color: "#fff", fontFamily: "var(--font-sora)" }}
           >
-            {prefsSaving ? "Saving…" : prefsSaved ? "Saved ✓" : "Save Preferences"}
+            {prefsSaving ? "Saving…" : prefsSaved ? "Saved âœ“" : "Save Preferences"}
           </button>
           {!prefsValid && interests.length > 0 && (
             <p className="text-xs" style={{ color: "#ff8c42" }}>
-              Pick {MIN_INTERESTS}–{MAX_INTERESTS} interests with a skill level on each to save.
+              Pick {MIN_INTERESTS}â€“{MAX_INTERESTS} interests with a skill level on each to save.
             </p>
           )}
         </Section>
@@ -524,13 +533,13 @@ function SettingsPageInner() {
         <Section title="Integrations">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm" style={{ color: "#e8eaff" }}>Google Calendar &amp; Meet</p>
-              <p className="text-xs mt-0.5" style={{ color: "#9ba3cc" }}>
+              <p className="text-sm" style={{ color: "var(--lh-text)" }}>Google Calendar &amp; Meet</p>
+              <p className="text-xs mt-0.5" style={{ color: "var(--lh-text-2)" }}>
                 {calCreds === undefined
                   ? "Loading…"
                   : calCreds === null
                   ? "Connect to auto-generate Meet links and see your real calendar."
-                  : `Connected · ${calCreds.scopes.filter((s) => s.includes("calendar")).length} calendar scopes`}
+                  : `Connected Â· ${calCreds.scopes.filter((s) => s.includes("calendar")).length} calendar scopes`}
               </p>
             </div>
             {calCreds === null ? (
@@ -560,12 +569,12 @@ function SettingsPageInner() {
         </Section>
 
         <Section title="Email Digest">
-          <p className="text-sm" style={{ color: "#9ba3cc" }}>
+          <p className="text-sm" style={{ color: "var(--lh-text-2)" }}>
             How often would you like a summary email? Daily lands ~7pm PHT; weekly lands Sunday ~5pm PHT.
           </p>
           <div className="flex gap-2 flex-wrap">
             {(["daily", "weekly", "never"] as EmailDigest[]).map((opt) => (
-              <button key={opt} onClick={() => setEmailDigest(opt)} className="px-4 py-2 rounded-xl text-sm font-medium transition-all capitalize" style={{ background: emailDigest === opt ? "rgba(91,108,255,0.15)" : "rgba(255,255,255,0.04)", color: emailDigest === opt ? "#7c8bff" : "#9ba3cc", border: emailDigest === opt ? "1px solid rgba(91,108,255,0.3)" : "1px solid rgba(255,255,255,0.06)" }}>
+              <button key={opt} onClick={() => setEmailDigest(opt)} className="px-4 py-2 rounded-xl text-sm font-medium transition-all capitalize" style={{ background: emailDigest === opt ? "rgba(91,108,255,0.15)" : "var(--lh-card-3)", color: emailDigest === opt ? "#7c8bff" : "var(--lh-text-2)", border: emailDigest === opt ? "1px solid rgba(91,108,255,0.3)" : "1px solid rgba(255,255,255,0.06)" }}>
                 {opt}
               </button>
             ))}
@@ -573,22 +582,55 @@ function SettingsPageInner() {
         </Section>
 
         <Section title="Quiet Hours">
-          <p className="text-xs" style={{ color: "#9ba3cc" }}>No push notifications will be sent during this window.</p>
+          <p className="text-xs" style={{ color: "var(--lh-text-2)" }}>No push notifications will be sent during this window.</p>
           <div className="flex items-center gap-3">
             <div className="flex-1">
-              <label className="text-xs mb-1 block" style={{ color: "#5c6490" }}>From</label>
-              <input type="time" value={quietFrom} onChange={(e) => setQuietFrom(e.target.value)} className="w-full rounded-xl px-3 py-2 text-sm outline-none" style={{ background: "#0d0f1a", border: "1px solid rgba(255,255,255,0.08)", color: "#e8eaff" }} />
+              <label className="text-xs mb-1 block" style={{ color: "var(--lh-text-3)" }}>From</label>
+              <input type="time" value={quietFrom} onChange={(e) => setQuietFrom(e.target.value)} className="w-full rounded-xl px-3 py-2 text-sm outline-none" style={{ background: "var(--lh-input-bg)", border: "1px solid rgba(255,255,255,0.08)", color: "var(--lh-text)" }} />
             </div>
-            <span className="text-sm" style={{ color: "#5c6490", marginTop: 16 }}>→</span>
+            <span className="text-sm" style={{ color: "var(--lh-text-3)", marginTop: 16 }}>â†’</span>
             <div className="flex-1">
-              <label className="text-xs mb-1 block" style={{ color: "#5c6490" }}>To</label>
-              <input type="time" value={quietTo} onChange={(e) => setQuietTo(e.target.value)} className="w-full rounded-xl px-3 py-2 text-sm outline-none" style={{ background: "#0d0f1a", border: "1px solid rgba(255,255,255,0.08)", color: "#e8eaff" }} />
+              <label className="text-xs mb-1 block" style={{ color: "var(--lh-text-3)" }}>To</label>
+              <input type="time" value={quietTo} onChange={(e) => setQuietTo(e.target.value)} className="w-full rounded-xl px-3 py-2 text-sm outline-none" style={{ background: "var(--lh-input-bg)", border: "1px solid rgba(255,255,255,0.08)", color: "var(--lh-text)" }} />
             </div>
           </div>
         </Section>
 
+        <Section title={t("settings.theme.title")}>
+          <p className="text-xs" style={{ color: "var(--lh-text-2)" }}>
+            {t("settings.theme.sub")}
+          </p>
+          <div className="flex gap-2 flex-wrap">
+            {(
+              [
+                { value: "light", label: t("settings.theme.light"), emoji: "â˜€ï¸" },
+                { value: "dark",  label: t("settings.theme.dark"),  emoji: "ðŸŒ™" },
+                { value: "system",label: t("settings.theme.system"),emoji: "ðŸ–¥ï¸" },
+              ] as Array<{ value: Theme; label: string; emoji: string }>
+            ).map((opt) => {
+              const on = theme === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => pickTheme(opt.value)}
+                  className="px-4 py-2 rounded-xl text-sm font-medium transition-all inline-flex items-center gap-2"
+                  style={{
+                    background: on ? "var(--lh-tint-indigo)" : "var(--lh-card-2)",
+                    color: on ? "var(--lh-accent-2)" : "var(--lh-text-2)",
+                    border: on ? "1px solid var(--lh-accent-2)" : "1px solid var(--lh-border)",
+                  }}
+                  aria-pressed={on}
+                >
+                  <span aria-hidden>{opt.emoji}</span> {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </Section>
+
         <Section title={t("settings.language.title")}>
-          <p className="text-xs" style={{ color: "#9ba3cc" }}>
+          <p className="text-xs" style={{ color: "var(--lh-text-2)" }}>
             {t("settings.language.sub")}
           </p>
           <div className="flex gap-2 flex-wrap">
@@ -601,8 +643,8 @@ function SettingsPageInner() {
                   onClick={() => setLocale(opt.code as Locale)}
                   className="px-4 py-2 rounded-xl text-sm font-medium transition-all"
                   style={{
-                    background: on ? "rgba(91,108,255,0.15)" : "rgba(255,255,255,0.04)",
-                    color: on ? "#7c8bff" : "#9ba3cc",
+                    background: on ? "rgba(91,108,255,0.15)" : "var(--lh-card-3)",
+                    color: on ? "#7c8bff" : "var(--lh-text-2)",
                     border: on ? "1px solid rgba(91,108,255,0.3)" : "1px solid rgba(255,255,255,0.06)",
                   }}
                 >
@@ -614,7 +656,7 @@ function SettingsPageInner() {
         </Section>
 
         <Section title={t("settings.install.title")}>
-          <p className="text-xs" style={{ color: "#9ba3cc" }}>
+          <p className="text-xs" style={{ color: "var(--lh-text-2)" }}>
             {t("settings.install.sub")}
           </p>
           <div>
@@ -623,7 +665,7 @@ function SettingsPageInner() {
         </Section>
 
         <Section title="Feed Layout">
-          <p className="text-xs" style={{ color: "#9ba3cc" }}>
+          <p className="text-xs" style={{ color: "var(--lh-text-2)" }}>
             How many columns should the For-you feed pack into? Saves
             instantly and applies the next time the feed renders.
           </p>
@@ -637,21 +679,21 @@ function SettingsPageInner() {
                   onClick={() => handlePickFeedColumns(opt.value)}
                   className="rounded-xl px-3 py-2.5 text-left transition-all"
                   style={{
-                    background: on ? "rgba(91,108,255,0.18)" : "rgba(255,255,255,0.04)",
+                    background: on ? "rgba(91,108,255,0.18)" : "var(--lh-card-3)",
                     border: on ? "1px solid #5b6cff" : "1px solid rgba(255,255,255,0.08)",
-                    color: on ? "#7c8bff" : "#e8eaff",
+                    color: on ? "#7c8bff" : "var(--lh-text)",
                   }}
                   aria-pressed={on}
                 >
                   <p className="text-sm font-semibold">{opt.label}</p>
-                  <p className="text-[11px] mt-0.5" style={{ color: on ? "#9ba9ff" : "#9ba3cc" }}>
+                  <p className="text-[11px] mt-0.5" style={{ color: on ? "#9ba9ff" : "var(--lh-text-2)" }}>
                     {opt.sub}
                   </p>
                 </button>
               );
             })}
           </div>
-          {/* Mini preview — pure CSS so it shows the actual column behaviour */}
+          {/* Mini preview â€” pure CSS so it shows the actual column behaviour */}
           <div
             style={{
               columnCount: feedColumns,
@@ -679,20 +721,20 @@ function SettingsPageInner() {
             ))}
           </div>
           {feedColsSavedAt > 0 && Date.now() - feedColsSavedAt < 2500 && (
-            <p className="text-xs" style={{ color: "#22d3a0" }}>Saved ✓</p>
+            <p className="text-xs" style={{ color: "#22d3a0" }}>Saved âœ“</p>
           )}
         </Section>
 
         <button onClick={handleSave} disabled={saving || !userId} className="w-full py-3 rounded-xl font-semibold text-sm transition-all disabled:opacity-40" style={{ background: saved ? "#22d3a0" : "#5b6cff", color: "#fff", fontFamily: "var(--font-sora)" }}>
-          {saving ? "Saving…" : saved ? "Saved ✓" : "Save Changes"}
+          {saving ? "Saving…" : saved ? "Saved âœ“" : "Save Changes"}
         </button>
 
-        {/* Admin tools — only visible to admin/coordinator roles */}
+        {/* Admin tools â€” only visible to admin/coordinator roles */}
         {me && (me.role === "admin" || me.role === "coordinator") && (
           <AdminToolsSection actorId={me._id} />
         )}
 
-        {/* Danger zone — kept visually distinct so it can't be hit by accident */}
+        {/* Danger zone â€” kept visually distinct so it can't be hit by accident */}
         <div
           className="rounded-2xl p-5 flex flex-col gap-3 mt-2"
           style={{ background: "#1a0f12", border: "1px solid rgba(255,95,109,0.25)" }}
@@ -736,7 +778,7 @@ function SettingsPageInner() {
                 placeholder="DELETE"
                 className="rounded-xl px-3 py-2 text-sm outline-none"
                 style={{
-                  background: "#0d0f1a",
+                  background: "var(--lh-input-bg)",
                   border: "1px solid rgba(255,95,109,0.35)",
                   color: "#fff",
                   fontFamily: "var(--font-sora)",
@@ -756,8 +798,8 @@ function SettingsPageInner() {
                   }}
                   className="text-xs font-semibold px-3 py-2 rounded-lg"
                   style={{
-                    background: "rgba(255,255,255,0.06)",
-                    color: "#e8eaff",
+                    background: "var(--lh-border)",
+                    color: "var(--lh-text)",
                     border: "1px solid rgba(255,255,255,0.08)",
                   }}
                 >
@@ -811,8 +853,8 @@ function AdminToolsSection({ actorId }: { actorId: Id<"learnhub_users"> }) {
       <p className="text-sm font-semibold" style={{ color: "#7c8bff", fontFamily: "var(--font-sora)" }}>
         Admin tools
       </p>
-      <p className="text-xs" style={{ color: "#9ba3cc" }}>
-        One-click setup for fresh deployments. Each action is idempotent — safe to re-run.
+      <p className="text-xs" style={{ color: "var(--lh-text-2)" }}>
+        One-click setup for fresh deployments. Each action is idempotent â€” safe to re-run.
       </p>
       <button
         type="button"
@@ -865,9 +907,9 @@ function StreakCard({ userId }: { userId: Id<"learnhub_users"> }) {
 
   if (streak === undefined) {
     return (
-      <div className="rounded-2xl p-5 flex flex-col gap-3" style={{ background: "#131626", border: "1px solid rgba(255,255,255,0.06)" }}>
-        <p className="text-sm font-semibold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>🔥 Streak</p>
-        <div className="h-16 rounded-xl animate-pulse" style={{ background: "#1a1d30" }} />
+      <div className="rounded-2xl p-5 flex flex-col gap-3" style={{ background: "var(--lh-card)", border: "1px solid rgba(255,255,255,0.06)" }}>
+        <p className="text-sm font-semibold" style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}>ðŸ”¥ Streak</p>
+        <div className="h-16 rounded-xl animate-pulse" style={{ background: "var(--lh-card-2)" }} />
       </div>
     );
   }
@@ -878,11 +920,11 @@ function StreakCard({ userId }: { userId: Id<"learnhub_users"> }) {
   const notEnoughXp = streak.xpPoints < streak.freezeCostXp;
 
   return (
-    <div className="rounded-2xl p-5 flex flex-col gap-4" style={{ background: "#131626", border: "1px solid rgba(249,115,22,0.18)" }}>
+    <div className="rounded-2xl p-5 flex flex-col gap-4" style={{ background: "var(--lh-card)", border: "1px solid rgba(249,115,22,0.18)" }}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>🔥 Streak</p>
-          <p className="text-xs mt-0.5" style={{ color: "#9ba3cc" }}>
+          <p className="text-sm font-semibold" style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}>ðŸ”¥ Streak</p>
+          <p className="text-xs mt-0.5" style={{ color: "var(--lh-text-2)" }}>
             Visit LearnHub daily to keep your streak going. Missed days burn through your freezes first.
           </p>
         </div>
@@ -894,32 +936,32 @@ function StreakCard({ userId }: { userId: Id<"learnhub_users"> }) {
       </div>
 
       <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-xl p-3" style={{ background: "#1a1d30", border: "1px solid rgba(255,255,255,0.05)" }}>
-          <p className="text-[10px] uppercase tracking-wider" style={{ color: "#9ba3cc" }}>Current</p>
+        <div className="rounded-xl p-3" style={{ background: "var(--lh-card-2)", border: "1px solid rgba(255,255,255,0.05)" }}>
+          <p className="text-[10px] uppercase tracking-wider" style={{ color: "var(--lh-text-2)" }}>Current</p>
           <p className="mt-0.5 text-2xl font-bold" style={{ color: "#f97316", fontFamily: "var(--font-sora)" }}>
             {streak.currentStreak}
-            <span className="text-xs ml-1" style={{ color: "#9ba3cc" }}>day{streak.currentStreak === 1 ? "" : "s"}</span>
+            <span className="text-xs ml-1" style={{ color: "var(--lh-text-2)" }}>day{streak.currentStreak === 1 ? "" : "s"}</span>
           </p>
         </div>
-        <div className="rounded-xl p-3" style={{ background: "#1a1d30", border: "1px solid rgba(255,255,255,0.05)" }}>
-          <p className="text-[10px] uppercase tracking-wider" style={{ color: "#9ba3cc" }}>Longest</p>
-          <p className="mt-0.5 text-2xl font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>
+        <div className="rounded-xl p-3" style={{ background: "var(--lh-card-2)", border: "1px solid rgba(255,255,255,0.05)" }}>
+          <p className="text-[10px] uppercase tracking-wider" style={{ color: "var(--lh-text-2)" }}>Longest</p>
+          <p className="mt-0.5 text-2xl font-bold" style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}>
             {streak.longestStreak}
           </p>
         </div>
-        <div className="rounded-xl p-3" style={{ background: "#1a1d30", border: "1px solid rgba(56,189,248,0.18)" }}>
-          <p className="text-[10px] uppercase tracking-wider" style={{ color: "#9ba3cc" }}>Freezes 🧊</p>
+        <div className="rounded-xl p-3" style={{ background: "var(--lh-card-2)", border: "1px solid rgba(56,189,248,0.18)" }}>
+          <p className="text-[10px] uppercase tracking-wider" style={{ color: "var(--lh-text-2)" }}>Freezes ðŸ§Š</p>
           <p className="mt-0.5 text-2xl font-bold" style={{ color: "#38bdf8", fontFamily: "var(--font-sora)" }}>
             {streak.streakFreezesAvailable}
-            <span className="text-xs ml-1" style={{ color: "#9ba3cc" }}>/ {streak.maxFreezes}</span>
+            <span className="text-xs ml-1" style={{ color: "var(--lh-text-2)" }}>/ {streak.maxFreezes}</span>
           </p>
         </div>
       </div>
 
-      <div className="rounded-xl p-3 flex items-center justify-between gap-3 flex-wrap" style={{ background: "#1a1d30", border: "1px solid rgba(255,255,255,0.05)" }}>
+      <div className="rounded-xl p-3 flex items-center justify-between gap-3 flex-wrap" style={{ background: "var(--lh-card-2)", border: "1px solid rgba(255,255,255,0.05)" }}>
         <div className="min-w-0">
-          <p className="text-sm font-semibold" style={{ color: "#e8eaff" }}>Streak Freeze</p>
-          <p className="text-xs mt-0.5" style={{ color: "#9ba3cc" }}>
+          <p className="text-sm font-semibold" style={{ color: "var(--lh-text)" }}>Streak Freeze</p>
+          <p className="text-xs mt-0.5" style={{ color: "var(--lh-text-2)" }}>
             Spend {streak.freezeCostXp} XP to protect one missed day. You have {streak.xpPoints} XP.
           </p>
         </div>
@@ -927,7 +969,7 @@ function StreakCard({ userId }: { userId: Id<"learnhub_users"> }) {
           onClick={handleBuy}
           disabled={buying || !canBuy}
           className="px-4 py-2 rounded-lg text-xs font-semibold disabled:opacity-40 shrink-0"
-          style={{ background: canBuy && !buying ? "linear-gradient(135deg, #38bdf8, #6366f1)" : "rgba(255,255,255,0.05)", color: canBuy && !buying ? "#fff" : "#9ba3cc", border: "none" }}
+          style={{ background: canBuy && !buying ? "linear-gradient(135deg, #38bdf8, #6366f1)" : "var(--lh-card-3)", color: canBuy && !buying ? "#fff" : "var(--lh-text-2)", border: "none" }}
         >
           {buying ? "Buying…" : atMax ? "Max stashed" : notEnoughXp ? `Need ${streak.freezeCostXp - streak.xpPoints} more XP` : `Buy for ${streak.freezeCostXp} XP`}
         </button>

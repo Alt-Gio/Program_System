@@ -628,7 +628,7 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
                 style={{
                   position: "absolute", left: 8, right: 8, bottom: -6,
                   transform: "translateY(100%)", zIndex: 30,
-                  background: "#131626", border: "1px solid rgba(91,108,255,0.35)",
+                  background: "var(--lh-card)", border: "1px solid rgba(91,108,255,0.35)",
                   borderRadius: 10, padding: 6, display: "flex", flexWrap: "wrap", gap: 6,
                   boxShadow: "0 8px 24px rgba(0,0,0,0.45)",
                 }}
@@ -876,7 +876,7 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
                       style={{
                         background: "transparent",
                         border: 0,
-                        color: "#9ba3cc",
+                        color: "var(--lh-text-2)",
                         cursor: "pointer",
                         fontSize: 11,
                         whiteSpace: "nowrap",
@@ -905,7 +905,7 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
                     style={{
                       background: "transparent",
                       border: 0,
-                      color: "#9ba3cc",
+                      color: "var(--lh-text-2)",
                       cursor: "pointer",
                       fontSize: 11,
                       whiteSpace: "nowrap",
@@ -949,8 +949,8 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
               above is the source of truth; this is a read-only preview. */}
           {detectedHashtags.length > 0 && (
             <div style={{ marginTop: 10, marginBottom: 4 }}>
-              <div style={{ fontSize: 11, color: "#9ba3cc", marginBottom: 6, letterSpacing: "0.04em" }}>
-                Hashtags <span style={{ color: "#5c6490" }}>· extracted from your post</span>
+              <div style={{ fontSize: 11, color: "var(--lh-text-2)", marginBottom: 6, letterSpacing: "0.04em" }}>
+                Hashtags <span style={{ color: "var(--lh-text-3)" }}>· extracted from your post</span>
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {detectedHashtags.map((h) => (

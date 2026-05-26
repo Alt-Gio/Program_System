@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -11,7 +11,7 @@ function LoginContent() {
   const errorReason = searchParams.get("reason") ?? "";
   const callbackUrl = searchParams.get("callbackUrl") ?? "/learnhub/feed";
 
-  // Org-partner sign-in is intentionally not surfaced as a primary button —
+  // Org-partner sign-in is intentionally not surfaced as a primary button â€”
   // it's an institutional role, not something a learner ever picks. The
   // existing `intendedRole` mismatch in the callback would otherwise refuse
   // an org_partner sign-in if it came through the default (no-role) flow
@@ -41,7 +41,7 @@ function LoginContent() {
   };
 
   // Auto-reveal the org option if the user got bounced here with a
-  // role_mismatch error whose existing role is org_partner — otherwise
+  // role_mismatch error whose existing role is org_partner â€” otherwise
   // they're stuck guessing which portal to use.
   useEffect(() => {
     if (error === "role_mismatch" && errorReason.startsWith("existing:org_partner")) {
@@ -61,10 +61,10 @@ function LoginContent() {
   }, []);
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center px-4" style={{ background: "#0d0f1a" }}>
+    <main className="min-h-screen flex flex-col items-center justify-center px-4" style={{ background: "var(--lh-input-bg)" }}>
       <div className="pointer-events-none fixed inset-0" style={{ background: "radial-gradient(ellipse 60% 40% at 50% 30%, rgba(91,108,255,0.12) 0%, transparent 70%)" }} />
 
-      <div className="relative z-10 w-full max-w-sm rounded-2xl p-8 flex flex-col items-center gap-6" style={{ background: "#131626", border: "1px solid rgba(91,108,255,0.2)", boxShadow: "0 0 40px rgba(91,108,255,0.08)" }}>
+      <div className="relative z-10 w-full max-w-sm rounded-2xl p-8 flex flex-col items-center gap-6" style={{ background: "var(--lh-card)", border: "1px solid rgba(91,108,255,0.2)", boxShadow: "0 0 40px rgba(91,108,255,0.08)" }}>
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -76,13 +76,13 @@ function LoginContent() {
           >L</button>
           <div>
             <p className="text-xs font-medium tracking-widest uppercase" style={{ color: "#5b6cff", fontFamily: "var(--font-sora)" }}>ILCDB</p>
-            <p className="text-lg font-bold leading-tight" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>LearnHub</p>
+            <p className="text-lg font-bold leading-tight" style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}>LearnHub</p>
           </div>
         </div>
 
         <div className="text-center">
-          <p className="text-base font-medium" style={{ color: "#e8eaff" }}>Welcome back</p>
-          <p className="text-sm mt-1" style={{ color: "#9ba3cc" }}>{ORG_CONFIG.tagline}</p>
+          <p className="text-base font-medium" style={{ color: "var(--lh-text)" }}>Welcome back</p>
+          <p className="text-sm mt-1" style={{ color: "var(--lh-text-2)" }}>{ORG_CONFIG.tagline}</p>
         </div>
 
         {error && (
@@ -102,9 +102,9 @@ function LoginContent() {
         <button
           onClick={handleGoogleLogin}
           className="w-full flex items-center justify-center gap-3 rounded-xl py-3 px-5 font-medium transition-all duration-150 active:scale-95"
-          style={{ background: "#1a1d30", border: "1px solid rgba(91,108,255,0.35)", color: "#e8eaff" }}
+          style={{ background: "var(--lh-card-2)", border: "1px solid rgba(91,108,255,0.35)", color: "var(--lh-text)" }}
           onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "#5b6cff"; (e.currentTarget as HTMLElement).style.background = "rgba(91,108,255,0.08)"; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,108,255,0.35)"; (e.currentTarget as HTMLElement).style.background = "#1a1d30"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,108,255,0.35)"; (e.currentTarget as HTMLElement).style.background = "var(--lh-card-2)"; }}
         >
           <GoogleIcon />
           Continue with Google
@@ -130,12 +130,12 @@ function LoginContent() {
                 onClick={() => setOrgRevealed(false)}
                 aria-label="Hide org partner sign-in"
                 className="text-xs"
-                style={{ color: "#9ba3cc", background: "transparent", border: 0, cursor: "pointer" }}
+                style={{ color: "var(--lh-text-2)", background: "transparent", border: 0, cursor: "pointer" }}
               >
                 hide
               </button>
             </div>
-            <p className="text-xs mb-3" style={{ color: "#9ba3cc", lineHeight: 1.5 }}>
+            <p className="text-xs mb-3" style={{ color: "var(--lh-text-2)", lineHeight: 1.5 }}>
               Institutional accounts only. Use this to manage cohorts,
               verify mentors, and post opportunities.
             </p>
@@ -168,11 +168,11 @@ function LoginContent() {
           </button>
         )}
 
-        <p className="text-xs text-center" style={{ color: "#5c6490" }}>
+        <p className="text-xs text-center" style={{ color: "var(--lh-text-3)" }}>
           By continuing, you agree to {ORG_CONFIG.orgName}&apos;s platform policies.
         </p>
       </div>
-      <p className="mt-6 text-xs" style={{ color: "#5c6490" }}>{ORG_CONFIG.orgName} · {ORG_CONFIG.productName} · {new Date().getFullYear()}</p>
+      <p className="mt-6 text-xs" style={{ color: "var(--lh-text-3)" }}>{ORG_CONFIG.orgName} Â· {ORG_CONFIG.productName} Â· {new Date().getFullYear()}</p>
     </main>
   );
 }

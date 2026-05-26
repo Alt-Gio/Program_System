@@ -7,9 +7,9 @@ import { useLearnhubSession } from "@/lib/learnhub/hooks";
 import type { Id } from "@/convex/_generated/dataModel";
 
 const BORDER = "rgba(255,255,255,0.06)";
-const CARD = "#111323";
-const TEXT = "#e8eaf4";
-const MUTED = "rgba(185,190,230,0.6)";
+const CARD = "var(--lh-card)";
+const TEXT = "var(--lh-text)";
+const MUTED = "var(--lh-text-2)";
 const INDIGO = "#6366f1";
 
 export function GroupChatPanel({ groupId, canSend }: { groupId: Id<"learnhub_groups">; canSend: boolean }) {

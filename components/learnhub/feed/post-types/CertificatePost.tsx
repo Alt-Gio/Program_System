@@ -66,7 +66,7 @@ export function CertificatePost({ metadata }: { metadata: Record<string, unknown
 
           <p
             className="text-sm font-bold"
-            style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}
+            style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}
           >
             {m.certTitle ?? "ILCDB Certificate"}
           </p>
@@ -84,16 +84,16 @@ export function CertificatePost({ metadata }: { metadata: Record<string, unknown
           )}
 
           {m.issuedByName && (
-            <p className="text-xs mt-2" style={{ color: "#9ba3cc" }}>
+            <p className="text-xs mt-2" style={{ color: "var(--lh-text-2)" }}>
               Issued by{" "}
-              <span style={{ color: "#e8eaff" }}>{m.issuedByName}</span>
+              <span style={{ color: "var(--lh-text)" }}>{m.issuedByName}</span>
             </p>
           )}
 
           {m.verificationId && (
             <p
               className="text-[10px] mt-1 font-mono"
-              style={{ color: "#5c6490" }}
+              style={{ color: "var(--lh-text-3)" }}
             >
               {m.verificationId}
             </p>

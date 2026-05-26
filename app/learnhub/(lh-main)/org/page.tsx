@@ -1,12 +1,12 @@
-"use client";
+﻿"use client";
 
 /**
- * Org Partner home — manager-style dashboard.
+ * Org Partner home â€” manager-style dashboard.
  *
  * Org partners + coordinators + admins land here to:
- *   • see all opportunities they posted (with applicant counts)
- *   • verify mentors pending review
- *   • peek at cohorts associated with the program
+ *   â€¢ see all opportunities they posted (with applicant counts)
+ *   â€¢ verify mentors pending review
+ *   â€¢ peek at cohorts associated with the program
  */
 
 import { useState } from "react";
@@ -61,10 +61,10 @@ export default function OrgHomePage() {
   if (loading || summary === undefined) {
     return (
       <div style={{ padding: 24, color: "#fff" }}>
-        <div style={{ height: 28, width: 240, background: "rgba(255,255,255,0.06)", borderRadius: 8, marginBottom: 18 }} />
+        <div style={{ height: 28, width: 240, background: "var(--lh-border)", borderRadius: 8, marginBottom: 18 }} />
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
           {[0, 1, 2, 3, 4].map((i) => (
-            <div key={i} style={{ height: 110, borderRadius: 18, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }} />
+            <div key={i} style={{ height: 110, borderRadius: 18, background: "var(--lh-card-3)", border: "1px solid rgba(255,255,255,0.08)" }} />
           ))}
         </div>
       </div>
@@ -76,7 +76,7 @@ export default function OrgHomePage() {
       <div style={{ padding: 24, color: "#fff" }}>
         <div style={{ margin: "30px auto", maxWidth: 440, padding: 28, textAlign: "center", borderRadius: 20,
           background: "linear-gradient(180deg, rgba(236,72,153,0.06), rgba(255,255,255,0.02))", border: `1px solid ${PINK}44` }}>
-          <div style={{ fontSize: 38, marginBottom: 8 }}>🔒</div>
+          <div style={{ fontSize: 38, marginBottom: 8 }}>ðŸ”’</div>
           <h2 style={{ margin: 0, fontWeight: 800, letterSpacing: "-0.02em" }}>Org Console</h2>
           <p style={{ margin: "8px 0 18px", color: "rgba(255,255,255,0.65)", fontSize: 13.5 }}>
             This console is for <strong style={{ color: ORANGE }}>Org Partners</strong>,{" "}
@@ -84,8 +84,8 @@ export default function OrgHomePage() {
             Switch to one of those roles to manage opportunities and verify mentors.
           </p>
           <Link href="/learnhub/feed" style={{ display: "inline-block", padding: "9px 16px", borderRadius: 10,
-            background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff", fontSize: 13, fontWeight: 600 }}>
-            Back to feed →
+            background: "var(--lh-border)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff", fontSize: 13, fontWeight: 600 }}>
+            Back to feed â†’
           </Link>
         </div>
       </div>
@@ -103,20 +103,20 @@ function OrgConsole({ summary }: { summary: NonNullable<SummaryData> }) {
   if (summary.forbidden) return null;
 
   return (
-    <div style={{ color: "#fff", background: "#06060f", minHeight: "100%", padding: "0 0 32px", fontFamily: "'Inter', 'Plus Jakarta Sans', sans-serif" }}>
+    <div style={{ color: "#fff", background: "var(--lh-bg)", minHeight: "100%", padding: "0 0 32px", fontFamily: "'Inter', 'Plus Jakarta Sans', sans-serif" }}>
       <div style={{
         background: `linear-gradient(90deg, ${ORANGE}11, transparent 70%)`,
         borderBottom: `1px solid ${ORANGE}22`, padding: "12px 20px",
         display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12, color: "rgba(255,255,255,0.7)" }}>
-          <span style={{ color: ORANGE }}>🏢</span>
-          <span><strong style={{ color: "#fff" }}>Org Console</strong> · Manage job orders, verify mentors, and view cohorts.</span>
+          <span style={{ color: ORANGE }}>ðŸ¢</span>
+          <span><strong style={{ color: "#fff" }}>Org Console</strong> Â· Manage job orders, verify mentors, and view cohorts.</span>
         </div>
         <Link href="/learnhub/work/post" style={{
           padding: "8px 14px", borderRadius: 99,
           background: `linear-gradient(135deg, ${ORANGE}, ${PINK})`,
-          color: "#06060f", fontWeight: 700, fontSize: 12.5,
+          color: "var(--lh-bg)", fontWeight: 700, fontSize: 12.5,
           display: "inline-flex", alignItems: "center", gap: 6,
         }}>
           <Plus size={14} /> Post a job order
@@ -129,7 +129,7 @@ function OrgConsole({ summary }: { summary: NonNullable<SummaryData> }) {
             Welcome back, {summary.org.name.split(" ")[0]}.
           </h1>
           <p style={{ margin: "4px 0 0", fontSize: 13, color: "rgba(255,255,255,0.55)" }}>
-            {summary.org.organization ? `${summary.org.organization} · ` : ""}
+            {summary.org.organization ? `${summary.org.organization} Â· ` : ""}
             Live overview of your postings, mentor pipeline, and cohorts.
           </p>
         </header>
@@ -144,9 +144,9 @@ function OrgConsole({ summary }: { summary: NonNullable<SummaryData> }) {
         </div>
 
         <section>
-          <SectionHeader title="Your job orders" sub="Posts you own — newest first." href="/learnhub/work/manage" cta="Manage all →" />
+          <SectionHeader title="Your job orders" sub="Posts you own â€” newest first." href="/learnhub/work/manage" cta="Manage all â†’" />
           {summary.opportunities.length === 0 ? (
-            <EmptyState emoji="💼" title="No postings yet"
+            <EmptyState emoji="ðŸ’¼" title="No postings yet"
               body="Use the &ldquo;Post a job order&rdquo; button up top to publish your first opportunity. Students whose certificates match will see it surfaced first." />
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -158,22 +158,22 @@ function OrgConsole({ summary }: { summary: NonNullable<SummaryData> }) {
                 }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{o.title}</div>
-                    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "rgba(255,255,255,0.45)", marginTop: 3 }}>{o.workType} · {o.payType}</div>
+                    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "rgba(255,255,255,0.45)", marginTop: 3 }}>{o.workType} Â· {o.payType}</div>
                   </div>
                   <div>
                     <span style={{
                       padding: "4px 10px", borderRadius: 99, fontSize: 10.5,
                       fontFamily: "'JetBrains Mono', monospace", letterSpacing: 1.2, textTransform: "uppercase",
                       color: o.status === "open" ? GREEN : "rgba(255,255,255,0.45)",
-                      background: o.status === "open" ? `${GREEN}1c` : "rgba(255,255,255,0.04)",
-                      border: `1px solid ${o.status === "open" ? `${GREEN}55` : "rgba(255,255,255,0.1)"}`,
+                      background: o.status === "open" ? `${GREEN}1c` : "var(--lh-card-3)",
+                      border: `1px solid ${o.status === "open" ? `${GREEN}55` : "var(--lh-border-strong)"}`,
                     }}>{o.status}</span>
                   </div>
                   <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "#fff" }}>{o.filledSlots ?? 0} / {o.slots}</div>
                   <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12.5, color: SKY, fontWeight: 700 }}>{o.applicantCount} applied</div>
                   <div style={{ display: "flex", justifyContent: "flex-end" }}>
                     <Link href={`/learnhub/work/manage?id=${o.id}`} style={{
-                      padding: "6px 10px", borderRadius: 8, background: "rgba(255,255,255,0.04)",
+                      padding: "6px 10px", borderRadius: 8, background: "var(--lh-card-3)",
                       border: "1px solid rgba(255,255,255,0.1)", color: "#fff", fontSize: 11.5, fontWeight: 600,
                       display: "inline-flex", alignItems: "center", gap: 6,
                     }}>Manage <ExternalLink size={12} /></Link>
@@ -185,9 +185,9 @@ function OrgConsole({ summary }: { summary: NonNullable<SummaryData> }) {
         </section>
 
         <section>
-          <SectionHeader title="Mentors pending verification" sub="Approve to unlock mentor-only features for them." href="/learnhub/org/mentors" cta={summary.pendingMentors.length > 0 ? "Review all →" : undefined} />
+          <SectionHeader title="Mentors pending verification" sub="Approve to unlock mentor-only features for them." href="/learnhub/org/mentors" cta={summary.pendingMentors.length > 0 ? "Review all â†’" : undefined} />
           {summary.pendingMentors.length === 0 ? (
-            <EmptyState emoji="✅" title="No mentors waiting"
+            <EmptyState emoji="âœ…" title="No mentors waiting"
               body="When a new mentor submits verification, they'll show up here for you to approve." />
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -201,9 +201,9 @@ function OrgConsole({ summary }: { summary: NonNullable<SummaryData> }) {
         <section>
           <SectionHeader
             title="Watch curation"
-            sub="Surface YouTube channels and videos to /learnhub/watch — Org Partners decide what learners see."
+            sub="Surface YouTube channels and videos to /learnhub/watch â€” Org Partners decide what learners see."
             href="/learnhub/org/curate"
-            cta="Curate videos →"
+            cta="Curate videos â†’"
           />
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14,
@@ -213,22 +213,22 @@ function OrgConsole({ summary }: { summary: NonNullable<SummaryData> }) {
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 13.5, fontWeight: 700, color: "#fff" }}>Pick channels learners should follow</div>
               <div style={{ marginTop: 4, fontSize: 12, color: "rgba(255,255,255,0.55)", lineHeight: 1.45 }}>
-                Paste a YouTube video or channel URL. Your curated content fills the Watch tab so it stays educational — not doom-scroll.
+                Paste a YouTube video or channel URL. Your curated content fills the Watch tab so it stays educational â€” not doom-scroll.
               </div>
             </div>
             <Link href="/learnhub/org/curate" style={{
               padding: "8px 14px", borderRadius: 10,
-              background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+              background: "var(--lh-border)", border: "1px solid rgba(255,255,255,0.12)",
               color: "#fff", fontSize: 12, fontWeight: 600, textDecoration: "none",
               whiteSpace: "nowrap",
-            }}>Open curation →</Link>
+            }}>Open curation â†’</Link>
           </div>
         </section>
 
         <section>
-          <SectionHeader title="Cohorts" sub="Active groups (batches + programs) you can target." href="/learnhub/org/cohorts" cta={summary.cohorts.length > 0 ? "See all →" : undefined} />
+          <SectionHeader title="Cohorts" sub="Active groups (batches + programs) you can target." href="/learnhub/org/cohorts" cta={summary.cohorts.length > 0 ? "See all â†’" : undefined} />
           {summary.cohorts.length === 0 ? (
-            <EmptyState emoji="🧭" title="No cohorts visible yet"
+            <EmptyState emoji="ðŸ§­" title="No cohorts visible yet"
               body="Cohorts appear here once batches and program groups are created. Tag a job order with a cohort to broadcast it." />
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
@@ -239,7 +239,7 @@ function OrgConsole({ summary }: { summary: NonNullable<SummaryData> }) {
                 }}>
                   <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9.5, color: SKY,
                     letterSpacing: 1.4, textTransform: "uppercase", marginBottom: 6 }}>
-                    {c.type} {c.programType ? `· ${c.programType}` : ""}
+                    {c.type} {c.programType ? `Â· ${c.programType}` : ""}
                   </div>
                   <div style={{ fontSize: 14.5, fontWeight: 700, color: "#fff" }}>{c.name}</div>
                   <div style={{ marginTop: 6, fontSize: 12, color: "rgba(255,255,255,0.55)", lineHeight: 1.45,
@@ -247,7 +247,7 @@ function OrgConsole({ summary }: { summary: NonNullable<SummaryData> }) {
                     {c.description}
                   </div>
                   <div style={{ marginTop: 10, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
-                    👥 {c.memberCount} members
+                    ðŸ‘¥ {c.memberCount} members
                   </div>
                 </div>
               ))}
@@ -337,13 +337,13 @@ function MentorRow({ pending, actorId }: {
         <div style={{ fontSize: 13.5, fontWeight: 700, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{mentor.name}</div>
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, color: "rgba(255,255,255,0.5)", marginTop: 3 }}>
           {pending.designation ?? mentor.designation ?? "Mentor"}
-          {mentor.regionalOffice ? ` · ${mentor.regionalOffice}` : ""}
+          {mentor.regionalOffice ? ` Â· ${mentor.regionalOffice}` : ""}
         </div>
         {mentor.expertiseTags.length > 0 && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
             {mentor.expertiseTags.slice(0, 4).map((tag) => (
               <span key={tag} style={{ padding: "2px 8px", borderRadius: 99,
-                background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+                background: "var(--lh-card-3)", border: "1px solid rgba(255,255,255,0.08)",
                 fontSize: 10.5, color: "rgba(255,255,255,0.6)" }}>{tag}</span>
             ))}
           </div>
@@ -352,24 +352,24 @@ function MentorRow({ pending, actorId }: {
       {done ? (
         <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5,
           color: done === "approved" ? GREEN : "#ef4444", letterSpacing: 1.2, textTransform: "uppercase" }}>
-          {done === "approved" ? "✓ Approved" : "✕ Rejected"}
+          {done === "approved" ? "âœ“ Approved" : "âœ• Rejected"}
         </span>
       ) : (
         <div style={{ display: "flex", gap: 8 }}>
           <button type="button" onClick={handleApprove} disabled={busy !== null} style={{
             padding: "8px 12px", borderRadius: 10,
-            background: `linear-gradient(135deg, ${GREEN}, #06b6d4)`, color: "#06060f",
+            background: `linear-gradient(135deg, ${GREEN}, #06b6d4)`, color: "var(--lh-bg)",
             fontSize: 12, fontWeight: 700, border: 0,
             display: "inline-flex", alignItems: "center", gap: 6,
             cursor: busy ? "wait" : "pointer", opacity: busy ? 0.6 : 1,
-          }}><CheckCircle2 size={14} /> {busy === "approve" ? "…" : "Approve"}</button>
+          }}><CheckCircle2 size={14} /> {busy === "approve" ? "â€¦" : "Approve"}</button>
           <button type="button" onClick={handleReject} disabled={busy !== null} style={{
             padding: "8px 12px", borderRadius: 10,
             background: "rgba(239,68,68,0.12)", color: "#ff5f6d",
             fontSize: 12, fontWeight: 700, border: "1px solid rgba(239,68,68,0.4)",
             display: "inline-flex", alignItems: "center", gap: 6,
             cursor: busy ? "wait" : "pointer", opacity: busy ? 0.6 : 1,
-          }}><XCircle size={14} /> {busy === "reject" ? "…" : "Reject"}</button>
+          }}><XCircle size={14} /> {busy === "reject" ? "â€¦" : "Reject"}</button>
         </div>
       )}
     </div>

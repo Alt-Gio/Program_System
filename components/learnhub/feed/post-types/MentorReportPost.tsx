@@ -17,10 +17,10 @@ function Stat({ label, value }: { label: string; value: string | number }) {
       className="flex-1 rounded-lg px-3 py-2.5 text-center"
       style={{ background: "rgba(13,15,26,0.5)", border: "1px solid rgba(91,108,255,0.18)" }}
     >
-      <div className="text-lg font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>
+      <div className="text-lg font-bold" style={{ color: "var(--lh-text)", fontFamily: "var(--font-sora)" }}>
         {value}
       </div>
-      <div className="text-[10px] uppercase tracking-wider mt-0.5" style={{ color: "#9ba3cc" }}>
+      <div className="text-[10px] uppercase tracking-wider mt-0.5" style={{ color: "var(--lh-text-2)" }}>
         {label}
       </div>
     </div>
@@ -73,10 +73,10 @@ export function MentorReportPost({ metadata }: { metadata: Record<string, unknow
             className="rounded-lg px-3 py-2.5 text-xs"
             style={{ background: "rgba(13,15,26,0.4)", border: "1px solid rgba(99,102,241,0.12)" }}
           >
-            <div className="uppercase tracking-wider text-[10px] mb-1" style={{ color: "#9ba3cc" }}>
+            <div className="uppercase tracking-wider text-[10px] mb-1" style={{ color: "var(--lh-text-2)" }}>
               Modality
             </div>
-            <div className="flex items-center gap-3" style={{ color: "#e8eaff" }}>
+            <div className="flex items-center gap-3" style={{ color: "var(--lh-text)" }}>
               <span>🌐 {mod.online ?? 0} online</span>
               <span>🤝 {mod.faceToFace ?? 0} on-site</span>
               <span>🔀 {mod.hybrid ?? 0} hybrid</span>
