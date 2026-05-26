@@ -19,6 +19,8 @@ const EVENT_ICONS: Record<string, string> = {
   mentor_verified: "✅",
   mentor_verification_rejected: "❌",
   mentor_match_available: "✨",
+  mentorship_request_received: "🙋",
+  mentorship_accepted: "📅",
   flashcards_due: "🎴",
   streak_at_risk: "🔥",
   work_opportunity_posted: "💼",
@@ -28,7 +30,15 @@ const EVENT_ICONS: Record<string, string> = {
   new_message: "💬",
   endorsement_request: "📝",
   cohort_announcement: "📣",
+  cohort_member_joined: "🤝",
+  cohort_milestone_reached: "🎯",
+  cohort_started: "🚀",
+  cohort_ending_soon: "⏳",
   streak_reminder: "🔥",
+  level_up: "⭐",
+  challenge_started: "🏆",
+  challenge_completed: "🥇",
+  path_completed: "🏁",
 };
 
 function iconFor(event: string): string {

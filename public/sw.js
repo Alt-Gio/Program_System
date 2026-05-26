@@ -12,13 +12,22 @@
  *      a client-side drain (see lib/offline-queue.ts).
  * ----------------------------------------------------------- */
 
-const CACHE_VERSION = "dtc-pwa-v3";
+const CACHE_VERSION = "dtc-pwa-v4";
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 
+// Install-time precache. Everything else is cached opportunistically the
+// first time the user visits a route. Keep this list tight — too many URLs
+// here makes install slow and brittle (any 404 aborts the whole cache.addAll
+// unless we .catch — which we do, but it still hurts UX).
 const SHELL_URLS = [
+  // Root + auth surfaces
+  "/",
+  "/login",
+  // Meeting Hall + DTC logbook
   "/meeting-hall",
   "/dtc-logbook",
+  // Intern portal core
   "/intern/dashboard",
   "/intern/tasks",
   "/intern/habits",
@@ -26,10 +35,28 @@ const SHELL_URLS = [
   "/intern/messages",
   "/intern/qr",
   "/intern/qr-checkin",
+  // Supervisor
   "/supervisor/dashboard",
+  // LearnHub primary landing pages
+  "/learnhub/today",
+  "/learnhub/feed",
+  "/learnhub/paths",
+  "/learnhub/mentors",
+  // PMS dashboard core
+  "/dashboard",
+  // Manifests + icons
   "/manifest.json",
+  "/learnhub-manifest.json",
+  "/meeting-hall-manifest.json",
+  "/intern-manifest.json",
+  "/icons/dict-icon.svg",
+  "/icons/dict-maskable.svg",
   "/icons/dtc-icon.svg",
   "/icons/dtc-maskable.svg",
+  "/icons/learnhub-icon.svg",
+  "/icons/learnhub-maskable.svg",
+  "/icons/intern-icon.svg",
+  "/icons/intern-maskable.svg",
 ];
 
 // One sync tag handles all queues; drain walks every store.
@@ -66,6 +93,56 @@ const ENDPOINTS = [
 function endpointFor(pathname) {
   return ENDPOINTS.find((e) => e.path === pathname) || null;
 }
+
+// Branded offline fallback returned when navigation fails AND no cached
+// copy of that route exists. Keep this small + self-contained — it must
+// render with zero network. The retry button just reloads; the "go to
+// installed pages" CTAs link to routes already in SHELL_URLS so they're
+// guaranteed to work offline after install.
+const OFFLINE_FALLBACK_HTML = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Offline — DICT Region V</title>
+<style>
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #06060f; color: #e8eaf4; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif; }
+body { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.card { max-width: 460px; width: 100%; background: linear-gradient(160deg, rgba(91,108,255,0.08), rgba(255,255,255,0.02)); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 32px; text-align: center; }
+.dot { width: 56px; height: 56px; border-radius: 99px; background: linear-gradient(135deg, #5b6cff, #7c5cff); margin: 0 auto 18px; display: flex; align-items: center; justify-content: center; font-size: 26px; }
+h1 { font-size: 22px; margin: 0 0 8px; font-weight: 700; }
+p { font-size: 14px; line-height: 1.55; margin: 0 0 14px; color: #b9bee6; }
+.btn { display: inline-block; padding: 10px 18px; border-radius: 999px; background: #5b6cff; color: #fff; font-weight: 600; font-size: 13px; text-decoration: none; border: none; cursor: pointer; }
+.btn.ghost { background: transparent; border: 1px solid rgba(255,255,255,0.14); color: #cfd3eb; margin-left: 6px; }
+.row { margin-top: 18px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.quick { margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.06); }
+.quick p { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #6f76a0; margin-bottom: 10px; }
+.quick a { display: inline-block; margin: 4px 6px; padding: 6px 12px; font-size: 12px; color: #a8b4ff; text-decoration: none; border-radius: 99px; background: rgba(91,108,255,0.1); border: 1px solid rgba(91,108,255,0.25); }
+.tag { display: inline-block; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; padding: 3px 10px; border-radius: 99px; background: rgba(255,140,66,0.12); color: #ff8c42; border: 1px solid rgba(255,140,66,0.3); margin-bottom: 12px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="dot">📡</div>
+  <span class="tag">Offline</span>
+  <h1>You're offline</h1>
+  <p>We couldn't reach the network for this page. Anything you've already visited will still open — and submissions made offline (bookings, journal entries, habits, check-ins) sync automatically when you reconnect.</p>
+  <div class="row">
+    <button class="btn" onclick="location.reload()">Try again</button>
+    <a class="btn ghost" href="/">Go to home</a>
+  </div>
+  <div class="quick">
+    <p>Pages cached for offline use</p>
+    <a href="/learnhub/today">LearnHub · Today</a>
+    <a href="/meeting-hall">Meeting Hall</a>
+    <a href="/intern/dashboard">Intern Portal</a>
+    <a href="/dashboard">Dashboard</a>
+  </div>
+</div>
+</body>
+</html>`;
 
 // --- IndexedDB helpers -------------------------------------------------
 
@@ -145,20 +222,36 @@ self.addEventListener("activate", (event) => {
 
 // --- Fetch handling ----------------------------------------------------
 
-function isPublicNavigation(pathname) {
-  if (pathname === "/meeting-hall" || pathname === "/dtc-logbook") return true;
-  if (pathname.startsWith("/intern/")) return true;
-  if (pathname.startsWith("/supervisor/")) return true;
+// Paths we never want the SW to mediate — auth callbacks, OAuth round-trips,
+// and anything that mutates server state via GET (rare, but exists for
+// certificate verification + invite links). These bypass the navigation
+// handler and hit the network directly.
+function isUnshellablePath(pathname) {
+  if (pathname.startsWith("/api/")) return true;
+  if (pathname.startsWith("/_next/")) return true;
+  if (pathname.startsWith("/accept-invite")) return true;
+  if (pathname.startsWith("/learnhub/verify/")) return true;
+  // PWA Web Share Target lands here with query params we must not strip
+  // or replay from cache — always hit the network so the latest share is
+  // forwarded to the composer.
+  if (pathname === "/learnhub/share") return true;
   return false;
 }
 
+// Whole-app PWA model (post-Batch-5 refactor): any same-origin GET
+// navigation that isn't on the bypass list is eligible for the offline
+// shell. This replaces the old allowlist (meeting-hall / intern /
+// supervisor only) so dashboard, learnhub, cohorts, projects, etc. all
+// get a usable offline fallback after their first successful visit.
+function isPublicNavigation(pathname) {
+  return !isUnshellablePath(pathname);
+}
+
 function shellKeyFor(pathname) {
-  // Cache each intern/supervisor route under its own shell key so the
-  // navigation fallback can find it by pathname.
-  if (pathname === "/meeting-hall" || pathname === "/dtc-logbook") return pathname;
-  if (pathname.startsWith("/intern/")) return pathname;
-  if (pathname.startsWith("/supervisor/")) return pathname;
-  return null;
+  if (isUnshellablePath(pathname)) return null;
+  // One cache key per pathname — search strings are intentionally dropped
+  // so /projects/A and /projects/A?tab=overview share an offline shell.
+  return pathname || "/";
 }
 
 self.addEventListener("fetch", (event) => {
@@ -195,12 +288,10 @@ self.addEventListener("fetch", (event) => {
             (await cache.match(req)) ||
             (key ? await cache.match(key) : null);
           if (cached) return cached;
-          return new Response(
-            "<!doctype html><meta charset=utf-8><title>Offline</title>" +
-              "<div style='font-family:system-ui;padding:40px;max-width:480px;margin:0 auto;text-align:center'>" +
-              "<h1>You're offline</h1><p>Visit this page once while online and it'll be available offline afterwards.</p></div>",
-            { status: 503, headers: { "Content-Type": "text/html; charset=utf-8" } }
-          );
+          return new Response(OFFLINE_FALLBACK_HTML, {
+            status: 503,
+            headers: { "Content-Type": "text/html; charset=utf-8" },
+          });
         }
       })()
     );

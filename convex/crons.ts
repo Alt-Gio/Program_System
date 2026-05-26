@@ -105,12 +105,39 @@ crons.daily(
 
 // ── LearnHub: Sunday weekly digest (09:00 UTC ≈ 17:00 PHT Sunday) ──────────
 // One summary per learner — videos / flashcards / journals / streak / XP.
-// Skips dormant accounts with zero activity for the week.
+// Skips dormant accounts with zero activity for the week. Also fires the
+// Resend email for learners whose notifPrefs.emailDigest === "weekly".
 crons.weekly(
   "learnhub-weekly-digest",
   { dayOfWeek: "sunday", hourUTC: 9, minuteUTC: 0 },
   internal.learnhub_notifications.notifyWeeklyDigest,
   {}
 );
+
+// ── LearnHub: Daily digest email (11:00 UTC ≈ 19:00 PHT) ──────────────────
+// Rec #8 — short evening email for learners whose digest preference is
+// "daily". Recaps today's activity + streak status with a CTA back into the
+// app. Quietly no-ops if RESEND_API_KEY is not configured on the deployment.
+crons.daily(
+  "learnhub-daily-digest-email",
+  { hourUTC: 11, minuteUTC: 0 },
+  internal.learnhub_notifications.notifyDailyDigest,
+  {}
+);
+
+// ── LearnHub: Cohort lifecycle transitions (00:30 UTC ≈ 08:30 PHT daily) ──
+// Walks every learning cohort and advances lifecycleStatus based on
+// startDate/endDate. Also auto-archives upcoming cohorts with zero growth
+// 14 days past their startDate.
+crons.daily(
+  "learnhub-cohort-lifecycle",
+  { hourUTC: 0, minuteUTC: 30 },
+  internal.learnhub_groups.tickCohortLifecycles,
+  {}
+);
+
+// ── LearnHub: Saturday cohort recap (09:00 UTC ≈ 17:00 PHT Sat) ───────────
+// Per-cohort weekly summary for active cohorts. Wired in Phase 8.B.
+// (Cron registered ahead of time; handler is a no-op until B ships.)
 
 export default crons;

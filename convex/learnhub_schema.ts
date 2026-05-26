@@ -75,6 +75,8 @@ export const learnhubTables = {
       v.literal("20+")
     )),
     onboardingCompletedAt: v.optional(v.number()),
+    welcomeDismissedAt: v.optional(v.number()),
+    calendarPromptDismissedAt: v.optional(v.number()),
     feedColumns: v.optional(v.number()),
     isDeleted: v.optional(v.boolean()),
     maxMentees: v.optional(v.number()),
@@ -201,7 +203,8 @@ export const learnhubTables = {
       v.literal("regional"),
       v.literal("program"),
       v.literal("interest"),
-      v.literal("org")
+      v.literal("org"),
+      v.literal("learning")
     ),
     programType: v.optional(v.string()),
     batchNumber: v.optional(v.number()),
@@ -210,15 +213,33 @@ export const learnhubTables = {
     memberCount: v.number(),
     isPrivate: v.boolean(),
     createdAt: v.number(),
+    // Phase 8 cohort fields (all optional — additive, no migration)
+    pathId: v.optional(v.id("learnhub_learning_paths")),
+    regionScope: v.optional(v.string()),
+    startDate: v.optional(v.string()),
+    endDate: v.optional(v.string()),
+    capacity: v.optional(v.number()),
+    coverEmoji: v.optional(v.string()),
+    coverColor: v.optional(v.string()),
+    lifecycleStatus: v.optional(v.union(
+      v.literal("draft"),
+      v.literal("upcoming"),
+      v.literal("active"),
+      v.literal("completed"),
+      v.literal("archived")
+    )),
   })
     .index("by_type", ["type"])
-    .index("by_program", ["programType"]),
+    .index("by_program", ["programType"])
+    .index("by_path", ["pathId"])
+    .index("by_lifecycle", ["lifecycleStatus"]),
 
   learnhub_group_members: defineTable({
     groupId: v.id("learnhub_groups"),
     userId: v.id("learnhub_users"),
     role: v.union(v.literal("member"), v.literal("admin")),
     joinedAt: v.number(),
+    notificationsMuted: v.optional(v.boolean()),
   })
     .index("by_group", ["groupId"])
     .index("by_user", ["userId"]),
@@ -703,6 +724,7 @@ export const learnhubTables = {
     deadline: v.optional(v.number()),
     completedAt: v.optional(v.number()),
     createdAt: v.number(),
+    pathId: v.optional(v.id("learnhub_learning_paths")),
   }).index("by_user", ["userId"]),
 
   learnhub_xp_events: defineTable({
@@ -717,6 +739,8 @@ export const learnhubTables = {
       v.literal("video_completion"),
       v.literal("flashcard_review"),
       v.literal("mentor_acceptance"),
+      v.literal("module_completion"),
+      v.literal("challenge_completion"),
       v.literal("manual")
     ),
     sourceId: v.optional(v.string()),
@@ -748,9 +772,20 @@ export const learnhubTables = {
     prerequisitePathIds: v.array(v.id("learnhub_learning_paths")),
     enrollmentCount: v.number(),
     createdAt: v.number(),
+    // Phase 9 — author-defined paths (all optional, additive)
+    visibility: v.optional(v.union(
+      v.literal("private"),
+      v.literal("cohort"),
+      v.literal("public")
+    )),
+    published: v.optional(v.boolean()),
+    coverEmoji: v.optional(v.string()),
+    coverColor: v.optional(v.string()),
+    goalId: v.optional(v.id("learnhub_goals")),
   })
     .index("by_creator", ["createdBy"])
-    .index("by_program", ["programType"]),
+    .index("by_program", ["programType"])
+    .index("by_published", ["published"]),
 
   learnhub_path_enrollments: defineTable({
     pathId: v.id("learnhub_learning_paths"),
@@ -759,9 +794,14 @@ export const learnhubTables = {
     completedModuleIndices: v.array(v.number()),
     completedAt: v.optional(v.number()),
     enrolledAt: v.number(),
+    // Phase 8 cohort + commitment fields (additive)
+    groupId: v.optional(v.id("learnhub_groups")),
+    assignedByMentorId: v.optional(v.id("learnhub_users")),
+    targetCompletionDate: v.optional(v.string()),
   })
     .index("by_student", ["studentId"])
-    .index("by_path", ["pathId"]),
+    .index("by_path", ["pathId"])
+    .index("by_group", ["groupId"]),
 
   // ── Dynamic Forms ────────────────────────────────────────
   learnhub_forms: defineTable({
@@ -1011,12 +1051,19 @@ export const learnhubTables = {
   // ── Messaging ────────────────────────────────────────────
   learnhub_conversations: defineTable({
     participantIds: v.array(v.id("learnhub_users")),
-    type: v.optional(v.union(v.literal("direct"), v.literal("mentoring"))),
+    type: v.optional(v.union(
+      v.literal("direct"),
+      v.literal("mentoring"),
+      v.literal("group")
+    )),
     relatedId: v.optional(v.string()),
+    groupId: v.optional(v.id("learnhub_groups")),
     lastMessage: v.optional(v.string()),
     lastMessageAt: v.optional(v.number()),
     unreadCounts: v.any(),
-  }).index("by_participants", ["participantIds"]),
+  })
+    .index("by_participants", ["participantIds"])
+    .index("by_group", ["groupId"]),
 
   learnhub_messages: defineTable({
     conversationId: v.id("learnhub_conversations"),

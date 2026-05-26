@@ -23,7 +23,17 @@ const PUSH_EVENTS = new Set([
   // LearnHub cohesion-pass events that warrant a phone push:
   "mentor_verified",
   "mentor_match_available",
+  "mentorship_request_received",
+  "mentorship_accepted",
   "streak_at_risk",
+  // Phase 8 cohort + progression events (high-value):
+  "cohort_milestone_reached",
+  "cohort_started",
+  "cohort_ending_soon",
+  "level_up",
+  "challenge_started",
+  "challenge_completed",
+  "path_completed",
 ]);
 
 interface SendNotifBody {

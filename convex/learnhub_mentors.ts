@@ -1,8 +1,15 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { awardLearnHubXp } from "./learnhub_xp";
 import { evaluateAndAwardForUser } from "./learnhub_badges";
 import { v } from "convex/values";
+
+// Phase 9.B — internal query for the notification action to look up
+// a mentorship relationship without exposing it on the public API.
+export const getRelationship = internalQuery({
+  args: { relationshipId: v.id("learnhub_mentoring_relationships") },
+  handler: async (ctx, args) => ctx.db.get(args.relationshipId),
+});
 
 // ── Invite Queries ────────────────────────────────────────────────────────────
 
@@ -423,7 +430,7 @@ export const requestMentorship = mutation({
       .filter((g) => g.length > 0 && g.length <= 120)
       .slice(0, 5);
 
-    return await ctx.db.insert("learnhub_mentoring_relationships", {
+    const relationshipId = await ctx.db.insert("learnhub_mentoring_relationships", {
       mentorId: args.mentorId,
       menteeId: args.menteeId,
       status: "requested",
@@ -433,6 +440,28 @@ export const requestMentorship = mutation({
       createdAt: now,
       updatedAt: now,
     });
+
+    // Phase 9.B — fan out a notification to the mentor so they see this
+    // request without having to manually visit /learnhub/mentor.
+    await ctx.scheduler.runAfter(
+      0,
+      internal.learnhub_notifications.notifyMentorshipRequestReceived,
+      { relationshipId },
+    );
+
+    return relationshipId;
+  },
+});
+
+// Phase 9.B.5 — pending request count for the mentor inbox pulse pill.
+export const countPendingRequests = query({
+  args: { mentorId: v.id("learnhub_users") },
+  handler: async (ctx, args) => {
+    const all = await ctx.db
+      .query("learnhub_mentoring_relationships")
+      .withIndex("by_mentor", (q) => q.eq("mentorId", args.mentorId))
+      .collect();
+    return all.filter((r) => r.status === "requested").length;
   },
 });
 
@@ -494,6 +523,16 @@ export const respondToMentorshipRequest = mutation({
 
     // The mentee may have just earned the Mentor Magnet badge.
     await evaluateAndAwardForUser(ctx, rel.menteeId);
+
+    // Rec #2 — nudge both parties to schedule a first call. Deep link
+    // pre-fills the calendar new-event modal with the other party as an
+    // attendee. Best-effort — the relationship is already active.
+    await ctx.scheduler.runAfter(
+      0,
+      internal.learnhub_notifications.notifyMentorshipAccepted,
+      { relationshipId: rel._id },
+    );
+
     return { ok: true };
   },
 });

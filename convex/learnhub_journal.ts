@@ -31,6 +31,18 @@ const DEFAULT_PROMPTS: Array<{
   { slug: "gratitude", text: "What's one thing you're grateful for from today?", category: "mood", weight: 2 },
   { slug: "compare-week-ago", text: "What can you do today that you couldn't a week ago?", category: "reflection", weight: 3 },
   { slug: "block-time", text: "When this week will you block focus time to keep momentum?", category: "goal", weight: 2 },
+
+  // ── Filipino-grounded reflection prompts (Phase 8.F.3) ──────────────
+  // Mixed Tagalog + English so they read naturally to bilingual readers.
+  // Local context: family, barangay, kuya/ate, bayanihan, OFW life.
+  { slug: "share-family", text: "Anong natutunan mo ngayong linggo na puwede mong ibahagi sa pamilya mo?", category: "reflection", weight: 3 },
+  { slug: "barangay-impact", text: "Who in your barangay or community would benefit from what you learned today?", category: "reflection", weight: 3 },
+  { slug: "kuya-ate-question", text: "Kung may kuya o ate ka rito, anong tanong mo sa kanya ngayon?", category: "learning", weight: 2 },
+  { slug: "bayanihan-help", text: "Sino sa cohort mo ang puwede mong tulungan ngayong linggo? Magmungkahi ng isang konkretong tulong.", category: "goal", weight: 2 },
+  { slug: "pasok-out", text: "Anong skill ngayon ang puwede mong gamitin para sa pang-araw-araw na pasok mo?", category: "learning", weight: 2 },
+  { slug: "lola-explain", text: "Pretend you're explaining this week's lesson to your lola. How would you say it in plain Tagalog?", category: "learning", weight: 2 },
+  { slug: "pinoy-pride", text: "What's one local Filipino innovator, project, or initiative you'd love to learn from?", category: "reflection", weight: 2 },
+  { slug: "araw-araw-habit", text: "Anong maliit na ugali (habit) ang puwede mong simulan ngayong linggo para sa long-term na goal mo?", category: "goal", weight: 3 },
 ];
 
 // Manila-day formatter — matches the convention in learnhub_streaks.

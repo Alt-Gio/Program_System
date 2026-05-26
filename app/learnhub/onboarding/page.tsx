@@ -3,12 +3,15 @@ import { Suspense } from "react";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import {
   INTEREST_TAXONOMY as SHARED_TAXONOMY,
   INTEREST_CATEGORIES,
   normalizeInterest,
 } from "@/lib/learnhub/interests";
 import { ORG_CONFIG } from "@/lib/learnhub/org-config";
+import type { Id } from "@/convex/_generated/dataModel";
 
 type Role = "student" | "mentor" | "org_partner";
 type SkillLevel = "beginner" | "intermediate" | "advanced";
@@ -92,12 +95,28 @@ const SKILL_LEVELS: Array<{ value: SkillLevel; short: string }> = [
   { value: "advanced", short: "Advanced" },
 ];
 
-const TOTAL_STEPS = 4;
+// Step 5 (path pick) only renders for learners. Mentors + org partners skip it.
+const TOTAL_STEPS = 5;
 
 function OnboardingPageInner() {
   const router = useRouter();
   const [profile, setProfile] = useState<PendingProfile | null>(null);
   const [step, setStep] = useState(1);
+
+  // Rec #4 — accept ?suggestedCohort= from public cohort page shares.
+  // Captured on mount so it survives even if the user navigates within
+  // the onboarding flow.
+  const [suggestedCohortId, setSuggestedCohortId] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    const sc = sp.get("suggestedCohort");
+    if (sc) setSuggestedCohortId(sc);
+  }, []);
+  const suggestedCohort = useQuery(
+    api.learnhub_groups.getCohortPublicSummary,
+    suggestedCohortId ? { groupId: suggestedCohortId as Id<"learnhub_groups"> } : "skip",
+  );
 
   // Step 1 — identity
   const [displayName, setDisplayName] = useState("");
@@ -118,6 +137,10 @@ function OnboardingPageInner() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [hoursPerWeek, setHoursPerWeek] = useState<Hours | "">("");
   const [connectCalendar, setConnectCalendar] = useState(true);
+
+  // Step 5 — pick your first path (learners only)
+  const [pickedPathId, setPickedPathId] = useState<string>("");
+  const [pathDeadline, setPathDeadline] = useState<string>("");
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -192,14 +215,35 @@ function OnboardingPageInner() {
     interests.length <= MAX_INTERESTS &&
     interests.every((t) => Boolean(skillLevels[t]));
   const step4Valid = goals.length >= 1;
+  const step5Valid = true; // Path pick is optional ("Skip for now")
+  const showPathStep = selectedRole === "student";
+  const effectiveTotalSteps = showPathStep ? 5 : 4;
+
+  // Phase 8.D: surface available paths ranked by interest overlap.
+  const allPaths = useQuery(
+    api.learnhub_learning_paths.listAvailablePaths,
+    step === 5 && showPathStep ? {} : "skip",
+  );
+  const rankedPaths = useMemo(() => {
+    if (!allPaths) return [];
+    const tagSet = new Set(interests.map((t) => normalizeInterest(t)));
+    const scored = allPaths.map((p) => {
+      const programNorm = normalizeInterest(p.programType);
+      const score = tagSet.has(programNorm) ? 5 : 0;
+      return { ...p, score };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, 6);
+  }, [allPaths, interests]);
 
   const canContinue = useMemo(() => {
     if (step === 1) return step1Valid;
     if (step === 2) return true;
     if (step === 3) return step3Valid;
     if (step === 4) return step4Valid;
+    if (step === 5) return step5Valid;
     return false;
-  }, [step, step1Valid, step3Valid, step4Valid]);
+  }, [step, step1Valid, step3Valid, step4Valid, step5Valid]);
 
   const goNext = () => {
     setError("");
@@ -217,7 +261,7 @@ function OnboardingPageInner() {
       setError("Pick at least one goal so we know what to surface.");
       return;
     }
-    setStep((s) => Math.min(TOTAL_STEPS, s + 1));
+    setStep((s) => Math.min(effectiveTotalSteps, s + 1));
   };
 
   const goBack = () => {
@@ -247,6 +291,8 @@ function OnboardingPageInner() {
     if (region.trim()) body.region = region.trim();
     if (province.trim()) body.province = province.trim();
     if (municipality.trim()) body.municipality = municipality.trim();
+    if (pickedPathId) body.pickedPathId = pickedPathId;
+    if (pathDeadline) body.pathDeadline = pathDeadline;
 
     const res = await fetch("/api/learnhub/auth/session", {
       method: "POST",
@@ -260,7 +306,11 @@ function OnboardingPageInner() {
       // request. router.push uses the SPA cache and can land on a page that
       // hasn't seen the cookie yet, producing a confusing "no pending profile"
       // bounce.
-      const dest = "/learnhub/today?welcome=1";
+      // Rec #4 — if they came from a public cohort share, send them
+      // straight to the cohort page so they can hit Join immediately.
+      const dest = suggestedCohortId
+        ? `/learnhub/squads/${suggestedCohortId}?welcome=1`
+        : "/learnhub/today?welcome=1";
       if (connectCalendar) {
         window.location.href = `/api/learnhub/calendar/connect?returnTo=${encodeURIComponent(dest)}`;
         return;
@@ -312,9 +362,29 @@ function OnboardingPageInner() {
             />
           ))}
           <span className="text-xs ml-2 tabular-nums" style={{ color: "#9ba3cc", fontFamily: "var(--font-sora)" }}>
-            {step}/{TOTAL_STEPS}
+            {step}/{effectiveTotalSteps}
           </span>
         </div>
+
+        {suggestedCohort && (
+          <div
+            className="rounded-2xl px-4 py-3 mb-4 flex items-center gap-3"
+            style={{
+              background: "linear-gradient(135deg, rgba(91,108,255,0.16), rgba(34,211,160,0.08))",
+              border: "1px solid rgba(91,108,255,0.3)",
+            }}
+          >
+            <span style={{ fontSize: 24, lineHeight: 1 }}>{suggestedCohort.coverEmoji}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold" style={{ color: "#7c8bff" }}>
+                Joining: {suggestedCohort.name}
+              </p>
+              <p className="text-[11px]" style={{ color: "#9ba3cc" }}>
+                We'll take you to this cohort right after signup.
+              </p>
+            </div>
+          </div>
+        )}
 
         <div>
           <p className="text-xs font-medium tracking-widest uppercase mb-1" style={{ color: "#5b6cff", fontFamily: "var(--font-sora)" }}>
@@ -325,6 +395,7 @@ function OnboardingPageInner() {
             {step === 2 && "Where are you based?"}
             {step === 3 && (copy?.title ?? "Pick your interests")}
             {step === 4 && "What are you here for?"}
+            {step === 5 && "Pick your first path"}
           </h1>
           {profile && step === 1 && (
             <p className="text-sm mt-1" style={{ color: "#9ba3cc" }}>
@@ -342,6 +413,11 @@ function OnboardingPageInner() {
           {step === 4 && (
             <p className="text-sm mt-1" style={{ color: "#9ba3cc" }}>
               These signals shape what shows up first in your feed.
+            </p>
+          )}
+          {step === 5 && showPathStep && (
+            <p className="text-sm mt-1" style={{ color: "#9ba3cc" }}>
+              Structured learning beats random scrolling. Pick a path and we'll suggest a {ORG_CONFIG.cohortLabel.toLowerCase()} to join.
             </p>
           )}
         </div>
@@ -648,6 +724,62 @@ function OnboardingPageInner() {
           </>
         )}
 
+        {step === 5 && showPathStep && (
+          <>
+            <p className="text-sm" style={{ color: "#9ba3cc", marginBottom: 8 }}>
+              We picked these based on your interests. Pick one to enroll automatically, or skip to browse later.
+            </p>
+            {rankedPaths.length === 0 ? (
+              <div className="rounded-xl p-4 text-sm" style={{ background: "#1a1d30", border: "1px solid rgba(255,255,255,0.07)", color: "#9ba3cc" }}>
+                No paths available yet — you can browse them from the My Learning page after onboarding.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {rankedPaths.map((p) => {
+                  const on = pickedPathId === p._id;
+                  return (
+                    <button
+                      key={p._id}
+                      type="button"
+                      onClick={() => setPickedPathId(on ? "" : p._id)}
+                      className="rounded-xl p-3 text-left transition-all"
+                      style={{
+                        background: on ? "rgba(91,108,255,0.18)" : "#1a1d30",
+                        border: on ? "1px solid #5b6cff" : "1px solid rgba(255,255,255,0.08)",
+                        color: "#e8eaff",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{p.title}</div>
+                      <div style={{ fontSize: 11, color: "#9ba3cc" }}>
+                        {p.moduleCount} modules · ~{p.estimatedWeeks} weeks · {p.programType}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#7c8bff", marginTop: 4, lineHeight: 1.4 }}>{p.description.slice(0, 90)}{p.description.length > 90 ? "…" : ""}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {pickedPathId && (
+              <label className="block mt-2">
+                <span className="text-xs" style={{ color: "#9ba3cc", display: "block", marginBottom: 4 }}>
+                  Finish by (optional)
+                </span>
+                <input
+                  type="date"
+                  value={pathDeadline}
+                  onChange={(e) => setPathDeadline(e.target.value)}
+                  className="rounded-lg px-3 py-2 text-sm"
+                  style={{ background: "#1a1d30", border: "1px solid rgba(255,255,255,0.08)", color: "#e8eaff" }}
+                />
+              </label>
+            )}
+            <p className="text-[11px] mt-2" style={{ color: "#5c6490" }}>
+              You can change paths or join a {ORG_CONFIG.cohortLabel.toLowerCase()} anytime from /learnhub/squads.
+            </p>
+          </>
+        )}
+
         {error && (
           <p className="text-sm" style={{ color: "#ff5f6d" }}>{error}</p>
         )}
@@ -664,7 +796,7 @@ function OnboardingPageInner() {
               ← Back
             </button>
           )}
-          {step < TOTAL_STEPS ? (
+          {step < effectiveTotalSteps ? (
             <button
               type="button"
               onClick={goNext}

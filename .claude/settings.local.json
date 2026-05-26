@@ -28,7 +28,15 @@
       "Bash(grep -E \"\\\\.ts$\")",
       "Bash(npm run *)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\actal\\\\Music\\\\Project\\\\CascadeProjects\\\\windsurf-project\" -Recurse -Name)",
-      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\actal\\\\Music\\\\Project\\\\CascadeProjects\\\\windsurf-project\\\\app\" -Depth 1 -Directory)"
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\actal\\\\Music\\\\Project\\\\CascadeProjects\\\\windsurf-project\\\\app\" -Depth 1 -Directory)",
+      "Bash(xargs grep -l \"learning.*path\\\\|Browse.*path\")",
+      "Bash(xargs grep -l \"path\")",
+      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\actal\\\\Music\\\\Project\\\\CascadeProjects\\\\windsurf-project\" -Recurse -Filter \"*.ts\" -o ErrorAction SilentlyContinue)",
+      "Bash(Select-Object -First 5)",
+      "Bash(xargs grep -l \"listMyConversations\\\\|sendMessage\\\\|learnhub_conversations\")",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(node -e \"try { require.resolve\\('sharp'\\); console.log\\('sharp OK'\\); } catch { console.log\\('sharp NO'\\); } try { require.resolve\\('@resvg/resvg-js'\\); console.log\\('resvg OK'\\); } catch { console.log\\('resvg NO'\\); }\")"
     ]
   }
 }

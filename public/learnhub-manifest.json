@@ -1,0 +1,56 @@
+{
+  "name": "ILCDB LearnHub",
+  "short_name": "LearnHub",
+  "description": "DICT Region V social learning platform. Cohorts, mentors, structured paths.",
+  "start_url": "/learnhub/today",
+  "scope": "/learnhub",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#090b18",
+  "theme_color": "#5b6cff",
+  "lang": "en-PH",
+  "categories": ["education", "productivity", "social"],
+  "icons": [
+    {
+      "src": "/icons/learnhub-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/learnhub-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Today",
+      "short_name": "Today",
+      "description": "Your daily learning dashboard",
+      "url": "/learnhub/today"
+    },
+    {
+      "name": "Browse paths",
+      "short_name": "Paths",
+      "description": "Discover learning paths",
+      "url": "/learnhub/paths"
+    },
+    {
+      "name": "Mentors",
+      "short_name": "Mentors",
+      "description": "Find a mentor",
+      "url": "/learnhub/mentors"
+    }
+  ],
+  "share_target": {
+    "action": "/learnhub/share",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  }
+}

@@ -5,7 +5,7 @@
 // for the Node runtime.
 
 import { v } from "convex/values";
-import { action } from "./_generated/server";
+import { action, internalAction } from "./_generated/server";
 import { api } from "./_generated/api";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
@@ -114,5 +114,56 @@ export const sendInvite = action({
       subject: "Your DICT invitation",
       html,
     });
+  },
+});
+
+// Rec #8 — LearnHub digest email.
+//
+// Shared sender for both the daily and weekly digest cron handlers in
+// learnhub_notifications.ts. Caller decides the cadence label, the headline
+// counters, and the deep-link path; this action only handles formatting +
+// delivery. Stays a no-op (returns ok:false) when RESEND_API_KEY isn't set
+// so dev environments don't fail noisily.
+export const sendLearnHubDigest = internalAction({
+  args: {
+    to: v.string(),
+    learnerName: v.string(),
+    cadence: v.union(v.literal("daily"), v.literal("weekly")),
+    headline: v.string(),
+    summary: v.string(),
+    streakLine: v.string(),
+    targetUrl: v.string(),
+  },
+  handler: async (
+    _ctx,
+    args,
+  ): Promise<{ ok: boolean; error?: string }> => {
+    const cadenceLabel = args.cadence === "daily" ? "Today on LearnHub" : "Your week on LearnHub";
+    const subject =
+      args.cadence === "daily"
+        ? `Today on LearnHub — ${args.headline}`
+        : `Your LearnHub week — ${args.headline}`;
+    const firstName = args.learnerName.split(" ")[0] || args.learnerName || "there";
+
+    const html = `
+      <div style="font-family:system-ui,Segoe UI,Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#0b0d1a;color:#e8eaf4;">
+        <div style="background:linear-gradient(135deg,#5b6cff,#7c5cff);padding:18px 22px;border-radius:14px;margin-bottom:18px;">
+          <p style="margin:0;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.78);">${cadenceLabel}</p>
+          <h2 style="margin:6px 0 0;font-size:22px;color:#fff;">${args.headline}</h2>
+        </div>
+        <p style="font-size:15px;margin:0 0 12px;">Hi ${firstName},</p>
+        <p style="font-size:14px;line-height:1.55;margin:0 0 14px;color:#cfd3eb;">${args.summary}</p>
+        <p style="font-size:13px;line-height:1.5;margin:0 0 22px;color:#9ba3cc;">${args.streakLine}</p>
+        <p style="margin:0 0 28px;">
+          <a href="${args.targetUrl}" style="background:#5b6cff;color:#fff;padding:11px 20px;border-radius:99px;text-decoration:none;font-weight:600;font-size:13px;">Open LearnHub →</a>
+        </p>
+        <p style="font-size:11px;color:#6f76a0;margin:0;">
+          You're receiving this because your LearnHub email digest is set to <b>${args.cadence}</b>.
+          Switch cadence or turn it off in <a href="${args.targetUrl.replace(/\/learnhub\/.*$/, "/learnhub/settings")}" style="color:#9ba9ff;">Settings → Email Digest</a>.
+        </p>
+      </div>
+    `;
+
+    return await sendMail({ to: args.to, subject, html });
   },
 });

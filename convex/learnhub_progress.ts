@@ -490,9 +490,11 @@ export const getLearnerOverview = query({
       certCount: certs.length,
       goals: goals.map((g) => ({
         id: g._id,
+        _id: g._id,
         title: g.title,
         deadline: g.deadline ?? null,
         completedAt: g.completedAt ?? null,
+        pathId: g.pathId ?? null,
       })),
     };
   },

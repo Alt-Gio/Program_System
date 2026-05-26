@@ -135,6 +135,74 @@ export const notifyMentorPendingVerification = internalAction({
 // know whether they're now visible on the marketplace. Triggered from
 // learnhub_mentors.reviewVerification. On approval, also kicks off the
 // match-available fan-out so learners with overlapping interests find out.
+// Rec #2 — when a mentor accepts, nudge BOTH parties to schedule a first
+// call. Deep link pre-fills the calendar new-event modal with the other
+// party as an attendee.
+export const notifyMentorshipAccepted = internalAction({
+  args: { relationshipId: v.id("learnhub_mentoring_relationships") },
+  handler: async (ctx, args) => {
+    const rel = await ctx.runQuery(internal.learnhub_mentors.getRelationship, {
+      relationshipId: args.relationshipId,
+    });
+    if (!rel) return;
+    const [mentor, mentee] = await Promise.all([
+      ctx.runQuery(api.learnhub_users.getUser, { id: rel.mentorId }),
+      ctx.runQuery(api.learnhub_users.getUser, { id: rel.menteeId }),
+    ]);
+
+    const buildRoute = (attendeeId: string) =>
+      `/learnhub/calendar?newEvent=1&attendee=${attendeeId}&title=${encodeURIComponent("Mentorship session")}`;
+
+    // Notify mentee — their request was accepted.
+    if (mentee && mentor) {
+      await sendNotification({
+        userId: rel.menteeId,
+        event: "mentorship_accepted",
+        title: `${mentor.name} accepted your request`,
+        body: "Tap to schedule your first call.",
+        targetRoute: buildRoute(rel.mentorId),
+        data: { relationshipId: args.relationshipId, otherUserId: rel.mentorId },
+      });
+    }
+    // Notify mentor too — gentle "schedule first call" reminder.
+    if (mentor && mentee) {
+      await sendNotification({
+        userId: rel.mentorId,
+        event: "mentorship_accepted",
+        title: `Schedule a first call with ${mentee.name}`,
+        body: "Connect your Calendar to set a session and Meet link.",
+        targetRoute: buildRoute(rel.menteeId),
+        data: { relationshipId: args.relationshipId, otherUserId: rel.menteeId },
+      });
+    }
+  },
+});
+
+// Phase 9.B — when a learner requests a mentor, fan a notification to the
+// mentor so they know to act on it.
+export const notifyMentorshipRequestReceived = internalAction({
+  args: { relationshipId: v.id("learnhub_mentoring_relationships") },
+  handler: async (ctx, args) => {
+    const rel = await ctx.runQuery(internal.learnhub_mentors.getRelationship, {
+      relationshipId: args.relationshipId,
+    });
+    if (!rel) return;
+    const mentee = await ctx.runQuery(api.learnhub_users.getUser, {
+      id: rel.menteeId,
+    });
+    const menteeName = mentee?.name ?? "A learner";
+    const snippet = (rel.requestNote ?? "").slice(0, 120);
+    await sendNotification({
+      userId: rel.mentorId,
+      event: "mentorship_request_received",
+      title: `New mentorship request from ${menteeName}`,
+      body: snippet || "Tap to review and accept or decline.",
+      targetRoute: "/learnhub/mentor",
+      data: { relationshipId: args.relationshipId },
+    });
+  },
+});
+
 export const notifyMentorVerificationResult = internalAction({
   args: {
     mentorId: v.id("learnhub_users"),
@@ -294,6 +362,80 @@ export const notifyWeeklyDigest = internalAction({
         targetRoute: "/learnhub/today",
         data: { totalXp: summary.totalXp, eventCount: summary.eventCount },
       });
+
+      // Rec #8 — also deliver as an email if the learner opted into the
+      // weekly cadence. Daily-cadence subscribers are handled separately by
+      // notifyDailyDigest. Best-effort: a Resend failure should not abort
+      // the per-user loop.
+      if (u.notifPrefs?.emailDigest === "weekly" && u.email) {
+        try {
+          const appUrl = process.env.LH_INTERNAL_URL ?? "";
+          await ctx.runAction(internal.emails.sendLearnHubDigest, {
+            to: u.email,
+            learnerName: u.name ?? "there",
+            cadence: "weekly",
+            headline: `${summary.totalXp} XP earned this week`,
+            summary: `You logged ${headline} across ${summary.eventCount} activit${summary.eventCount === 1 ? "y" : "ies"} in the last 7 days.`,
+            streakLine: streakPart,
+            targetUrl: `${appUrl.replace(/\/$/, "")}/learnhub/today`,
+          });
+        } catch (err) {
+          console.error("[learnhub_notifications] weekly digest email failed for", u._id, err);
+        }
+      }
+    }
+  },
+});
+
+// Rec #8 — Daily digest for learners on the "daily" cadence. Mirrors the
+// weekly handler's shape, but bounded to today's activity so the email is
+// short and motivational rather than a full recap. Skips users with no
+// activity yet today AND no current streak — there's literally nothing to
+// say and we'd rather not annoy a dormant account.
+export const notifyDailyDigest = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    const learners = await ctx.runQuery(
+      internal.learnhub_users.listStudentsForNotification,
+      {},
+    );
+    const today = new Date(Date.now()).toISOString().slice(0, 10);
+    const appUrl = process.env.LH_INTERNAL_URL ?? "";
+
+    for (const u of learners) {
+      if (u.notifPrefs?.emailDigest !== "daily") continue;
+      if (!u.email) continue;
+
+      const activeToday = await ctx.runQuery(
+        internal.learnhub_xp.hasActivityToday,
+        { userId: u._id, date: today },
+      );
+      const streak = u.currentStreak ?? 0;
+      if (!activeToday && streak === 0) continue;
+
+      const headline = activeToday
+        ? `Streak protected · ${streak || 1} day${streak === 1 ? "" : "s"}`
+        : `Your ${streak}-day streak is at risk`;
+      const summaryText = activeToday
+        ? `Nice — today's activity is logged. Keep momentum going with one more module, video, or journal entry.`
+        : `You haven't logged anything today yet. Even a 5-minute review keeps your streak alive.`;
+      const streakLine = activeToday
+        ? `Current streak: ${streak} day${streak === 1 ? "" : "s"}. Longest: ${u.longestStreak ?? streak}.`
+        : `Open a video, flashcard set, or journal entry before midnight PHT.`;
+
+      try {
+        await ctx.runAction(internal.emails.sendLearnHubDigest, {
+          to: u.email,
+          learnerName: u.name ?? "there",
+          cadence: "daily",
+          headline,
+          summary: summaryText,
+          streakLine,
+          targetUrl: `${appUrl.replace(/\/$/, "")}/learnhub/today`,
+        });
+      } catch (err) {
+        console.error("[learnhub_notifications] daily digest email failed for", u._id, err);
+      }
     }
   },
 });

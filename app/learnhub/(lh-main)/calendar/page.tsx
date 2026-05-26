@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   addMonths,
   endOfMonth,
@@ -59,6 +60,9 @@ function CalendarPageInner() {
   const [modalEvent, setModalEvent] = useState<GcalEvent | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
   const [newPrefill, setNewPrefill] = useState<Date | null>(null);
+  // Rec #2 — deep-link prefill from /api notification target
+  const [titlePrefill, setTitlePrefill] = useState<string>("");
+  const [attendeePrefill, setAttendeePrefill] = useState<string>("");
 
   // Stable month key (e.g. "2026-05") — every other Date derived from this
   // is recomputed only when the month changes. The earlier implementation
@@ -108,6 +112,27 @@ function CalendarPageInner() {
     fetchEvents(ctrl.signal);
     return () => ctrl.abort();
   }, [fetchEvents]);
+
+  // Rec #2 — open new-event modal pre-filled from URL params:
+  // ?newEvent=1&attendee={userId}&title={title}
+  // Looks up the attendee's email via Convex so the API can invite them.
+  const sp = useSearchParams();
+  const attendeeUserId = sp.get("attendee");
+  const attendeeUser = useQuery(
+    api.learnhub_users.getUser,
+    attendeeUserId ? { id: attendeeUserId as Id<"learnhub_users"> } : "skip",
+  );
+  useEffect(() => {
+    if (sp.get("newEvent") !== "1" || showNewModal) return;
+    const titleParam = sp.get("title");
+    if (titleParam) setTitlePrefill(titleParam);
+    if (attendeeUser?.email) setAttendeePrefill(attendeeUser.email);
+    // Only auto-open once attendee email is resolved (or no attendee was requested).
+    if (!attendeeUserId || attendeeUser !== undefined) {
+      setNewPrefill(new Date());
+      setShowNewModal(true);
+    }
+  }, [sp, attendeeUser, attendeeUserId, showNewModal]);
 
   // Keyboard nav: ← / → flips months, "t" jumps to today. Skips when a
   // modal is open or the user is typing in a field.
@@ -400,9 +425,17 @@ function CalendarPageInner() {
       {showNewModal && (
         <NewEventModal
           prefill={newPrefill ?? new Date()}
-          onClose={() => setShowNewModal(false)}
+          titlePrefill={titlePrefill}
+          attendeePrefill={attendeePrefill}
+          onClose={() => {
+            setShowNewModal(false);
+            setTitlePrefill("");
+            setAttendeePrefill("");
+          }}
           onCreated={() => {
             setShowNewModal(false);
+            setTitlePrefill("");
+            setAttendeePrefill("");
             fetchEvents();
           }}
         />
@@ -445,18 +478,23 @@ function HabitRail() {
 
 function NewEventModal({
   prefill,
+  titlePrefill,
+  attendeePrefill,
   onClose,
   onCreated,
 }: {
   prefill: Date;
+  titlePrefill?: string;
+  attendeePrefill?: string;
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const [summary, setSummary] = useState("");
+  const [summary, setSummary] = useState(titlePrefill ?? "");
   const [description, setDescription] = useState("");
   const [start, setStart] = useState(toLocalInput(prefill));
   const [end, setEnd] = useState(toLocalInput(new Date(prefill.getTime() + 60 * 60_000)));
   const [withMeet, setWithMeet] = useState(true);
+  const [attendees, setAttendees] = useState(attendeePrefill ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -465,6 +503,10 @@ function NewEventModal({
     if (!summary.trim()) return setError("Title required.");
     setSubmitting(true);
     try {
+      const attendeeList = attendees
+        .split(",")
+        .map((e) => e.trim())
+        .filter((e) => e.length > 0 && e.includes("@"));
       const res = await fetch("/api/learnhub/calendar/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -474,6 +516,7 @@ function NewEventModal({
           start: new Date(start).toISOString(),
           end: new Date(end).toISOString(),
           withMeet,
+          attendees: attendeeList.length > 0 ? attendeeList : undefined,
         }),
       });
       const data = await res.json();
@@ -505,6 +548,15 @@ function NewEventModal({
           <input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} style={inputStyle} />
         </Field>
       </div>
+      <Field label="Attendees (comma-separated emails, optional)">
+        <input
+          type="text"
+          value={attendees}
+          onChange={(e) => setAttendees(e.target.value)}
+          placeholder="alice@example.com, bob@example.com"
+          style={inputStyle}
+        />
+      </Field>
       <label className="flex items-center gap-2 cursor-pointer mt-1">
         <input type="checkbox" checked={withMeet} onChange={(e) => setWithMeet(e.target.checked)} />
         <span className="text-sm" style={{ color: "#e8eaff" }}>Add Google Meet link</span>

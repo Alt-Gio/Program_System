@@ -37,6 +37,89 @@ export const listUsers = query({
   },
 });
 
+/**
+ * Phase 8.E.4 — activity timeline.
+ *
+ * Pulls the user's recent XP events and surfaces them as a uniform
+ * timeline. Each row is derived (not stored) so the rendering can evolve
+ * without a schema migration. Limits to the last 50 events.
+ */
+export const getUserActivityTimeline = query({
+  args: {
+    userId: v.id("learnhub_users"),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = Math.min(args.limit ?? 50, 100);
+    const events = await ctx.db
+      .query("learnhub_xp_events")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .order("desc")
+      .take(limit);
+
+    type TimelineRow = {
+      id: string;
+      kind: "xp" | "badge" | "cohort_join" | "path_completion";
+      emoji: string;
+      title: string;
+      detail: string;
+      xp: number;
+      date: string;
+      createdAt: number;
+    };
+
+    const rows: TimelineRow[] = events.map((e) => {
+      let emoji = "⚡";
+      let kind: TimelineRow["kind"] = "xp";
+      switch (e.sourceType) {
+        case "module_completion":
+          emoji = "🎓";
+          kind = "path_completion";
+          break;
+        case "challenge_completion":
+          emoji = "🏆";
+          break;
+        case "flashcard_review":
+          emoji = "🎴";
+          break;
+        case "video_completion":
+          emoji = "📺";
+          break;
+        case "journal_habit":
+          emoji = "📝";
+          break;
+        case "mentor_acceptance":
+          emoji = "🤝";
+          break;
+        case "work_completion":
+          emoji = "💼";
+          break;
+        case "flow_session":
+          emoji = "🔁";
+          break;
+        case "daily_login":
+          emoji = "🌅";
+          break;
+        case "manual":
+          emoji = "✨";
+          break;
+      }
+      return {
+        id: e._id as string,
+        kind,
+        emoji,
+        title: e.reason,
+        detail: `+${e.amount} XP`,
+        xp: e.amount,
+        date: e.date,
+        createdAt: e.createdAt,
+      };
+    });
+
+    return rows;
+  },
+});
+
 export const createUser = mutation({
   args: {
     googleId: v.string(),

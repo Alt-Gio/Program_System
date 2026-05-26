@@ -280,6 +280,220 @@ export const getPostsByAuthor = query({
   },
 });
 
+/**
+ * Phase 9.A.3 — lightweight post search for the path module composer.
+ * Returns only the fields the picker needs (id, type, content snippet, hashtags,
+ * author name/avatar). Filters by hashtag (case-insensitive substring),
+ * post type, and author. No like counts, no bookmarks — keeps payload small.
+ */
+export const searchPostsForComposer = query({
+  args: {
+    hashtag: v.optional(v.string()),
+    type: v.optional(v.string()),
+    authorId: v.optional(v.id("learnhub_users")),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = Math.min(args.limit ?? 30, 60);
+    let posts;
+    if (args.authorId) {
+      posts = await ctx.db
+        .query("learnhub_posts")
+        .withIndex("by_author", (q) => q.eq("authorId", args.authorId!))
+        .order("desc")
+        .take(200);
+    } else {
+      posts = await ctx.db
+        .query("learnhub_posts")
+        .withIndex("by_created")
+        .order("desc")
+        .take(200);
+    }
+
+    const needle = args.hashtag?.trim().toLowerCase().replace(/^#/, "") ?? "";
+    const filtered = posts.filter((p) => {
+      if (args.type && p.type !== args.type) return false;
+      if (needle) {
+        const hits = (p.hashtags ?? []).some((h) => h.toLowerCase().includes(needle));
+        const tagHits = (p.tags ?? []).some((t) => t.toLowerCase().includes(needle));
+        const contentHit = p.content.toLowerCase().includes(needle);
+        if (!hits && !tagHits && !contentHit) return false;
+      }
+      return true;
+    });
+
+    const sliced = filtered.slice(0, limit);
+    return Promise.all(
+      sliced.map(async (p) => {
+        const author = await ctx.db.get(p.authorId);
+        return {
+          _id: p._id,
+          type: p.type,
+          contentSnippet: p.content.slice(0, 160),
+          hashtags: p.hashtags ?? [],
+          createdAt: p.createdAt,
+          author: author
+            ? { _id: author._id, name: author.name, avatarUrl: author.avatarUrl }
+            : null,
+        };
+      }),
+    );
+  },
+});
+
+/**
+ * Detect a post type from a URL. Heuristic — falls back to "drive" for
+ * unknown URLs so the post is still attachable.
+ */
+function detectTypeFromUrl(url: string): "youtube" | "drive" | "form" | "video" | "text" {
+  const u = url.toLowerCase();
+  if (u.includes("youtube.com") || u.includes("youtu.be")) return "youtube";
+  if (u.includes("docs.google.com/forms") || u.includes("forms.gle")) return "form";
+  if (u.includes("drive.google.com") || u.includes("docs.google.com")) return "drive";
+  if (u.match(/\.(mp4|mov|webm|m4v)(\?|$)/)) return "video";
+  if (u.startsWith("http")) return "drive"; // generic external link bucket
+  return "text";
+}
+
+/**
+ * Rec #1 — bulk-attach materials to a path module.
+ *
+ * Lightweight wrapper around createPost for the path editor: paste a URL +
+ * title, the mutation auto-detects type and stamps sensible metadata.
+ * Returns the new post id so the client can push it into the module's
+ * `postIds` array and save the path.
+ */
+export const createMaterialPost = mutation({
+  args: {
+    actorId: v.id("learnhub_users"),
+    url: v.string(),
+    title: v.string(),
+    typeOverride: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const trimmedUrl = args.url.trim();
+    const trimmedTitle = args.title.trim();
+    if (!trimmedUrl) throw new Error("URL is required");
+    if (!trimmedTitle) throw new Error("Title is required");
+
+    const detected = detectTypeFromUrl(trimmedUrl);
+    const type = (args.typeOverride as typeof detected | undefined) ?? detected;
+    const now = Date.now();
+
+    // For youtube, pull the video id into metadata so the player works.
+    let metadata: Record<string, unknown> = { url: trimmedUrl, title: trimmedTitle };
+    if (type === "youtube") {
+      const idMatch =
+        trimmedUrl.match(/[?&]v=([^&]+)/) ||
+        trimmedUrl.match(/youtu\.be\/([^?]+)/) ||
+        trimmedUrl.match(/embed\/([^?]+)/);
+      const videoId = idMatch?.[1] ?? null;
+      metadata = { ...metadata, videoId, embedUrl: videoId ? `https://www.youtube.com/embed/${videoId}` : null };
+    }
+    if (type === "drive") {
+      metadata = { ...metadata, driveUrl: trimmedUrl };
+    }
+    if (type === "form") {
+      metadata = { ...metadata, formUrl: trimmedUrl };
+    }
+
+    const author = await ctx.db.get(args.actorId);
+    const isOrg = author?.role === "org_partner";
+
+    const postId = await ctx.db.insert("learnhub_posts", {
+      authorId: args.actorId,
+      type: type === "text" ? "text" : (type as "youtube" | "video" | "drive" | "form"),
+      content: trimmedTitle,
+      metadata,
+      hashtags: undefined,
+      boostLevel: isOrg ? "standard" : "none",
+      boostExpiresAt: isOrg ? now + ORG_BOOST_WINDOW_MS : undefined,
+      likeCount: 0,
+      commentCount: 0,
+      isPinned: false,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return postId;
+  },
+});
+
+/**
+ * Rec #3 — list posts scoped to a cohort. Lightweight projection so
+ * the cohort dashboard tab can render without a heavy feed query.
+ */
+export const listCohortPosts = query({
+  args: { groupId: v.id("learnhub_groups"), limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const posts = await ctx.db
+      .query("learnhub_posts")
+      .withIndex("by_group", (q) => q.eq("groupId", args.groupId))
+      .order("desc")
+      .take(args.limit ?? 50);
+    return Promise.all(
+      posts.map(async (p) => {
+        const author = await ctx.db.get(p.authorId);
+        return {
+          _id: p._id,
+          type: p.type,
+          content: p.content,
+          metadata: p.metadata ?? {},
+          likeCount: p.likeCount,
+          commentCount: p.commentCount,
+          createdAt: p.createdAt,
+          author: author
+            ? { _id: author._id, name: author.name, avatarUrl: author.avatarUrl }
+            : null,
+        };
+      }),
+    );
+  },
+});
+
+/**
+ * Rec #3 — create a cohort-scoped text post. Auto-stamps `groupId` and
+ * enforces that the author is a member of the cohort.
+ */
+export const createCohortPost = mutation({
+  args: {
+    authorId: v.id("learnhub_users"),
+    groupId: v.id("learnhub_groups"),
+    content: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const content = args.content.trim();
+    if (!content) throw new Error("Post content is required");
+    if (content.length > 2000) throw new Error("Post is too long (max 2000 chars)");
+
+    const membership = await ctx.db
+      .query("learnhub_group_members")
+      .withIndex("by_group", (q) => q.eq("groupId", args.groupId))
+      .filter((q) => q.eq(q.field("userId"), args.authorId))
+      .first();
+    if (!membership) throw new Error("Only members can post in this cohort");
+
+    const now = Date.now();
+    const fromContent = extractHashtags(content);
+
+    const postId = await ctx.db.insert("learnhub_posts", {
+      authorId: args.authorId,
+      groupId: args.groupId,
+      type: "text",
+      content,
+      metadata: {},
+      hashtags: fromContent.length > 0 ? fromContent.slice(0, 10) : undefined,
+      boostLevel: "none",
+      likeCount: 0,
+      commentCount: 0,
+      isPinned: false,
+      createdAt: now,
+      updatedAt: now,
+    });
+    return postId;
+  },
+});
+
 export const createPost = mutation({
   args: {
     authorId: v.id("learnhub_users"),

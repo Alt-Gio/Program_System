@@ -69,6 +69,8 @@ export async function POST(request: NextRequest) {
     province: rawProvince,
     municipality: rawMunicipality,
     name: rawName,
+    pickedPathId: rawPickedPathId,
+    pathDeadline: rawPathDeadline,
   } = body as {
     role: "student" | "mentor" | "org_partner";
     school?: string;
@@ -81,6 +83,8 @@ export async function POST(request: NextRequest) {
     province?: string;
     municipality?: string;
     name?: string;
+    pickedPathId?: string;
+    pathDeadline?: string;
   };
 
   if (!role || !["student", "mentor", "org_partner"].includes(role)) {
@@ -171,6 +175,24 @@ export async function POST(request: NextRequest) {
       province: cleanProvince,
       municipality: cleanMunicipality,
     });
+
+    // Phase 8.D: if the learner picked a path in onboarding, enroll them
+    // and create a matching goal row. Best-effort — failures shouldn't block
+    // the session.
+    if (role === "student" && typeof rawPickedPathId === "string" && rawPickedPathId.length > 0) {
+      try {
+        const deadlineStr = typeof rawPathDeadline === "string" && /^\d{4}-\d{2}-\d{2}$/.test(rawPathDeadline)
+          ? rawPathDeadline
+          : undefined;
+        await convex.mutation(api.learnhub_learning_paths.enrollWithCommitment, {
+          userId: userId as never,
+          pathId: rawPickedPathId as never,
+          targetCompletionDate: deadlineStr,
+        });
+      } catch (e) {
+        console.warn("[LearnHub] onboarding path enroll failed:", e);
+      }
+    }
 
     // Check for pending certificates matching this email
     // (auto-claim handled separately on profile load)

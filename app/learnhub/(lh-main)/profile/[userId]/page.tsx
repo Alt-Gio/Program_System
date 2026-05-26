@@ -8,13 +8,27 @@ import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLearnhubSession } from "@/lib/learnhub/hooks";
+import { levelFromXp } from "@/lib/learnhub/levels";
+
+const BRACKET_VISUAL: Record<string, { color: string; icon: string }> = {
+  Apprentice:   { color: "#22d3a0", icon: "🌱" },
+  Journeyman:   { color: "#5b6cff", icon: "🧭" },
+  Practitioner: { color: "#ff8c42", icon: "⭐" },
+  Master:       { color: "#ffd700", icon: "👑" },
+};
 
 function getLevel(xp: number) {
-  if (xp < 500) return { label: "Seedling", color: "#9ba3cc", icon: "🌱" };
-  if (xp < 1500) return { label: "Explorer", color: "#22d3a0", icon: "🧭" };
-  if (xp < 3000) return { label: "Achiever", color: "#5b6cff", icon: "⭐" };
-  if (xp < 6000) return { label: "Champion", color: "#ff8c42", icon: "🏆" };
-  return { label: "Legend", color: "#ffd700", icon: "👑" };
+  const info = levelFromXp(xp);
+  const visual = BRACKET_VISUAL[info.bracket];
+  return {
+    label: `Lv ${info.level} · ${info.bracket}`,
+    level: info.level,
+    color: visual.color,
+    icon: visual.icon,
+    current: info.current,
+    next: info.next,
+    pct: info.pct,
+  };
 }
 
 const ROLE_LABEL: Record<string, string> = { student: "Student", mentor: "Mentor", org_partner: "Org Partner" };
@@ -75,8 +89,7 @@ export default function ProfilePage({ params }: Props) {
   }
 
   const level = getLevel(user.xpPoints);
-  const xpToNext = user.xpPoints < 500 ? 500 : user.xpPoints < 1500 ? 1500 : user.xpPoints < 3000 ? 3000 : user.xpPoints < 6000 ? 6000 : null;
-  const xpProgress = xpToNext ? (user.xpPoints / xpToNext) * 100 : 100;
+  const xpProgress = level.pct;
 
   const startEdit = () => {
     setFormName(user.name);
@@ -242,7 +255,7 @@ export default function ProfilePage({ params }: Props) {
           <div className="mb-4">
             <div className="flex justify-between text-xs mb-1.5">
               <span style={{ color: "#9ba3cc" }}>{user.xpPoints.toLocaleString()} XP</span>
-              {xpToNext && <span style={{ color: "#5c6490" }}>{xpToNext.toLocaleString()} XP to next level</span>}
+              <span style={{ color: "#5c6490" }}>{level.current} / {level.next} to Lv {level.level + 1}</span>
             </div>
             <div className="h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
               <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(xpProgress, 100)}%`, background: `linear-gradient(90deg, ${level.color}, ${level.color}80)` }} />
@@ -278,6 +291,8 @@ export default function ProfilePage({ params }: Props) {
         </div>
       )}
 
+      <ActivityTimeline userId={user._id} />
+
       {/* Recent posts */}
       <div className="rounded-2xl p-5" style={{ background: "#131626", border: "1px solid rgba(255,255,255,0.06)" }}>
         <p className="text-sm font-semibold mb-3" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>Recent Posts</p>
@@ -297,6 +312,36 @@ export default function ProfilePage({ params }: Props) {
             </div>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ActivityTimeline({ userId }: { userId: Id<"learnhub_users"> }) {
+  const rows = useQuery(api.learnhub_users.getUserActivityTimeline, { userId, limit: 12 });
+  if (rows === undefined) {
+    return (
+      <div className="rounded-2xl p-5" style={{ background: "#131626", border: "1px solid rgba(255,255,255,0.06)" }}>
+        <p className="text-sm font-semibold mb-3" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>Activity</p>
+        <div className="h-16 rounded-xl animate-pulse" style={{ background: "#1a1d30" }} />
+      </div>
+    );
+  }
+  if (rows.length === 0) return null;
+  return (
+    <div className="rounded-2xl p-5" style={{ background: "#131626", border: "1px solid rgba(255,255,255,0.06)" }}>
+      <p className="text-sm font-semibold mb-3" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>Activity</p>
+      <div className="flex flex-col gap-2">
+        {rows.map((r) => (
+          <div key={r.id} className="rounded-xl px-3 py-2 flex items-center gap-3" style={{ background: "#1a1d30" }}>
+            <span style={{ fontSize: 18 }}>{r.emoji}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs" style={{ color: "#c8caf0" }}>{r.title}</p>
+              <p className="text-[10px] mt-0.5" style={{ color: "#5c6490" }}>{r.date}</p>
+            </div>
+            <span className="text-xs font-semibold" style={{ color: "#22d3a0" }}>{r.detail}</span>
+          </div>
+        ))}
       </div>
     </div>
   );

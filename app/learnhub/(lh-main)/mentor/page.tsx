@@ -254,7 +254,10 @@ function MentorshipInbox({ mentorId }: { mentorId: ConvexUserId }) {
         <p className="text-sm font-semibold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>
           🤝 Mentorship Requests
           {pending.length > 0 && (
-            <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(249,115,22,0.18)", color: "#f97316" }}>
+            <span
+              className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse"
+              style={{ background: "rgba(249,115,22,0.18)", color: "#f97316" }}
+            >
               {pending.length} new
             </span>
           )}

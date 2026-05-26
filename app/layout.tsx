@@ -32,15 +32,34 @@ export const metadata: Metadata = {
   title: "DICT Region V – Program Management System",
   description:
     "DICT Region V Program Management System for tracking ICT programs across Bicol Region provinces",
+  // Unified DICT R5 manifest. Subapps with distinct identity override this
+  // in their own layout: /learnhub/layout.tsx, /meeting-hall/layout.tsx, etc.
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    title: "DTC Hall",
+    title: "DICT R5",
     statusBarStyle: "black-translucent",
   },
   icons: {
-    icon: "/icons/dtc-icon.svg",
-    apple: "/icons/dtc-icon.svg",
+    icon: "/icons/dict-icon.svg",
+    shortcut: "/icons/dict-icon.svg",
+    apple: [
+      // iOS reads the first match. Single SVG covers all sizes on iOS 17+;
+      // older iOS will simply ignore unknown icon links without breaking.
+      { url: "/icons/dict-icon.svg", sizes: "any", type: "image/svg+xml" },
+    ],
+    other: [
+      { rel: "mask-icon", url: "/icons/dict-icon.svg", color: "#0a4bd4" },
+    ],
+  },
+  // Explicit format detection blocks — iOS otherwise turns phone numbers
+  // into call links and dates into calendar suggestions inside our UI.
+  formatDetection: {
+    telephone: false,
+    date: false,
+    address: false,
+    email: false,
+    url: false,
   },
 };
 

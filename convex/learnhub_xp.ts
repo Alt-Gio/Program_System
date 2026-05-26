@@ -1,6 +1,7 @@
 import { mutation, query, internalQuery, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
+import { crossedLevelBoundary } from "../lib/learnhub/levels";
 
 const XP_SOURCE = v.union(
   v.literal("daily_login"),
@@ -10,6 +11,8 @@ const XP_SOURCE = v.union(
   v.literal("video_completion"),
   v.literal("flashcard_review"),
   v.literal("mentor_acceptance"),
+  v.literal("module_completion"),
+  v.literal("challenge_completion"),
   v.literal("manual")
 );
 
@@ -27,6 +30,8 @@ const DAILY_CAPS = {
   video_completion: 150,
   flashcard_review: 50,
   mentor_acceptance: 1000,
+  module_completion: 200,
+  challenge_completion: 500,
   manual: 500,
 } as const;
 
@@ -82,8 +87,16 @@ export async function awardLearnHubXp(
     ...(args.sourceId ? { sourceId: args.sourceId } : {}),
   });
 
-  await ctx.db.patch(args.userId, { xpPoints: user.xpPoints + awarded });
-  return { awarded, duplicate: false, capped: awarded < amount };
+  const nextXp = user.xpPoints + awarded;
+  await ctx.db.patch(args.userId, { xpPoints: nextXp });
+  const { crossed, newLevel } = crossedLevelBoundary(user.xpPoints, nextXp);
+  return {
+    awarded,
+    duplicate: false,
+    capped: awarded < amount,
+    levelUp: crossed,
+    newLevel: crossed ? newLevel : undefined,
+  };
 }
 
 export const awardXp = mutation({

@@ -26,6 +26,123 @@ import type { Id } from "@/convex/_generated/dataModel";
 
 const MAX_EXPERTISE = 8;
 
+function CreateCohortModal({
+  open,
+  onClose,
+  mentorId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  mentorId: Id<"learnhub_users">;
+}) {
+  const paths = useQuery(api.learnhub_learning_paths.listAvailablePaths, open ? {} : "skip");
+  const createCohort = useMutation(api.learnhub_groups.createLearningCohort);
+  const [pathId, setPathId] = useState<string>("");
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [regionScope, setRegionScope] = useState("");
+  const [capacity, setCapacity] = useState<number>(12);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [emoji, setEmoji] = useState("🚀");
+  const [creating, setCreating] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  if (!open) return null;
+
+  const submit = async () => {
+    if (!pathId || !name || !startDate) {
+      setErr("Path, name, and start date are required.");
+      return;
+    }
+    setCreating(true);
+    setErr(null);
+    try {
+      await createCohort({
+        actorId: mentorId,
+        pathId: pathId as Id<"learnhub_learning_paths">,
+        name,
+        description,
+        regionScope: regionScope || undefined,
+        capacity: capacity || undefined,
+        startDate,
+        endDate: endDate || undefined,
+        coverEmoji: emoji,
+        publish: true,
+      });
+      onClose();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}>
+      <div style={{ background: "#111323", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16, padding: 24, width: 480, maxWidth: "90vw", maxHeight: "90vh", overflowY: "auto" }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700, color: "#e8eaf4", margin: "0 0 16px" }}>Create a {ORG_CONFIG.cohortLabel.toLowerCase()}</h2>
+
+        <label style={{ display: "block", marginBottom: 12 }}>
+          <span style={{ fontSize: 11, color: "#9ba3cc", display: "block", marginBottom: 4 }}>Path</span>
+          <select value={pathId} onChange={(e) => setPathId(e.target.value)} style={{ width: "100%", padding: 8, borderRadius: 8, background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "#e8eaf4" }}>
+            <option value="">Pick a path…</option>
+            {paths?.map((p) => (
+              <option key={p._id} value={p._id}>{p.title} · {p.moduleCount} modules</option>
+            ))}
+          </select>
+        </label>
+
+        <label style={{ display: "block", marginBottom: 12 }}>
+          <span style={{ fontSize: 11, color: "#9ba3cc", display: "block", marginBottom: 4 }}>Cohort name</span>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Web Dev Wave 1" style={{ width: "100%", padding: 8, borderRadius: 8, background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "#e8eaf4" }} />
+        </label>
+
+        <label style={{ display: "block", marginBottom: 12 }}>
+          <span style={{ fontSize: 11, color: "#9ba3cc", display: "block", marginBottom: 4 }}>Description</span>
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} style={{ width: "100%", padding: 8, borderRadius: 8, background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "#e8eaf4" }} />
+        </label>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+          <label>
+            <span style={{ fontSize: 11, color: "#9ba3cc", display: "block", marginBottom: 4 }}>Region (optional)</span>
+            <input value={regionScope} onChange={(e) => setRegionScope(e.target.value)} placeholder="e.g. Bicol" style={{ width: "100%", padding: 8, borderRadius: 8, background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "#e8eaf4" }} />
+          </label>
+          <label>
+            <span style={{ fontSize: 11, color: "#9ba3cc", display: "block", marginBottom: 4 }}>Capacity</span>
+            <input type="number" value={capacity} onChange={(e) => setCapacity(Number(e.target.value))} min={2} max={50} style={{ width: "100%", padding: 8, borderRadius: 8, background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "#e8eaf4" }} />
+          </label>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+          <label>
+            <span style={{ fontSize: 11, color: "#9ba3cc", display: "block", marginBottom: 4 }}>Start date</span>
+            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{ width: "100%", padding: 8, borderRadius: 8, background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "#e8eaf4" }} />
+          </label>
+          <label>
+            <span style={{ fontSize: 11, color: "#9ba3cc", display: "block", marginBottom: 4 }}>End date (optional)</span>
+            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={{ width: "100%", padding: 8, borderRadius: 8, background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "#e8eaf4" }} />
+          </label>
+        </div>
+
+        <label style={{ display: "block", marginBottom: 16 }}>
+          <span style={{ fontSize: 11, color: "#9ba3cc", display: "block", marginBottom: 4 }}>Cover emoji</span>
+          <input value={emoji} onChange={(e) => setEmoji(e.target.value)} maxLength={4} style={{ width: 80, padding: 8, borderRadius: 8, background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "#e8eaf4", fontSize: 22, textAlign: "center" }} />
+        </label>
+
+        {err && <p style={{ color: "#fca5a5", fontSize: 12, margin: "8px 0" }}>{err}</p>}
+
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <button onClick={onClose} style={{ padding: "8px 16px", borderRadius: 99, background: "transparent", color: "#e8eaf4", border: "1px solid rgba(255,255,255,0.1)", cursor: "pointer" }}>Cancel</button>
+          <button onClick={submit} disabled={creating} style={{ padding: "8px 16px", borderRadius: 99, background: "linear-gradient(135deg,#f97316,#ef4444)", color: "#fff", border: "none", fontWeight: 600, cursor: "pointer" }}>
+            {creating ? "Creating…" : "Create & Publish"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function MentorProfilePage() {
   const { userId, role, loading } = useLearnhubSession();
   const uid = userId ? (userId as Id<"learnhub_users">) : null;
@@ -40,6 +157,12 @@ export default function MentorProfilePage() {
   const [customDraft, setCustomDraft] = useState("");
   const [maxMentees, setMaxMentees] = useState<number>(5);
   const [docUrl, setDocUrl] = useState("");
+  const [showCreateCohort, setShowCreateCohort] = useState(false);
+
+  const myCohorts = useQuery(
+    api.learnhub_groups.listLedCohorts,
+    uid ? { mentorId: uid } : "skip",
+  );
 
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -319,6 +442,57 @@ export default function MentorProfilePage() {
         </div>
       </Section>
 
+      <Section title={`My ${ORG_CONFIG.squadLabel.toLowerCase()}`}>
+        {myCohorts === undefined ? (
+          <p className="text-xs" style={{ color: "#9ba3cc" }}>Loading…</p>
+        ) : myCohorts.length === 0 ? (
+          <div className="flex items-center justify-between">
+            <p className="text-xs m-0" style={{ color: "#9ba3cc" }}>
+              You haven't led a {ORG_CONFIG.cohortLabel.toLowerCase()} yet. Lead a group of learners through one of the existing paths.
+            </p>
+            {isVerified && (
+              <button
+                onClick={() => setShowCreateCohort(true)}
+                className="rounded-xl px-3 py-1.5 text-xs font-semibold"
+                style={{ background: "linear-gradient(135deg,#f97316,#ef4444)", color: "#fff", border: "none", cursor: "pointer" }}
+              >
+                + Create {ORG_CONFIG.cohortLabel.toLowerCase()}
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
+              {myCohorts.map((c) => (
+                <Link
+                  key={c.group._id}
+                  href={`/learnhub/squads/${c.group._id}`}
+                  className="rounded-xl p-3 flex items-center gap-3"
+                  style={{ background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.06)", textDecoration: "none", color: "#e8eaf4" }}
+                >
+                  <span style={{ fontSize: 22 }}>{c.group.coverEmoji ?? "🚀"}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{c.group.name}</div>
+                    <div style={{ fontSize: 11, color: "#9ba3cc" }}>
+                      {c.group.memberCount} members · {c.status}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+            {isVerified && (
+              <button
+                onClick={() => setShowCreateCohort(true)}
+                className="rounded-xl px-3 py-1.5 text-xs font-semibold"
+                style={{ background: "rgba(255,255,255,0.08)", color: "#e8eaf4", border: "1px solid rgba(255,255,255,0.1)", cursor: "pointer" }}
+              >
+                + Create another {ORG_CONFIG.cohortLabel.toLowerCase()}
+              </button>
+            )}
+          </>
+        )}
+      </Section>
+
       <Section title="Capacity">
         <Field label={`Max mentees (1–20) — ${maxMentees}`}>
           <input
@@ -390,6 +564,14 @@ export default function MentorProfilePage() {
         </button>
         {savedAt && <span className="text-xs" style={{ color: "#22c55e" }}>✓ Saved</span>}
       </div>
+
+      {uid && (
+        <CreateCohortModal
+          open={showCreateCohort}
+          onClose={() => setShowCreateCohort(false)}
+          mentorId={uid}
+        />
+      )}
     </div>
   );
 }

@@ -67,6 +67,12 @@ export const ORG_CONFIG = Object.freeze({
   programs,
   /** Color per program name. */
   programColors: DEFAULT_PROGRAM_COLORS,
+  /** Plural label for the cohort-discovery nav surface, e.g. "Squads" / "Barkadas". */
+  squadLabel: envOr("NEXT_PUBLIC_LEARNHUB_SQUAD_LABEL", "Squads"),
+  /** Singular label for one cohort, used in body copy and CTAs. */
+  cohortLabel: envOr("NEXT_PUBLIC_LEARNHUB_COHORT_LABEL", "Cohort"),
+  /** Honorific for a verified mentor, e.g. "Kuya/Ate" in Philippines deployments. */
+  mentorTitle: envOr("NEXT_PUBLIC_LEARNHUB_MENTOR_TITLE", "Mentor"),
 });
 
 export type OrgConfig = typeof ORG_CONFIG;

@@ -158,7 +158,7 @@ export default function LearningPathPage() {
 
       {/* Tab content */}
       {tab === "paths" && (
-        <PathsTab overview={overview ?? undefined} />
+        <PathsTab overview={overview ?? undefined} userId={uid} />
       )}
       {tab === "courses" && (
         <CoursesTab courses={courses} sessions={inProgressSessions} completed={overview?.sessionsCompleted ?? []} />
@@ -269,7 +269,7 @@ function StatTile({ icon, label, value, color }: { icon: React.ReactNode; label:
 
 type OverviewResult = NonNullable<ReturnType<typeof useQuery<typeof api.learnhub_progress.getLearnerOverview>>>;
 
-function PathsTab({ overview }: { overview: OverviewResult | undefined }) {
+function PathsTab({ overview, userId }: { overview: OverviewResult | undefined; userId: Id<"learnhub_users"> }) {
   if (overview === undefined) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -305,8 +305,9 @@ function PathsTab({ overview }: { overview: OverviewResult | undefined }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {overview.paths.map((p) => (
-        <PathCard key={p.pathId as unknown as string} path={p} />
+        <PathCard key={p.pathId as unknown as string} path={p} userId={userId} />
       ))}
+      <AuthoredPathsRail userId={userId} />
       {overview.goals.length > 0 && (
         <div style={{ marginTop: 6 }}>
           <h3 style={{ margin: "8px 0", fontSize: 12.5, color: "#9ba3cc", letterSpacing: 1.2, textTransform: "uppercase" }}>Goals</h3>
@@ -326,6 +327,23 @@ function PathsTab({ overview }: { overview: OverviewResult | undefined }) {
                     {formatDistanceToNow(g.deadline, { addSuffix: true })}
                   </span>
                 )}
+                {!g.completedAt && (
+                  g.pathId ? (
+                    <Link
+                      href={`/learnhub/learning-path/${g.pathId}`}
+                      style={{ fontSize: 11, fontWeight: 600, color: INDIGO, textDecoration: "none", padding: "4px 10px", borderRadius: 99, border: `1px solid rgba(91,108,255,0.3)`, whiteSpace: "nowrap" }}
+                    >
+                      Continue →
+                    </Link>
+                  ) : (
+                    <Link
+                      href={`/learnhub/learning-path/create?goalId=${g._id}`}
+                      style={{ fontSize: 11, fontWeight: 600, color: ORANGE, textDecoration: "none", padding: "4px 10px", borderRadius: 99, border: `1px solid rgba(249,115,22,0.3)`, whiteSpace: "nowrap" }}
+                    >
+                      Create path →
+                    </Link>
+                  )
+                )}
               </div>
             ))}
           </div>
@@ -335,11 +353,87 @@ function PathsTab({ overview }: { overview: OverviewResult | undefined }) {
   );
 }
 
-function PathCard({ path }: { path: OverviewResult["paths"][number] }) {
+function AuthoredPathsRail({ userId }: { userId: Id<"learnhub_users"> }) {
+  const authored = useQuery(api.learnhub_learning_paths.listAuthoredPaths, {
+    authorId: userId,
+    includeDrafts: true,
+  });
+  if (!authored || authored.length === 0) return null;
+  return (
+    <div style={{ marginTop: 6 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "8px 0" }}>
+        <h3 style={{ margin: 0, fontSize: 12.5, color: "#9ba3cc", letterSpacing: 1.2, textTransform: "uppercase" }}>Authored</h3>
+        <Link href="/learnhub/learning-path/create" style={{ fontSize: 11, color: INDIGO, textDecoration: "none" }}>+ New path</Link>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {authored.map((p) => (
+          <Link
+            key={p._id}
+            href={`/learnhub/learning-path/${p._id}`}
+            style={{
+              padding: "10px 14px", borderRadius: 10,
+              background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)",
+              display: "flex", alignItems: "center", gap: 10, textDecoration: "none", color: "#e8eaff",
+            }}
+          >
+            <span style={{ fontSize: 16 }}>{p.coverEmoji ?? "📚"}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{p.title}</div>
+              <div style={{ fontSize: 11, color: "#9ba3cc" }}>
+                {p.moduleCount} modules · {p.visibility}{!p.published ? " · draft" : ""}
+                {p.enrollmentCount > 0 && ` · ${p.enrollmentCount} enrolled`}
+              </div>
+            </div>
+            {!p.published && (
+              <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 99, background: "rgba(251,191,36,0.14)", color: "#fbbf24", fontWeight: 600 }}>
+                DRAFT
+              </span>
+            )}
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PathCard({ path, userId }: { path: OverviewResult["paths"][number]; userId: Id<"learnhub_users"> }) {
   const isComplete = path.completedAt !== null;
   const continueHref = path.nextPostId
     ? `/learnhub/feed?post=${path.nextPostId}#post-${path.nextPostId}`
     : "/learnhub/feed";
+
+  const enrollment = useQuery(
+    api.learnhub_learning_paths.getMyEnrollment,
+    { userId, pathId: path.pathId as Id<"learnhub_learning_paths"> },
+  );
+  const attempt = useMutation(api.learnhub_learning_paths.attemptModuleCompletion);
+  const [attempting, setAttempting] = useState(false);
+  const [gateMessage, setGateMessage] = useState<string | null>(null);
+
+  const handleMarkComplete = async () => {
+    if (!enrollment || isComplete) return;
+    setAttempting(true);
+    setGateMessage(null);
+    try {
+      const result = await attempt({
+        userId,
+        enrollmentId: enrollment._id,
+        moduleIndex: enrollment.currentModuleIndex,
+      });
+      if (!result.advanced) {
+        setGateMessage(result.reason ?? "Unable to advance");
+      } else if (result.bayanihan) {
+        setGateMessage(`✓ Advanced +${result.xp} XP (bayanihan boost)`);
+      } else {
+        setGateMessage(`✓ Advanced +${result.xp} XP`);
+      }
+    } catch (e) {
+      setGateMessage((e as Error).message);
+    } finally {
+      setAttempting(false);
+    }
+  };
+
   return (
     <div className="lh-path-card" style={{
       padding: 16, borderRadius: 14,
@@ -395,19 +489,41 @@ function PathCard({ path }: { path: OverviewResult["paths"][number] }) {
             <span style={{ color: "#cdd2e6", fontWeight: 600 }}>Next:</span> {path.currentModuleTitle}
           </p>
         )}
+        {gateMessage && (
+          <p style={{ margin: "6px 0 0", fontSize: 11, color: gateMessage.startsWith("✓") ? GREEN : "#fca5a5" }}>
+            {gateMessage}
+          </p>
+        )}
       </div>
 
-      <Link href={continueHref} style={{
-        padding: "10px 16px", borderRadius: 999, textDecoration: "none",
-        background: isComplete ? "rgba(255,255,255,0.05)" : `linear-gradient(135deg, ${ORANGE}, #ea580c)`,
-        color: isComplete ? "#9ba3cc" : "white",
-        border: isComplete ? "1px solid rgba(255,255,255,0.08)" : "none",
-        fontSize: 12.5, fontWeight: 700,
-        display: "inline-flex", alignItems: "center", gap: 6,
-        whiteSpace: "nowrap",
-      }}>
-        {isComplete ? "Review" : "Continue"} <ArrowRight size={14} />
-      </Link>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "stretch" }}>
+        <Link href={continueHref} style={{
+          padding: "10px 16px", borderRadius: 999, textDecoration: "none",
+          background: isComplete ? "rgba(255,255,255,0.05)" : `linear-gradient(135deg, ${ORANGE}, #ea580c)`,
+          color: isComplete ? "#9ba3cc" : "white",
+          border: isComplete ? "1px solid rgba(255,255,255,0.08)" : "none",
+          fontSize: 12.5, fontWeight: 700,
+          display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
+          whiteSpace: "nowrap",
+        }}>
+          {isComplete ? "Review" : "Continue"} <ArrowRight size={14} />
+        </Link>
+        {!isComplete && enrollment && (
+          <button
+            onClick={handleMarkComplete}
+            disabled={attempting}
+            style={{
+              padding: "6px 12px", borderRadius: 99,
+              background: "transparent", color: "#cdd2e6",
+              border: "1px solid rgba(255,255,255,0.12)",
+              fontSize: 11, fontWeight: 600, cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {attempting ? "Checking…" : `Mark M${enrollment.currentModuleIndex + 1} complete`}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

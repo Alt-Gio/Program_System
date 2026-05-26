@@ -1,0 +1,36 @@
+{
+  "name": "DTC Meeting Hall — DICT Region V",
+  "short_name": "DTC Hall",
+  "description": "Book the Digital Transformation Center meeting hall at DICT Region V. Works offline — submissions sync when you're back online.",
+  "id": "/meeting-hall?source=pwa",
+  "start_url": "/meeting-hall",
+  "scope": "/meeting-hall",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#06060f",
+  "theme_color": "#06060f",
+  "lang": "en-PH",
+  "categories": ["government", "productivity", "business"],
+  "icons": [
+    {
+      "src": "/icons/dtc-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/dtc-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Request Booking",
+      "short_name": "Book",
+      "description": "Submit a new booking request",
+      "url": "/meeting-hall?open=book"
+    }
+  ]
+}

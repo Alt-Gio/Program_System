@@ -1,0 +1,48 @@
+{
+  "name": "DTC Intern Portal — DICT Region V",
+  "short_name": "DTC Intern",
+  "description": "Intern portal for DICT Region V — habits, tasks, journal, QR check-in. Works offline; entries sync when you reconnect.",
+  "id": "/intern/dashboard?source=pwa",
+  "start_url": "/intern/dashboard",
+  "scope": "/intern",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "lang": "en-PH",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/intern-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/intern-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "QR Check-in",
+      "short_name": "Check-in",
+      "description": "Scan or display your attendance QR",
+      "url": "/intern/qr-checkin"
+    },
+    {
+      "name": "Habits",
+      "short_name": "Habits",
+      "description": "Log today's habits",
+      "url": "/intern/habits"
+    },
+    {
+      "name": "Journal",
+      "short_name": "Journal",
+      "description": "Open the daily journal",
+      "url": "/intern/journal"
+    }
+  ]
+}

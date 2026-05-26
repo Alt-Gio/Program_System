@@ -9,7 +9,7 @@
  * any single one.
  */
 
-import { query } from "./_generated/server";
+import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 
@@ -200,6 +200,14 @@ export const getDashboard = query({
       }),
     );
 
+    // Phase 9.C — calendar connection status for the Today banner.
+    const calCreds = await ctx.db
+      .query("learnhub_google_credentials")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .first();
+    const calendarConnected = calCreds !== null;
+    const calendarPromptDismissedAt = user.calendarPromptDismissedAt ?? null;
+
     return {
       user: {
         name: user.name,
@@ -218,6 +226,16 @@ export const getDashboard = query({
       continueLearning,
       recommendedMentors,
       freshPosts,
+      calendarConnected,
+      calendarPromptDismissedAt,
     };
+  },
+});
+
+// Phase 9.C — dismiss the Today calendar banner for 14 days.
+export const dismissCalendarPrompt = mutation({
+  args: { userId: v.id("learnhub_users") },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.userId, { calendarPromptDismissedAt: Date.now() });
   },
 });

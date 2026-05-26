@@ -38,6 +38,7 @@ export default function TodayPage() {
     uid ? { userId: uid } : "skip",
   );
   const logHabit = useMutation(api.learnhub_habits.logHabit);
+  const dismissCalendarPrompt = useMutation(api.learnhub_today.dismissCalendarPrompt);
 
   if (loading) {
     return <div className="px-4 py-10" style={{ color: "#9ba3cc" }}>Loading…</div>;
@@ -62,11 +63,54 @@ export default function TodayPage() {
 
   const firstName = dashboard.user.name.split(" ")[0];
 
+  // Phase 9.C — show calendar banner if not connected AND not dismissed in last 14 days.
+  const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
+  const calendarDismissed =
+    dashboard.calendarPromptDismissedAt &&
+    Date.now() - dashboard.calendarPromptDismissedAt < FOURTEEN_DAYS_MS;
+  const showCalendarBanner = !dashboard.calendarConnected && !calendarDismissed;
+
   return (
     <div
       className="px-4 py-6 max-w-3xl mx-auto"
       style={{ color: "#e8eaff", fontFamily: "var(--font-dm-sans, 'Inter', sans-serif)" }}
     >
+      {/* Phase 9.C — Calendar connect banner */}
+      {showCalendarBanner && (
+        <div
+          className="mb-4 rounded-2xl p-4 flex items-center gap-3"
+          style={{
+            background: "linear-gradient(135deg, rgba(91,108,255,0.15), rgba(34,211,160,0.08))",
+            border: "1px solid rgba(91,108,255,0.3)",
+          }}
+        >
+          <span style={{ fontSize: 22 }}>📅</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold" style={{ color: "#e8eaff" }}>
+              Connect Google Calendar
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: "#9ba3cc" }}>
+              See and create real Calendar events with Meet links from inside LearnHub.
+            </p>
+          </div>
+          <a
+            href="/api/learnhub/calendar/connect?returnTo=/learnhub/today"
+            className="rounded-full px-4 py-2 text-xs font-semibold whitespace-nowrap"
+            style={{ background: "#5b6cff", color: "#fff", textDecoration: "none" }}
+          >
+            Connect
+          </a>
+          <button
+            onClick={() => dismissCalendarPrompt({ userId: uid })}
+            className="text-xs opacity-50 hover:opacity-100"
+            style={{ background: "transparent", border: "none", color: "#9ba3cc", cursor: "pointer" }}
+            title="Dismiss for 14 days"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Greeting */}
       <header className="mb-5 flex items-start justify-between gap-3 flex-wrap">
         <div>

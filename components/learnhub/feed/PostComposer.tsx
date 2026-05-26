@@ -121,6 +121,23 @@ export function PostComposer({ onPost, userId, userName, userAvatar, userRole }:
 
   const [expanded, setExpanded] = useState(false);
   const [content, setContent] = useState("");
+
+  // PWA Web Share Target hand-off. /learnhub/share writes the shared text
+  // here before redirecting into the feed; consume once on mount so it
+  // pre-populates the composer and doesn't keep re-applying on rerender.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const shared = sessionStorage.getItem("learnhub:shared-draft");
+      if (shared) {
+        sessionStorage.removeItem("learnhub:shared-draft");
+        setContent(shared);
+        setExpanded(true);
+      }
+    } catch {
+      // Private mode / disabled storage — share target silently drops.
+    }
+  }, []);
   const [type, setType] = useState<PostTypeValue>("text");
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [meetLink, setMeetLink] = useState("");

@@ -11,6 +11,9 @@ import {
   INTEREST_CATEGORIES,
   normalizeInterest,
 } from "@/lib/learnhub/interests";
+import { useLocale } from "@/lib/i18n/LocaleProvider";
+import { LOCALES, type Locale } from "@/lib/i18n/translations";
+import InstallAppButton from "@/components/InstallAppButton";
 
 const FEED_COLUMN_OPTIONS: Array<{ value: number; label: string; sub: string }> = [
   { value: 1, label: "1 column", sub: "Single, full-width cards" },
@@ -50,6 +53,7 @@ function SettingsPageInner() {
   const { userId } = useLearnhubSession();
   const sp = useSearchParams();
   const router = useRouter();
+  const { locale, setLocale, t } = useLocale();
   const [pushEnabled, setPushEnabled] = useState(false);
   const [emailDigest, setEmailDigest] = useState<EmailDigest>("weekly");
   const [quietFrom, setQuietFrom] = useState("");
@@ -292,8 +296,8 @@ function SettingsPageInner() {
   return (
     <div className="max-w-xl mx-auto px-4 py-6">
       <div className="mb-6">
-        <h1 className="text-xl font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>Settings</h1>
-        <p className="text-sm mt-0.5" style={{ color: "#9ba3cc" }}>Manage your LearnHub preferences</p>
+        <h1 className="text-xl font-bold" style={{ color: "#e8eaff", fontFamily: "var(--font-sora)" }}>{t("settings.title")}</h1>
+        <p className="text-sm mt-0.5" style={{ color: "#9ba3cc" }}>{t("settings.subtitle")}</p>
       </div>
 
       {calToast && (
@@ -556,7 +560,9 @@ function SettingsPageInner() {
         </Section>
 
         <Section title="Email Digest">
-          <p className="text-sm" style={{ color: "#9ba3cc" }}>How often would you like a summary email?</p>
+          <p className="text-sm" style={{ color: "#9ba3cc" }}>
+            How often would you like a summary email? Daily lands ~7pm PHT; weekly lands Sunday ~5pm PHT.
+          </p>
           <div className="flex gap-2 flex-wrap">
             {(["daily", "weekly", "never"] as EmailDigest[]).map((opt) => (
               <button key={opt} onClick={() => setEmailDigest(opt)} className="px-4 py-2 rounded-xl text-sm font-medium transition-all capitalize" style={{ background: emailDigest === opt ? "rgba(91,108,255,0.15)" : "rgba(255,255,255,0.04)", color: emailDigest === opt ? "#7c8bff" : "#9ba3cc", border: emailDigest === opt ? "1px solid rgba(91,108,255,0.3)" : "1px solid rgba(255,255,255,0.06)" }}>
@@ -578,6 +584,41 @@ function SettingsPageInner() {
               <label className="text-xs mb-1 block" style={{ color: "#5c6490" }}>To</label>
               <input type="time" value={quietTo} onChange={(e) => setQuietTo(e.target.value)} className="w-full rounded-xl px-3 py-2 text-sm outline-none" style={{ background: "#0d0f1a", border: "1px solid rgba(255,255,255,0.08)", color: "#e8eaff" }} />
             </div>
+          </div>
+        </Section>
+
+        <Section title={t("settings.language.title")}>
+          <p className="text-xs" style={{ color: "#9ba3cc" }}>
+            {t("settings.language.sub")}
+          </p>
+          <div className="flex gap-2 flex-wrap">
+            {LOCALES.map((opt) => {
+              const on = locale === opt.code;
+              return (
+                <button
+                  key={opt.code}
+                  type="button"
+                  onClick={() => setLocale(opt.code as Locale)}
+                  className="px-4 py-2 rounded-xl text-sm font-medium transition-all"
+                  style={{
+                    background: on ? "rgba(91,108,255,0.15)" : "rgba(255,255,255,0.04)",
+                    color: on ? "#7c8bff" : "#9ba3cc",
+                    border: on ? "1px solid rgba(91,108,255,0.3)" : "1px solid rgba(255,255,255,0.06)",
+                  }}
+                >
+                  {opt.native}
+                </button>
+              );
+            })}
+          </div>
+        </Section>
+
+        <Section title={t("settings.install.title")}>
+          <p className="text-xs" style={{ color: "#9ba3cc" }}>
+            {t("settings.install.sub")}
+          </p>
+          <div>
+            <InstallAppButton label={t("btn.install")} variant="primary" />
           </div>
         </Section>
 
@@ -645,6 +686,11 @@ function SettingsPageInner() {
         <button onClick={handleSave} disabled={saving || !userId} className="w-full py-3 rounded-xl font-semibold text-sm transition-all disabled:opacity-40" style={{ background: saved ? "#22d3a0" : "#5b6cff", color: "#fff", fontFamily: "var(--font-sora)" }}>
           {saving ? "Saving…" : saved ? "Saved ✓" : "Save Changes"}
         </button>
+
+        {/* Admin tools — only visible to admin/coordinator roles */}
+        {me && (me.role === "admin" || me.role === "coordinator") && (
+          <AdminToolsSection actorId={me._id} />
+        )}
 
         {/* Danger zone — kept visually distinct so it can't be hit by accident */}
         <div
@@ -735,6 +781,53 @@ function SettingsPageInner() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function AdminToolsSection({ actorId }: { actorId: Id<"learnhub_users"> }) {
+  const seedPaths = useMutation(api.learnhub_seed_paths.seedStarterPaths);
+  const [seeding, setSeeding] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+
+  const handleSeed = async () => {
+    setSeeding(true);
+    setResult(null);
+    try {
+      const r = await seedPaths({ actorId });
+      setResult(`Created ${r.created} starter paths (${r.skipped} already existed).`);
+    } catch (e) {
+      setResult(`Error: ${(e as Error).message}`);
+    } finally {
+      setSeeding(false);
+    }
+  };
+
+  return (
+    <div
+      className="rounded-2xl p-5 flex flex-col gap-3 mt-2"
+      style={{ background: "rgba(91,108,255,0.06)", border: "1px solid rgba(91,108,255,0.2)" }}
+    >
+      <p className="text-sm font-semibold" style={{ color: "#7c8bff", fontFamily: "var(--font-sora)" }}>
+        Admin tools
+      </p>
+      <p className="text-xs" style={{ color: "#9ba3cc" }}>
+        One-click setup for fresh deployments. Each action is idempotent — safe to re-run.
+      </p>
+      <button
+        type="button"
+        onClick={handleSeed}
+        disabled={seeding}
+        className="rounded-xl px-4 py-2 text-sm font-semibold transition-all disabled:opacity-40"
+        style={{ background: "#5b6cff", color: "#fff", alignSelf: "flex-start" }}
+      >
+        {seeding ? "Seeding…" : "Seed starter learning paths"}
+      </button>
+      {result && (
+        <p className="text-xs" style={{ color: result.startsWith("Error") ? "#fca5a5" : "#22c55e" }}>
+          {result}
+        </p>
+      )}
     </div>
   );
 }
