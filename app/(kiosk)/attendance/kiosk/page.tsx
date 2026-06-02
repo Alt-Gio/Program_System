@@ -110,7 +110,8 @@ export default function KioskPage() {
   const reconnTimer    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const greetTimer     = useRef<ReturnType<typeof setTimeout> | null>(null);
   const greetExitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastGreetRef   = useRef<Record<string, number>>({});
+  const lastGreetRef    = useRef<Record<string, number>>({});
+  const lastPresenceRef = useRef<Record<string, number>>({});
   const recogRef       = useRef<{ stop: () => void; start: () => void } | null>(null);
   const voiceActiveRef = useRef(false);
 
@@ -459,7 +460,22 @@ export default function KioskPage() {
           });
         }
 
-        // Trigger greeting for first recognized + non-cooldown face.
+        // Mark EVERY recognized person present in Convex — independent of the
+        // greeting cooldown, so being seen at the kiosk always reflects on the
+        // Personnel page even when the face server has them on greet-cooldown.
+        // Throttled to once per person per 60s; markPresence is idempotent.
+        for (const f of results) {
+          if (!f.recognized || !f.userId) continue;
+          const now   = Date.now();
+          const lastP = lastPresenceRef.current[f.userId] ?? 0;
+          if (now - lastP > 60_000) {
+            lastPresenceRef.current[f.userId] = now;
+            void recordPresence(f); // mark present in Convex + auto-photo
+          }
+        }
+
+        // Trigger the on-screen greeting for the first recognized,
+        // non-cooldown face (separate from presence recording above).
         for (const f of results) {
           if (f.recognized && !f.onCooldown && f.userId) {
             const now  = Date.now();
@@ -467,7 +483,6 @@ export default function KioskPage() {
             if (now - last > 30_000) {
               lastGreetRef.current[f.userId] = now;
               showGreeting(f);
-              void recordPresence(f); // mark present in Convex + photo
               break;
             }
           }
