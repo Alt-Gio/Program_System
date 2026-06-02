@@ -6,6 +6,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import {
   Mail, Building2, List, LayoutGrid, Camera, Loader2, X, Check,
+  History, ChevronDown, ChevronRight, Clock, LogIn, LogOut,
 } from "lucide-react";
 
 // ─── Face server config (mirrors app/(main)/attendance/register/page.tsx) ──
@@ -35,10 +36,15 @@ type Person = {
 };
 
 // ─── Status → styling ──────────────────────────────────────────────
-const STATUS_META: Record<Status, { label: string; ring: string; dot: string; badge: string }> = {
-  present:   { label: "Present",        ring: "ring-green-500", dot: "bg-green-500", badge: "bg-green-100 text-green-800 border-green-200" },
-  traveling: { label: "Traveling / Out", ring: "ring-blue-500",  dot: "bg-blue-500",  badge: "bg-blue-100 text-blue-800 border-blue-200" },
-  absent:    { label: "Absent",         ring: "ring-gray-300",  dot: "bg-gray-400",  badge: "bg-gray-100 text-gray-600 border-gray-200" },
+// Each status colours the WHOLE box: a tinted card body (`card`) plus a solid
+// label band (`band` + `bandLabel`) for a strong at-a-glance board look.
+const STATUS_META: Record<Status, {
+  label: string; bandLabel: string;
+  ring: string; dot: string; badge: string; card: string; band: string;
+}> = {
+  present:   { label: "Present",         bandLabel: "Present",   ring: "ring-green-500", dot: "bg-green-500", badge: "bg-green-100 text-green-800 border-green-200", card: "border-green-300 bg-green-50", band: "bg-green-500" },
+  traveling: { label: "Traveling / Out", bandLabel: "Traveling", ring: "ring-blue-500",  dot: "bg-blue-500",  badge: "bg-blue-100 text-blue-800 border-blue-200",   card: "border-blue-300 bg-blue-50",   band: "bg-blue-500" },
+  absent:    { label: "Absent",          bandLabel: "Absent",    ring: "ring-gray-300",  dot: "bg-gray-400",  badge: "bg-gray-100 text-gray-600 border-gray-200",   card: "border-gray-300 bg-gray-100",  band: "bg-gray-400" },
 };
 
 type Toast = { kind: "ok" | "err"; text: string } | null;
@@ -200,7 +206,7 @@ function Avatar({ person, size }: { person: Person; size: "sm" | "lg" }) {
         />
       ) : (
         <div className={`${dim} flex items-center justify-center rounded-full bg-blue-100 font-bold text-blue-700`}>
-          {person.firstName[0]}{person.lastName[0]}
+          {(person.firstName[0] ?? "") + (person.lastName[0] ?? "")}
         </div>
       )}
       <span
@@ -211,63 +217,140 @@ function Avatar({ person, size }: { person: Person; size: "sm" | "lg" }) {
   );
 }
 
-function StatusBadge({ person }: { person: Person }) {
-  const m = STATUS_META[person.status];
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${m.badge}`}>
-      {m.label}{person.isOverridden ? " (manual)" : ""}
-    </span>
-  );
-}
-
 // ─── Vertical row ──────────────────────────────────────────────────
 function PersonRow({ person, isAdmin, setToast }: PersonProps) {
+  const m = STATUS_META[person.status];
+  const [open, setOpen] = useState(false);
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3">
-      <Avatar person={person} size="sm" />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <p className="truncate font-semibold text-gray-900">
-            {person.firstName} {person.lastName}
-          </p>
-          <StatusBadge person={person} />
-        </div>
-        <p className="mt-0.5 truncate text-xs text-gray-500">{person.position}</p>
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-400">
-          <span className="inline-flex items-center gap-1">
-            <Building2 className="h-3 w-3" />{person.division}
+    <div className={`overflow-hidden rounded-xl border-2 ${m.card}`}>
+      <div className="flex items-stretch">
+        {/* Solid vertical status label band */}
+        <div className={`flex items-center justify-center px-2 ${m.band}`}>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-white [writing-mode:vertical-rl] rotate-180">
+            {m.bandLabel}{person.isOverridden ? " ·M" : ""}
           </span>
-          {person.email && (
-            <span className="inline-flex items-center gap-1">
-              <Mail className="h-3 w-3" /><span className="truncate">{person.email}</span>
-            </span>
-          )}
+        </div>
+        <div className="flex flex-1 items-center gap-3 p-3">
+          <Avatar person={person} size="sm" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-semibold text-gray-900">
+              {person.firstName} {person.lastName}
+            </p>
+            <p className="mt-0.5 truncate text-xs text-gray-600">{person.position}</p>
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500">
+              <span className="inline-flex items-center gap-1">
+                <Building2 className="h-3 w-3" />{person.division}
+              </span>
+              {person.email && (
+                <span className="inline-flex items-center gap-1">
+                  <Mail className="h-3 w-3" /><span className="truncate">{person.email}</span>
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <HistoryToggle open={open} onToggle={() => setOpen((v) => !v)} />
+            {isAdmin && <AdminControls person={person} setToast={setToast} />}
+          </div>
         </div>
       </div>
-      {isAdmin && <AdminControls person={person} setToast={setToast} />}
+      {open && <AttendanceHistoryPanel personId={person._id} />}
     </div>
   );
 }
 
 // ─── Horizontal card ───────────────────────────────────────────────
 function PersonCard({ person, isAdmin, setToast }: PersonProps) {
+  const m = STATUS_META[person.status];
+  const [open, setOpen] = useState(false);
   return (
-    <div className="flex flex-col items-center rounded-xl border border-gray-200 bg-white p-4 text-center">
-      <Avatar person={person} size="lg" />
-      <p className="mt-2 truncate w-full font-semibold text-gray-900">
-        {person.firstName} {person.lastName}
-      </p>
-      <p className="mt-0.5 truncate w-full text-xs text-gray-500">{person.position}</p>
-      <div className="mt-1 inline-flex items-center gap-1 text-xs text-gray-400">
-        <Building2 className="h-3 w-3" />{person.division}
+    <div className={`overflow-hidden rounded-xl border-2 ${m.card}`}>
+      {/* Solid status label band across the top */}
+      <div className={`px-3 py-1.5 text-center ${m.band}`}>
+        <span className="text-xs font-bold uppercase tracking-wider text-white">
+          {m.bandLabel}{person.isOverridden ? " · Manual" : ""}
+        </span>
       </div>
-      <div className="mt-2"><StatusBadge person={person} /></div>
-      {isAdmin && <div className="mt-3 w-full"><AdminControls person={person} setToast={setToast} /></div>}
+      <div className="flex flex-col items-center p-4 text-center">
+        <Avatar person={person} size="lg" />
+        <p className="mt-2 truncate w-full font-semibold text-gray-900">
+          {person.firstName} {person.lastName}
+        </p>
+        <p className="mt-0.5 truncate w-full text-xs text-gray-600">{person.position}</p>
+        <div className="mt-1 inline-flex items-center gap-1 text-xs text-gray-500">
+          <Building2 className="h-3 w-3" />{person.division}
+        </div>
+        <div className="mt-3 flex w-full items-center justify-center gap-1.5">
+          <HistoryToggle open={open} onToggle={() => setOpen((v) => !v)} />
+          {isAdmin && <AdminControls person={person} setToast={setToast} />}
+        </div>
+      </div>
+      {open && <AttendanceHistoryPanel personId={person._id} />}
     </div>
   );
 }
 
 type PersonProps = { person: Person; isAdmin: boolean; setToast: (t: Toast) => void };
+
+// ─── Attendance history follow-ups ─────────────────────────────────
+function HistoryToggle({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      title="Attendance history"
+      className="inline-flex items-center gap-0.5 rounded-lg border border-gray-300 bg-white/80 px-2 py-1.5 text-xs font-medium text-gray-700 hover:bg-white"
+    >
+      <History className="h-3.5 w-3.5" />
+      {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+    </button>
+  );
+}
+
+type HistoryEvent = {
+  _id: string;
+  action: "time_in" | "time_out";
+  timestamp: string;
+  confidence: number;
+};
+
+function AttendanceHistoryPanel({ personId }: { personId: Id<"personnel"> }) {
+  const history = useQuery(api.personnel.attendanceHistory, { id: personId, limit: 20 }) as
+    | HistoryEvent[] | undefined;
+  return (
+    <div className="border-t border-white/70 bg-white/70 px-4 py-2">
+      {history === undefined ? (
+        <p className="py-1 text-xs text-gray-400">Loading history…</p>
+      ) : history.length === 0 ? (
+        <p className="py-1 text-xs text-gray-400">No recognized events in the last 60 days.</p>
+      ) : (
+        <ul className="space-y-1">
+          {history.map((e) => (
+            <li key={e._id} className="flex items-center gap-2 text-xs text-gray-600">
+              {e.action === "time_in"
+                ? <LogIn className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
+                : <LogOut className="h-3.5 w-3.5 text-blue-600 flex-shrink-0" />}
+              <span className="font-medium text-gray-800">
+                {e.action === "time_in" ? "Time in" : "Time out"}
+              </span>
+              <Clock className="h-3 w-3 text-gray-300" />
+              <span>{formatEventTime(e.timestamp)}</span>
+              <span className="ml-auto text-gray-400">{Math.round(e.confidence * 100)}%</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function formatEventTime(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleString(undefined, {
+    month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+  });
+}
 
 // ─── Admin controls: photo upload + status override ────────────────
 function AdminControls({ person, setToast }: { person: Person; setToast: (t: Toast) => void }) {

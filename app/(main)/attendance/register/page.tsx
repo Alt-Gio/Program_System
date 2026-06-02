@@ -4,12 +4,12 @@ import {
   useCallback, useEffect, useMemo, useRef, useState,
 } from "react";
 import Link from "next/link";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import {
   Camera as CameraIcon, UserPlus, CheckCircle, Loader2, X, ArrowLeft, AlertCircle,
-  ServerCrash, Sparkles,
+  ServerCrash, Sparkles, ChevronDown, ChevronRight, Clock, LogIn, LogOut,
 } from "lucide-react";
 
 // ─── Config ──────────────────────────────────────────────────────
@@ -86,12 +86,19 @@ export default function RegisterFacePage() {
     | UserAccount[] | undefined;
   const authUsers    = useQuery(api.auth.listEnrollableAuthUsers, {}) as
     | AuthUser[] | undefined;
+  const positions    = useQuery(api.personnel.listPositions, {}) as
+    | string[] | undefined;
+
+  // Upserts a personnel row when registering a Staff member, returning its id
+  // so the face is enrolled under it (and shows up in the Personnel logbook).
+  const upsertStaff = useMutation(api.personnel.upsertStaff);
 
   const [registered,    setRegistered]    = useState<RegisteredFace[] | null>(null);
   const [selectedKey,   setSelectedKey]   = useState<string>("");
   const [manualName,    setManualName]    = useState("");
   const [manualRole,    setManualRole]    = useState("intern");
   const [manualProgram, setManualProgram] = useState("");
+  const [manualPosition, setManualPosition] = useState("");
   // Only used for the file-upload path. Camera burst never touches this.
   const [photoBlob,     setPhotoBlob]     = useState<Blob | null>(null);
   const [photoName,     setPhotoName]     = useState<string>("");
@@ -215,13 +222,39 @@ export default function RegisterFacePage() {
   };
 
   // ── Resolve who we're registering — shared by burst + single-file paths ─
+  //    Async because the Staff path upserts a personnel record first so the
+  //    face is enrolled under that personnel id (and appears in the logbook).
   //    Throws so callers can surface the error in the toast.
-  const resolveTarget = (): {
+  const resolveTarget = async (): Promise<{
     userId: string; name: string; role: string; program: string;
-  } => {
+  }> => {
     if (selectedKey === MANUAL_OPTION_KEY) {
       const name = manualName.trim();
       if (!name) throw new Error("Enter a name for the person first.");
+
+      // Staff → create/update a Personnel row, enroll under its id.
+      if (manualRole === "readonly") {
+        const position = manualPosition.trim();
+        if (!position) {
+          throw new Error("Pick or type a Position for this staff member.");
+        }
+        const tokens    = name.split(/\s+/);
+        const firstName = tokens.length > 1 ? tokens.slice(0, -1).join(" ") : tokens[0];
+        const lastName  = tokens.length > 1 ? tokens[tokens.length - 1] : "";
+        const personnelId = await upsertStaff({
+          firstName,
+          lastName,
+          position,
+          division: manualProgram.trim(),
+        });
+        return {
+          userId:  personnelId,
+          name,
+          role:    "staff",
+          program: manualProgram.trim(),
+        };
+      }
+
       const slug =
         name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") ||
         "person";
@@ -291,7 +324,7 @@ export default function RegisterFacePage() {
 
     let target;
     try {
-      target = resolveTarget();
+      target = await resolveTarget();
     } catch (e) {
       setMessage({
         kind: "err",
@@ -353,7 +386,7 @@ export default function RegisterFacePage() {
 
     let target;
     try {
-      target = resolveTarget();
+      target = await resolveTarget();
     } catch (e) {
       setMessage({
         kind: "err",
@@ -594,6 +627,33 @@ export default function RegisterFacePage() {
                   ))}
                 </select>
               </label>
+
+              {/* Staff get a Position — pick an existing one from the datalist
+                  or type a new one. On register this upserts a Personnel row. */}
+              {manualRole === "readonly" && (
+                <label className="block space-y-1 sm:col-span-2">
+                  <span className="text-xs font-medium text-gray-700">
+                    Position <span className="text-gray-400">(pick or type)</span>
+                  </span>
+                  <input
+                    type="text"
+                    list="staff-positions"
+                    value={manualPosition}
+                    onChange={(e) => setManualPosition(e.target.value)}
+                    disabled={submitting}
+                    placeholder="e.g. Information Systems Analyst II"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                  <datalist id="staff-positions">
+                    {(positions ?? []).map((p) => (
+                      <option key={p} value={p} />
+                    ))}
+                  </datalist>
+                  <span className="block text-[11px] text-gray-400">
+                    This staff member will appear in the Personnel logbook after registering.
+                  </span>
+                </label>
+              )}
               <label className="block space-y-1">
                 <span className="text-xs font-medium text-gray-700">
                   Program / Division <span className="text-gray-400">(optional)</span>
@@ -736,7 +796,8 @@ export default function RegisterFacePage() {
                 !photoBlob ||
                 submitting ||
                 (!isManual && !selected) ||
-                (isManual && manualName.trim().length === 0)
+                (isManual && manualName.trim().length === 0) ||
+                (isManual && manualRole === "readonly" && manualPosition.trim().length === 0)
               }
               onClick={submit}
               className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
@@ -806,6 +867,148 @@ export default function RegisterFacePage() {
           </div>
         </section>
       </div>
+
+      {/* Staff attendance follow-ups — registered staff with their live status
+          today; expand a row to see their recent time-in / time-out history. */}
+      <StaffFollowUps />
     </div>
   );
+}
+
+// ─── Staff follow-ups (attendance history) ───────────────────────────
+type StaffPerson = {
+  _id: Id<"personnel">;
+  firstName: string;
+  lastName: string;
+  position: string;
+  division: string;
+  status: "present" | "traveling" | "absent";
+  lastEventAt: string | null;
+};
+
+const STATUS_PILL: Record<StaffPerson["status"], string> = {
+  present:   "bg-green-100 text-green-800 border-green-200",
+  traveling: "bg-blue-100 text-blue-800 border-blue-200",
+  absent:    "bg-gray-100 text-gray-600 border-gray-200",
+};
+const STATUS_LABEL: Record<StaffPerson["status"], string> = {
+  present: "Present", traveling: "Traveling / Out", absent: "Absent",
+};
+
+function StaffFollowUps() {
+  const staff = useQuery(api.personnel.listWithStatus, { isActive: true }) as
+    | StaffPerson[] | undefined;
+  const [openId, setOpenId] = useState<Id<"personnel"> | null>(null);
+
+  return (
+    <section className="bg-white rounded-xl border border-gray-200 shadow-sm">
+      <header className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <h2 className="font-semibold text-gray-800">Staff Attendance Follow-ups</h2>
+        <span className="text-xs text-gray-500">
+          {staff === undefined ? "Loading…" : `${staff.length} staff`}
+        </span>
+      </header>
+      <div className="p-2 sm:p-3">
+        {staff === undefined ? (
+          <div className="space-y-2 p-2">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-10 bg-gray-100 rounded-lg animate-pulse" />
+            ))}
+          </div>
+        ) : staff.length === 0 ? (
+          <p className="text-sm text-gray-500 text-center py-6">
+            No staff yet. Register one on the left with Role = Staff.
+          </p>
+        ) : (
+          <ul className="divide-y divide-gray-100">
+            {staff.map((p) => (
+              <StaffFollowUpRow
+                key={p._id}
+                person={p}
+                open={openId === p._id}
+                onToggle={() => setOpenId(openId === p._id ? null : p._id)}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
+  );
+}
+
+type HistoryEvent = {
+  _id: string;
+  action: "time_in" | "time_out";
+  timestamp: string;
+  date: string;
+  confidence: number;
+  cameraId: string;
+};
+
+function StaffFollowUpRow({
+  person, open, onToggle,
+}: { person: StaffPerson; open: boolean; onToggle: () => void }) {
+  // Only fetch history when this row is expanded.
+  const history = useQuery(
+    api.personnel.attendanceHistory,
+    open ? { id: person._id, limit: 20 } : "skip",
+  ) as HistoryEvent[] | undefined;
+
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center gap-2 py-2 px-1 text-left hover:bg-gray-50 rounded-lg"
+      >
+        {open
+          ? <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          : <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />}
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-gray-900 truncate">
+            {person.firstName} {person.lastName}
+          </p>
+          <p className="text-xs text-gray-500 truncate">{person.position} · {person.division}</p>
+        </div>
+        <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${STATUS_PILL[person.status]}`}>
+          {STATUS_LABEL[person.status]}
+        </span>
+      </button>
+
+      {open && (
+        <div className="ml-6 mb-2 mr-1 rounded-lg border border-gray-100 bg-gray-50/60 p-2">
+          {history === undefined ? (
+            <p className="text-xs text-gray-400 px-1 py-2">Loading history…</p>
+          ) : history.length === 0 ? (
+            <p className="text-xs text-gray-400 px-1 py-2">No recognized events in the last 60 days.</p>
+          ) : (
+            <ul className="space-y-1">
+              {history.map((e) => (
+                <li key={e._id} className="flex items-center gap-2 text-xs text-gray-600">
+                  {e.action === "time_in"
+                    ? <LogIn className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
+                    : <LogOut className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />}
+                  <span className="font-medium text-gray-800">
+                    {e.action === "time_in" ? "Time in" : "Time out"}
+                  </span>
+                  <Clock className="w-3 h-3 text-gray-300" />
+                  <span>{formatEventTime(e.timestamp)}</span>
+                  <span className="ml-auto text-gray-400">{Math.round(e.confidence * 100)}%</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </li>
+  );
+}
+
+function formatEventTime(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleString(undefined, {
+    month: "short", day: "numeric",
+    hour: "numeric", minute: "2-digit",
+  });
 }

@@ -132,6 +132,97 @@ export const clearStatusOverride = mutation({
   },
 });
 
+/** Distinct positions already in use — feeds the Position combobox on the
+ *  attendance/register page (pick an existing one or type a new one). */
+export const listPositions = query({
+  args: {},
+  handler: async (ctx) => {
+    const all = await ctx.db.query("personnel").collect();
+    const set = new Set<string>();
+    for (const p of all) if (p.position?.trim()) set.add(p.position.trim());
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  },
+});
+
+/**
+ * Upsert a staff member from the attendance/register flow. Matches an existing
+ * personnel row by normalized full name; updates position/division/email when
+ * found, otherwise inserts. Returns the personnel `_id` so the caller can
+ * enroll the face under it — that id is what `listWithStatus` joins on.
+ */
+export const upsertStaff = mutation({
+  args: {
+    firstName: v.string(),
+    lastName: v.string(),
+    position: v.string(),
+    division: v.string(),
+    email: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const target = normalizeName(`${args.firstName} ${args.lastName}`);
+    const all = await ctx.db.query("personnel").collect();
+    const existing = all.find(
+      (p) => normalizeName(`${p.firstName} ${p.lastName}`) === target,
+    );
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        position: args.position || existing.position,
+        division: args.division || existing.division,
+        email: args.email ?? existing.email,
+        isActive: true,
+      });
+      return existing._id;
+    }
+    return await ctx.db.insert("personnel", {
+      firstName: args.firstName,
+      lastName: args.lastName,
+      position: args.position,
+      division: args.division,
+      email: args.email,
+      isActive: true,
+    });
+  },
+});
+
+/**
+ * Per-person attendance "follow-ups": recent recognized time-in/out events.
+ * Matches on the personnel id (events enrolled under it) AND, as a fallback,
+ * on normalized name across a recent 60-day window — so legacy name-only
+ * enrollments still surface.
+ */
+export const attendanceHistory = query({
+  args: { id: v.id("personnel"), limit: v.optional(v.number()) },
+  handler: async (ctx, { id, limit }) => {
+    const person = await ctx.db.get(id);
+    if (!person) return [];
+    const lim = limit ?? 20;
+
+    const byId = await ctx.db
+      .query("face_attendance")
+      .withIndex("by_user", (q) => q.eq("userId", id))
+      .order("desc")
+      .take(lim * 2);
+
+    const today = new Date().toISOString().split("T")[0];
+    const since = new Date(Date.now() - 60 * 24 * 3600 * 1000)
+      .toISOString()
+      .split("T")[0];
+    const recent = await ctx.db
+      .query("face_attendance")
+      .withIndex("by_date", (q) => q.gte("date", since).lte("date", today))
+      .collect();
+    const target = normalizeName(`${person.firstName} ${person.lastName}`);
+    const byName = recent.filter((r) => normalizeName(r.name) === target);
+
+    const merged = new Map<string, (typeof byId)[number]>();
+    for (const r of [...byId, ...byName]) merged.set(r._id, r);
+
+    return Array.from(merged.values())
+      .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+      .slice(0, lim);
+  },
+});
+
 export const create = mutation({
   args: {
     firstName: v.string(), lastName: v.string(), position: v.string(),
