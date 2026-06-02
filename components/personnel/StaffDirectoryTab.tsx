@@ -7,6 +7,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import {
   Mail, Building2, List, LayoutGrid, Camera, Loader2, X, Check,
   History, ChevronDown, ChevronRight, Clock, LogIn, LogOut,
+  Users, UserCheck, UserX, Plane, Search, Radio, Briefcase,
 } from "lucide-react";
 
 // ─── Face server config (mirrors app/(main)/attendance/register/page.tsx) ──
@@ -54,8 +55,11 @@ export function StaffDirectoryTab() {
     | Person[] | undefined;
 
   const [isAdmin, setIsAdmin] = useState(false);
-  const [layout, setLayout] = useState<Layout>("vertical");
+  const [layout, setLayout] = useState<Layout>("horizontal");
   const [toast, setToast] = useState<Toast>(null);
+  const [q, setQ] = useState("");
+  const [filter, setFilter] = useState<Status | "all">("all");
+  const [now, setNow] = useState(() => new Date());
 
   // Resolve role (admin/manager get the management controls).
   useEffect(() => {
@@ -84,6 +88,12 @@ export function StaffDirectoryTab() {
     try { localStorage.setItem(LAYOUT_KEY, l); } catch { /* ignore */ }
   };
 
+  // Live clock — small touch that makes the board feel alive.
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
   // Auto-dismiss toasts.
   useEffect(() => {
     if (!toast) return;
@@ -97,26 +107,94 @@ export function StaffDirectoryTab() {
     return c;
   }, [personnel]);
 
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return (personnel ?? []).filter((p) => {
+      if (filter !== "all" && p.status !== filter) return false;
+      if (!needle) return true;
+      return (
+        `${p.firstName} ${p.lastName}`.toLowerCase().includes(needle) ||
+        p.position.toLowerCase().includes(needle) ||
+        p.division.toLowerCase().includes(needle) ||
+        (p.email ?? "").toLowerCase().includes(needle)
+      );
+    });
+  }, [personnel, q, filter]);
+
   const loading = personnel === undefined;
+  const total = personnel?.length ?? 0;
 
   return (
     <div className="space-y-4">
-      {/* Header: counts + legend + layout toggle */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          <span className="text-gray-500">{personnel?.length ?? 0} active personnel</span>
-          <span className="h-4 w-px bg-gray-200" />
-          <Legend status="present" count={counts.present} />
-          <Legend status="traveling" count={counts.traveling} />
-          <Legend status="absent" count={counts.absent} />
+      {/* ── Board header: title + live clock ─────────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-gradient-to-r from-slate-50 to-white px-4 py-3 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
+            <Users className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold leading-tight text-gray-900">Attendance Board</h2>
+            <p className="flex items-center gap-1.5 text-xs text-gray-500">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+              </span>
+              Live · {now.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}
+            </p>
+          </div>
         </div>
-        <div className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5">
-          <LayoutButton active={layout === "vertical"} onClick={() => changeLayout("vertical")} label="List view">
-            <List className="h-4 w-4" />
-          </LayoutButton>
-          <LayoutButton active={layout === "horizontal"} onClick={() => changeLayout("horizontal")} label="Grid view">
-            <LayoutGrid className="h-4 w-4" />
-          </LayoutButton>
+        <div className="text-right">
+          <div className="font-mono text-2xl font-bold tabular-nums tracking-tight text-gray-900">
+            {now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+          </div>
+          <p className="text-[11px] uppercase tracking-wide text-gray-400">Local time</p>
+        </div>
+      </div>
+
+      {/* ── Stat tiles (click to filter) ─────────────────────────── */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatTile label="Present" count={counts.present} accent="green" icon={<UserCheck className="h-5 w-5" />}
+          active={filter === "present"} onClick={() => setFilter(filter === "present" ? "all" : "present")} pulse />
+        <StatTile label="Traveling / Out" count={counts.traveling} accent="blue" icon={<Plane className="h-5 w-5" />}
+          active={filter === "traveling"} onClick={() => setFilter(filter === "traveling" ? "all" : "traveling")} />
+        <StatTile label="Absent" count={counts.absent} accent="gray" icon={<UserX className="h-5 w-5" />}
+          active={filter === "absent"} onClick={() => setFilter(filter === "absent" ? "all" : "absent")} />
+        <StatTile label="Total Staff" count={total} accent="slate" icon={<Briefcase className="h-5 w-5" />}
+          active={filter === "all"} onClick={() => setFilter("all")} />
+      </div>
+
+      {/* ── Toolbar: search + layout toggle ──────────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search name, position, division…"
+            className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
+          {q && (
+            <button onClick={() => setQ("")} aria-label="Clear search"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {filter !== "all" && (
+            <button onClick={() => setFilter("all")}
+              className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-200">
+              {STATUS_META[filter].label} <X className="h-3 w-3" />
+            </button>
+          )}
+          <div className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5">
+            <LayoutButton active={layout === "vertical"} onClick={() => changeLayout("vertical")} label="List view">
+              <List className="h-4 w-4" />
+            </LayoutButton>
+            <LayoutButton active={layout === "horizontal"} onClick={() => changeLayout("horizontal")} label="Grid view">
+              <LayoutGrid className="h-4 w-4" />
+            </LayoutButton>
+          </div>
         </div>
       </div>
 
@@ -137,22 +215,31 @@ export function StaffDirectoryTab() {
         </div>
       )}
 
+      {/* ── Board body ───────────────────────────────────────────── */}
       {loading ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {[0, 1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-20 animate-pulse rounded-xl bg-gray-100" />
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+          {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+            <div key={i} className="h-44 animate-pulse rounded-xl bg-gray-100" />
           ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-white py-16 text-center">
+          <Radio className="h-8 w-8 text-gray-300" />
+          <p className="mt-3 text-sm font-medium text-gray-600">No one matches your view</p>
+          <p className="text-xs text-gray-400">
+            {q || filter !== "all" ? "Try clearing the search or filter." : "Register staff from the Attendance page to populate the board."}
+          </p>
         </div>
       ) : layout === "vertical" ? (
         <div className="space-y-2">
-          {(personnel ?? []).map((p) => (
-            <PersonRow key={p._id} person={p} isAdmin={isAdmin} setToast={setToast} />
+          {filtered.map((p) => (
+            <PersonRow key={p._id} person={p} isAdmin={isAdmin} setToast={setToast} now={now} />
           ))}
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-          {(personnel ?? []).map((p) => (
-            <PersonCard key={p._id} person={p} isAdmin={isAdmin} setToast={setToast} />
+          {filtered.map((p) => (
+            <PersonCard key={p._id} person={p} isAdmin={isAdmin} setToast={setToast} now={now} />
           ))}
         </div>
       )}
@@ -161,14 +248,43 @@ export function StaffDirectoryTab() {
 }
 
 // ─── Header helpers ────────────────────────────────────────────────
-function Legend({ status, count }: { status: Status; count: number }) {
-  const m = STATUS_META[status];
+const TILE_ACCENT: Record<string, { ring: string; icon: string; num: string }> = {
+  green: { ring: "ring-green-500 border-green-300 bg-green-50", icon: "bg-green-500", num: "text-green-700" },
+  blue:  { ring: "ring-blue-500 border-blue-300 bg-blue-50",   icon: "bg-blue-500",  num: "text-blue-700" },
+  gray:  { ring: "ring-gray-400 border-gray-300 bg-gray-50",   icon: "bg-gray-400",  num: "text-gray-700" },
+  slate: { ring: "ring-slate-600 border-slate-300 bg-slate-50", icon: "bg-slate-700", num: "text-slate-800" },
+};
+
+function StatTile({
+  label, count, accent, icon, active, onClick, pulse,
+}: {
+  label: string; count: number; accent: keyof typeof TILE_ACCENT;
+  icon: React.ReactNode; active: boolean; onClick: () => void; pulse?: boolean;
+}) {
+  const a = TILE_ACCENT[accent];
   return (
-    <span className="inline-flex items-center gap-1.5 text-gray-600">
-      <span className={`h-2.5 w-2.5 rounded-full ${m.dot}`} />
-      {m.label}
-      <span className="font-semibold text-gray-900">{count}</span>
-    </span>
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        "group flex items-center gap-3 rounded-2xl border bg-white p-3 text-left shadow-sm transition hover:shadow-md " +
+        (active ? `ring-2 ${a.ring}` : "border-gray-200")
+      }
+    >
+      <div className={`relative flex h-11 w-11 items-center justify-center rounded-xl text-white ${a.icon}`}>
+        {icon}
+        {pulse && count > 0 && (
+          <span className="absolute -right-1 -top-1 flex h-3 w-3">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+            <span className="relative inline-flex h-3 w-3 rounded-full border-2 border-white bg-green-500" />
+          </span>
+        )}
+      </div>
+      <div className="min-w-0">
+        <div className={`text-2xl font-bold leading-none tabular-nums ${a.num}`}>{count}</div>
+        <div className="mt-1 truncate text-xs font-medium text-gray-500">{label}</div>
+      </div>
+    </button>
   );
 }
 
@@ -189,6 +305,32 @@ function LayoutButton({
       {children}
     </button>
   );
+}
+
+// ─── Last-seen helper ──────────────────────────────────────────────
+function lastSeen(person: Person): string {
+  if (!person.lastEventAt) return "Not seen today";
+  const d = new Date(person.lastEventAt);
+  const time = isNaN(d.getTime())
+    ? ""
+    : d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const verb = person.lastAction === "time_out" ? "Out" : "In";
+  return time ? `${verb} · ${time}` : person.status;
+}
+
+/** Compact "3m / 2h / 1d ago" relative to `now`. Empty when no event. */
+function relativeAgo(iso: string | null, now: Date): string {
+  if (!iso) return "";
+  const then = new Date(iso).getTime();
+  if (isNaN(then)) return "";
+  const sec = Math.max(0, Math.floor((now.getTime() - then) / 1000));
+  if (sec < 60) return "just now";
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr / 24);
+  return `${day}d ago`;
 }
 
 // ─── Avatar ────────────────────────────────────────────────────────
@@ -218,11 +360,11 @@ function Avatar({ person, size }: { person: Person; size: "sm" | "lg" }) {
 }
 
 // ─── Vertical row ──────────────────────────────────────────────────
-function PersonRow({ person, isAdmin, setToast }: PersonProps) {
+function PersonRow({ person, isAdmin, setToast, now }: PersonProps) {
   const m = STATUS_META[person.status];
   const [open, setOpen] = useState(false);
   return (
-    <div className={`overflow-hidden rounded-xl border-2 ${m.card}`}>
+    <div className={`overflow-hidden rounded-xl border-2 shadow-sm transition hover:shadow-md ${m.card}`}>
       <div className="flex items-stretch">
         {/* Solid vertical status label band */}
         <div className={`flex items-center justify-center px-2 ${m.band}`}>
@@ -248,6 +390,12 @@ function PersonRow({ person, isAdmin, setToast }: PersonProps) {
               )}
             </div>
           </div>
+          <div className="hidden shrink-0 text-right sm:block">
+            <div className="inline-flex items-center gap-1 text-xs font-medium text-gray-600">
+              <Clock className="h-3 w-3 text-gray-400" />{lastSeen(person)}
+            </div>
+            <div className="text-[11px] text-gray-400">{relativeAgo(person.lastEventAt, now)}</div>
+          </div>
           <div className="flex shrink-0 items-center gap-1.5">
             <HistoryToggle open={open} onToggle={() => setOpen((v) => !v)} />
             {isAdmin && <AdminControls person={person} setToast={setToast} />}
@@ -260,16 +408,17 @@ function PersonRow({ person, isAdmin, setToast }: PersonProps) {
 }
 
 // ─── Horizontal card ───────────────────────────────────────────────
-function PersonCard({ person, isAdmin, setToast }: PersonProps) {
+function PersonCard({ person, isAdmin, setToast, now }: PersonProps) {
   const m = STATUS_META[person.status];
   const [open, setOpen] = useState(false);
   return (
-    <div className={`overflow-hidden rounded-xl border-2 ${m.card}`}>
+    <div className={`overflow-hidden rounded-xl border-2 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg ${m.card}`}>
       {/* Solid status label band across the top */}
-      <div className={`px-3 py-1.5 text-center ${m.band}`}>
+      <div className={`flex items-center justify-between px-3 py-1.5 ${m.band}`}>
         <span className="text-xs font-bold uppercase tracking-wider text-white">
           {m.bandLabel}{person.isOverridden ? " · Manual" : ""}
         </span>
+        <span className="text-[10px] font-medium text-white/80">{relativeAgo(person.lastEventAt, now)}</span>
       </div>
       <div className="flex flex-col items-center p-4 text-center">
         <Avatar person={person} size="lg" />
@@ -279,6 +428,9 @@ function PersonCard({ person, isAdmin, setToast }: PersonProps) {
         <p className="mt-0.5 truncate w-full text-xs text-gray-600">{person.position}</p>
         <div className="mt-1 inline-flex items-center gap-1 text-xs text-gray-500">
           <Building2 className="h-3 w-3" />{person.division}
+        </div>
+        <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-medium text-gray-600">
+          <Clock className="h-3 w-3 text-gray-400" />{lastSeen(person)}
         </div>
         <div className="mt-3 flex w-full items-center justify-center gap-1.5">
           <HistoryToggle open={open} onToggle={() => setOpen((v) => !v)} />
@@ -290,7 +442,7 @@ function PersonCard({ person, isAdmin, setToast }: PersonProps) {
   );
 }
 
-type PersonProps = { person: Person; isAdmin: boolean; setToast: (t: Toast) => void };
+type PersonProps = { person: Person; isAdmin: boolean; setToast: (t: Toast) => void; now: Date };
 
 // ─── Attendance history follow-ups ─────────────────────────────────
 function HistoryToggle({ open, onToggle }: { open: boolean; onToggle: () => void }) {

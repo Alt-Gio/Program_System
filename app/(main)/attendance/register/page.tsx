@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { mergePositions } from "@/lib/positions";
 import {
   Camera as CameraIcon, UserPlus, CheckCircle, Loader2, X, ArrowLeft, AlertCircle,
   ServerCrash, Sparkles, ChevronDown, ChevronRight, Clock, LogIn, LogOut,
@@ -645,7 +646,7 @@ export default function RegisterFacePage() {
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                   />
                   <datalist id="staff-positions">
-                    {(positions ?? []).map((p) => (
+                    {mergePositions(positions).map((p) => (
                       <option key={p} value={p} />
                     ))}
                   </datalist>
