@@ -223,6 +223,57 @@ export const attendanceHistory = query({
   },
 });
 
+/**
+ * Resolve an opaque recognized userId (from the face server) to a personnel
+ * record. Used by the kiosk to (a) decide whether to capture a photo and
+ * (b) enrich the greeting. `normalizeId` returns null for non-personnel ids
+ * (guests, user_accounts ids, "manual-..." strings) so this never throws.
+ */
+export const personnelPhotoStatus = query({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    // Uniform shape (no discriminated union) so the client can read fields freely.
+    const empty = {
+      isPersonnel: false, hasPhoto: false,
+      firstName: "", lastName: "", position: "", division: "",
+    };
+    const id = ctx.db.normalizeId("personnel", userId);
+    if (!id) return empty;
+    const p = await ctx.db.get(id);
+    if (!p) return empty;
+    return {
+      isPersonnel: true,
+      hasPhoto: !!p.photoStorageId,
+      firstName: p.firstName,
+      lastName: p.lastName,
+      position: p.position,
+      division: p.division,
+    };
+  },
+});
+
+/**
+ * Auto-fill a personnel display photo from a kiosk capture — ONLY when the
+ * person has no photo yet, so a deliberately uploaded photo is never
+ * overwritten. No-ops safely for non-personnel ids.
+ */
+export const setPhotoIfMissing = mutation({
+  args: { userId: v.string(), storageId: v.id("_storage") },
+  handler: async (ctx, { userId, storageId }) => {
+    const id = ctx.db.normalizeId("personnel", userId);
+    if (!id) return { updated: false as const, reason: "not_personnel" };
+    const person = await ctx.db.get(id);
+    if (!person) return { updated: false as const, reason: "not_found" };
+    if (person.photoStorageId) {
+      // Don't overwrite a curated photo; discard the just-uploaded blob.
+      await ctx.storage.delete(storageId);
+      return { updated: false as const, reason: "has_photo" };
+    }
+    await ctx.db.patch(id, { photoStorageId: storageId });
+    return { updated: true as const };
+  },
+});
+
 export const create = mutation({
   args: {
     firstName: v.string(), lastName: v.string(), position: v.string(),

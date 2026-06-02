@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useConvex } from "convex/react";
+import { api } from "@/convex/_generated/api";
 
 // ── Types ─────────────────────────────────────────────────────────
 type FaceResult = {
@@ -17,13 +19,17 @@ type FaceResult = {
 };
 
 type GreetingState = {
-  visible:  boolean;
-  name:     string;
-  role:     string;
-  program:  string;
-  action:   "time_in" | "time_out";
-  time:     string;
-  initials: string;
+  visible:    boolean;
+  userId:     string;
+  name:       string;
+  role:       string;
+  program:    string;
+  action:     "time_in" | "time_out";
+  status:     "present" | "out";
+  detail:     string;       // "Position · Division" (personnel) or program
+  photoSaved: boolean;
+  time:       string;
+  initials:   string;
 };
 
 type Layout = "landscape" | "portrait";
@@ -56,14 +62,18 @@ function tod(): "morning" | "afternoon" | "evening" {
   return h < 12 ? "morning" : h < 18 ? "afternoon" : "evening";
 }
 
-function buildGreeting(name: string): { title: string; subtitle: string } {
+function buildGreeting(
+  name: string,
+  status: "present" | "out" = "present",
+): { title: string; subtitle: string } {
   const first = name.split(" ")[0] ?? name;
   const h = new Date().getHours();
-  if (h < 10)  return { title: `Good morning, ${first}!`,    subtitle: "Your attendance has been recorded. Have a productive day ahead." };
-  if (h < 12)  return { title: `Welcome back, ${first}!`,    subtitle: "Great to see you. Your morning session is logged." };
-  if (h < 14)  return { title: `Good afternoon, ${first}!`,  subtitle: "Hope you had a great lunch. Attendance logged successfully." };
-  if (h < 18)  return { title: `Welcome, ${first}!`,         subtitle: "Your afternoon attendance is confirmed. Keep it up!" };
-  return        { title: `Good evening, ${first}!`,          subtitle: "Late session logged. Thank you for your dedication." };
+  const greeting = h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+  const title = `${greeting}, ${first}!`;
+  const subtitle = status === "out"
+    ? "You're timed out for today. Thank you — see you next time!"
+    : "You're marked present. Have a productive day ahead!";
+  return { title, subtitle };
 }
 
 function speak(text: string) {
@@ -117,6 +127,9 @@ export default function KioskPage() {
   const [voiceCaption, setVoiceCaption] = useState("");
   const [presentCount, setPresentCount] = useState(0);
   const [scanning,     setScanning]     = useState(false);
+
+  // Convex client for imperative, event-driven reads/writes from the WS handler.
+  const convex = useConvex();
 
   // ── WebSocket URL — picks ws/wss based on page scheme ───────────
   const WS_URL = (
@@ -295,17 +308,22 @@ export default function KioskPage() {
     const time = new Date().toLocaleTimeString("en-PH", {
       hour: "2-digit", minute: "2-digit", hour12: true,
     });
+    const status: "present" | "out" = face.action === "time_out" ? "out" : "present";
     setGreetLeaving(false);
     setGreeting({
-      visible:  true,
-      name:     face.name,
-      role:     face.role ?? "readonly",
-      program:  face.program ?? "",
-      action:   face.action ?? "time_in",
+      visible:    true,
+      userId:     face.userId ?? face.name,
+      name:       face.name,
+      role:       face.role ?? "readonly",
+      program:    face.program ?? "",
+      action:     face.action ?? "time_in",
+      status,
+      detail:     face.program ?? "",
+      photoSaved: false,
       time,
-      initials: initials(face.name),
+      initials:   initials(face.name),
     });
-    speak(buildGreeting(face.name).title);
+    speak(buildGreeting(face.name, status).title);
 
     if (greetTimer.current)     clearTimeout(greetTimer.current);
     if (greetExitTimer.current) clearTimeout(greetExitTimer.current);
@@ -318,6 +336,87 @@ export default function KioskPage() {
       }, 600);
     }, 4500);
   }, []);
+
+  // ── Capture a still JPEG from the live capture canvas (for photo upload) ──
+  const captureStill = useCallback((): Promise<Blob | null> => {
+    return new Promise((resolve) => {
+      const v = videoRef.current;
+      const c = captureRef.current;
+      if (!v || !c || !v.videoWidth) { resolve(null); return; }
+      const ctx = c.getContext("2d");
+      if (!ctx) { resolve(null); return; }
+      c.width  = v.videoWidth;
+      c.height = v.videoHeight;
+      // Mirror to match the selfie-style display.
+      ctx.save();
+      ctx.scale(-1, 1);
+      ctx.drawImage(v, -c.width, 0);
+      ctx.restore();
+      c.toBlob((blob) => resolve(blob), "image/jpeg", 0.85);
+    });
+  }, []);
+
+  // ── Record presence in Convex + auto-fill personnel photo if missing ──
+  //    Fired once per person per 30s (gated by the WS handler). All failures
+  //    are swallowed so the live overlay is never affected.
+  const recordPresence = useCallback(async (face: FaceResult) => {
+    if (!face.userId) return;
+    try {
+      // 1) Mark present (idempotent). Reflect the real status in the greeting.
+      const res = await convex.mutation(api.face_recognition.markPresence, {
+        userId:     face.userId,
+        name:       face.name,
+        confidence: face.confidence,
+        cameraId:   "kiosk",
+        timestamp:  new Date().toISOString(),
+      });
+      const status: "present" | "out" = res.status;
+      const action: "time_in" | "time_out" =
+        res.action ?? (status === "out" ? "time_out" : "time_in");
+
+      // 2) Is this a personnel record? Enrich greeting + maybe save a photo.
+      const info = await convex.query(api.personnel.personnelPhotoStatus, {
+        userId: face.userId,
+      });
+
+      let detail = face.program ?? "";
+      let photoSaved = false;
+
+      if (info.isPersonnel) {
+        detail = info.position
+          ? `${info.position}${info.division ? ` · ${info.division}` : ""}`
+          : detail;
+
+        if (!info.hasPhoto) {
+          const blob = await captureStill();
+          if (blob) {
+            const uploadUrl = await convex.mutation(api.files.generateUploadUrl, {});
+            const up = await fetch(uploadUrl, {
+              method:  "POST",
+              headers: { "Content-Type": blob.type || "image/jpeg" },
+              body:    blob,
+            });
+            if (up.ok) {
+              const { storageId } = await up.json();
+              const saved = await convex.mutation(api.personnel.setPhotoIfMissing, {
+                userId: face.userId, storageId,
+              });
+              photoSaved = saved.updated;
+            }
+          }
+        }
+      }
+
+      // 3) Patch the greeting in place (only if it's still this person's).
+      setGreeting((prev) =>
+        prev && prev.userId === face.userId
+          ? { ...prev, status, action, detail, photoSaved }
+          : prev,
+      );
+    } catch {
+      /* network / Convex hiccup — never break the kiosk display */
+    }
+  }, [convex, captureStill]);
 
   // ── WebSocket ───────────────────────────────────────────────────
   const connectWS = useCallback(() => {
@@ -368,6 +467,7 @@ export default function KioskPage() {
             if (now - last > 30_000) {
               lastGreetRef.current[f.userId] = now;
               showGreeting(f);
+              void recordPresence(f); // mark present in Convex + photo
               break;
             }
           }
@@ -386,7 +486,7 @@ export default function KioskPage() {
 
     ws.onerror = () => setWsStatus("error");
     wsRef.current = ws;
-  }, [WS_URL, drawFaces, showGreeting]);
+  }, [WS_URL, drawFaces, showGreeting, recordPresence]);
 
   // ── Frame capture ───────────────────────────────────────────────
   const sendFrame = useCallback(() => {
@@ -1142,7 +1242,7 @@ export default function KioskPage() {
                   textTransform: "uppercase",
                 }}
               >
-                {greetRole.label}{greeting.program ? ` · ${greeting.program}` : ""}
+                {greetRole.label}{greeting.detail ? ` · ${greeting.detail}` : ""}
               </div>
 
               {/* Greeting text */}
@@ -1156,7 +1256,7 @@ export default function KioskPage() {
                   lineHeight: 1.1,
                   marginBottom: 10,
                 }}>
-                  {buildGreeting(greeting.name).title}
+                  {buildGreeting(greeting.name, greeting.status).title}
                 </div>
                 <div style={{
                   fontFamily: "'Sora', sans-serif",
@@ -1166,8 +1266,27 @@ export default function KioskPage() {
                   lineHeight: 1.5,
                   maxWidth:   400,
                 }}>
-                  {buildGreeting(greeting.name).subtitle}
+                  {buildGreeting(greeting.name, greeting.status).subtitle}
                 </div>
+                {greeting.photoSaved && (
+                  <div style={{
+                    marginTop:     10,
+                    display:       "inline-flex",
+                    alignItems:    "center",
+                    gap:           6,
+                    fontFamily:    "'Sora', sans-serif",
+                    fontSize:      11,
+                    fontWeight:    600,
+                    color:         "#5DD3A8",
+                    letterSpacing: "0.08em",
+                  }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M20 6L9 17l-5-5" stroke="#5DD3A8" strokeWidth="2.5"
+                        strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    Profile photo saved
+                  </div>
+                )}
               </div>
 
               {/* Confirmed pill */}

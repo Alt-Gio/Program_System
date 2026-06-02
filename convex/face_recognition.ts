@@ -139,6 +139,86 @@ export const markAttendanceInternalAction = internalMutation({
   handler: async (ctx, args) => markAttendanceInternal(ctx, args),
 });
 
+/** A re-scan this long after time-in is treated as the person LEAVING (time_out).
+ *  Repeated scans within the window are no-ops, so the kiosk's 30s greet cooldown
+ *  can't flip someone from Present to Out. */
+const OUT_THRESHOLD_MS = 4 * 60 * 60 * 1000; // 4 hours
+
+/**
+ * Browser-callable "mark present" for the kiosk. Unlike `markAttendance`
+ * (every 2nd event of the day becomes time_out), this is idempotent for the
+ * common case of being seen repeatedly while present:
+ *
+ *   - no events today              → insert "time_in"  (Present)
+ *   - last is "time_in",  < 4h ago → no write          (still Present)
+ *   - last is "time_in",  ≥ 4h ago → insert "time_out" (leaving / Out)
+ *   - last is "time_out"           → no write          (already done for today)
+ *
+ * Safe to call on every recognition; the kiosk additionally throttles to once
+ * per person per 30s.
+ */
+export const markPresence = mutation({
+  args: {
+    userId:     v.string(),
+    name:       v.string(),
+    confidence: v.optional(v.number()),
+    cameraId:   v.optional(v.string()),
+    timestamp:  v.optional(v.string()),
+  },
+  handler: async (
+    ctx,
+    { userId, name, confidence, cameraId, timestamp },
+  ): Promise<
+    | { action: "time_in" | "time_out"; status: "present" | "out" }
+    | { action: null; status: "present" | "out"; skipped: string }
+  > => {
+    const ts      = timestamp ?? new Date().toISOString();
+    const rawDate = ts.split("T")[0];
+    const today   = /^\d{4}-\d{2}-\d{2}$/.test(rawDate)
+      ? rawDate
+      : new Date().toISOString().split("T")[0];
+
+    const todays = await ctx.db
+      .query("face_attendance")
+      .withIndex("by_user_date", (q) =>
+        q.eq("userId", userId).eq("date", today),
+      )
+      .collect();
+
+    const insert = async (action: "time_in" | "time_out") => {
+      await ctx.db.insert("face_attendance", {
+        userId,
+        name,
+        confidence: confidence ?? 1,
+        action,
+        cameraId:   cameraId ?? "kiosk",
+        timestamp:  ts,
+        date:       today,
+      });
+    };
+
+    if (todays.length === 0) {
+      await insert("time_in");
+      return { action: "time_in", status: "present" };
+    }
+
+    // Latest event of the day.
+    const last = todays.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
+
+    if (last.action === "time_out") {
+      return { action: null, status: "out", skipped: "already_out" };
+    }
+
+    // last.action === "time_in"
+    const elapsed = Date.now() - Date.parse(last.timestamp);
+    if (Number.isFinite(elapsed) && elapsed >= OUT_THRESHOLD_MS) {
+      await insert("time_out");
+      return { action: "time_out", status: "out" };
+    }
+    return { action: null, status: "present", skipped: "already_present" };
+  },
+});
+
 // ------------------------------------------------------------
 // QUERIES
 // ------------------------------------------------------------
