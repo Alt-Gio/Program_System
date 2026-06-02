@@ -101,6 +101,15 @@ export default defineSchema({
     division: v.string(),
     email: v.optional(v.string()),
     isActive: v.boolean(),
+    // Live attendance logbook fields (additive, optional — no migration).
+    /** Uploaded display photo, which doubles as the face-recognition enrollment image. */
+    photoStorageId: v.optional(v.id("_storage")),
+    /** Admin manual status override; only applied when statusOverrideDate === today. */
+    statusOverride: v.optional(v.union(
+      v.literal("present"), v.literal("traveling"), v.literal("absent"),
+    )),
+    /** YYYY-MM-DD the override was set for. */
+    statusOverrideDate: v.optional(v.string()),
   }).index("by_division", ["division"]),
 
   // ----------------------------------------------------------
