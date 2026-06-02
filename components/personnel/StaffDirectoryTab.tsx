@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, memo } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import {
-  Mail, Building2, List, LayoutGrid, Camera, Loader2, X, Check,
+  Mail, Building2, List, LayoutGrid, Grid3x3, Camera, Loader2, X, Check,
   History, ChevronDown, ChevronRight, Clock, LogIn, LogOut,
   Users, UserCheck, UserX, Plane, Search, Radio, Briefcase,
 } from "lucide-react";
@@ -19,7 +19,8 @@ const MAX_UPLOAD_BYTES = 8 * 1024 * 1024; // 8 MB
 const LAYOUT_KEY = "personnel-logbook-layout";
 
 type Status = "present" | "traveling" | "absent";
-type Layout = "vertical" | "horizontal";
+type Layout = "vertical" | "horizontal" | "compact";
+const LAYOUTS: Layout[] = ["vertical", "horizontal", "compact"];
 
 type Person = {
   _id: Id<"personnel">;
@@ -59,6 +60,7 @@ export function StaffDirectoryTab() {
   const [toast, setToast] = useState<Toast>(null);
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Status | "all">("all");
+  const [selectedId, setSelectedId] = useState<Id<"personnel"> | null>(null);
   const [now, setNow] = useState(() => new Date());
 
   // Resolve role (admin/manager get the management controls).
@@ -81,16 +83,18 @@ export function StaffDirectoryTab() {
   // Persisted layout preference.
   useEffect(() => {
     const saved = typeof window !== "undefined" ? localStorage.getItem(LAYOUT_KEY) : null;
-    if (saved === "vertical" || saved === "horizontal") setLayout(saved);
+    if (saved && (LAYOUTS as string[]).includes(saved)) setLayout(saved as Layout);
   }, []);
   const changeLayout = (l: Layout) => {
     setLayout(l);
     try { localStorage.setItem(LAYOUT_KEY, l); } catch { /* ignore */ }
   };
 
-  // Live clock — small touch that makes the board feel alive.
+  // Coarse "now" for the relative "x ago" labels — updates every 30s (the
+  // strings only change at minute granularity), so the whole board doesn't
+  // re-render every second. The header's seconds clock is isolated in <LiveClock/>.
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
+    const t = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(t);
   }, []);
 
@@ -143,12 +147,7 @@ export function StaffDirectoryTab() {
             </p>
           </div>
         </div>
-        <div className="text-right">
-          <div className="font-mono text-2xl font-bold tabular-nums tracking-tight text-gray-900">
-            {now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-          </div>
-          <p className="text-[11px] uppercase tracking-wide text-gray-400">Local time</p>
-        </div>
+        <LiveClock />
       </div>
 
       {/* ── Stat tiles (click to filter) ─────────────────────────── */}
@@ -191,8 +190,11 @@ export function StaffDirectoryTab() {
             <LayoutButton active={layout === "vertical"} onClick={() => changeLayout("vertical")} label="List view">
               <List className="h-4 w-4" />
             </LayoutButton>
-            <LayoutButton active={layout === "horizontal"} onClick={() => changeLayout("horizontal")} label="Grid view">
+            <LayoutButton active={layout === "horizontal"} onClick={() => changeLayout("horizontal")} label="Card view">
               <LayoutGrid className="h-4 w-4" />
+            </LayoutButton>
+            <LayoutButton active={layout === "compact"} onClick={() => changeLayout("compact")} label="Faces (compact)">
+              <Grid3x3 className="h-4 w-4" />
             </LayoutButton>
           </div>
         </div>
@@ -236,11 +238,37 @@ export function StaffDirectoryTab() {
             <PersonRow key={p._id} person={p} isAdmin={isAdmin} setToast={setToast} now={now} />
           ))}
         </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+      ) : layout === "horizontal" ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((p) => (
             <PersonCard key={p._id} person={p} isAdmin={isAdmin} setToast={setToast} now={now} />
           ))}
+        </div>
+      ) : (
+        // ── Compact "Faces" view: dense face wall + drill-down detail ──
+        <div className="space-y-3">
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10">
+            {filtered.map((p) => (
+              <CompactTile
+                key={p._id}
+                person={p}
+                selected={selectedId === p._id}
+                onSelect={() => setSelectedId(selectedId === p._id ? null : p._id)}
+              />
+            ))}
+          </div>
+          {(() => {
+            const sel = filtered.find((p) => p._id === selectedId);
+            return sel ? (
+              <CompactDetail
+                person={sel}
+                isAdmin={isAdmin}
+                setToast={setToast}
+                now={now}
+                onClose={() => setSelectedId(null)}
+              />
+            ) : null;
+          })()}
         </div>
       )}
     </div>
@@ -307,6 +335,24 @@ function LayoutButton({
   );
 }
 
+/** Self-contained seconds clock — isolated so its 1s tick never re-renders
+ *  the personnel list. */
+function LiveClock() {
+  const [t, setT] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setT(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div className="text-right">
+      <div className="font-mono text-2xl font-bold tabular-nums tracking-tight text-gray-900">
+        {t.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+      </div>
+      <p className="text-[11px] uppercase tracking-wide text-gray-400">Local time</p>
+    </div>
+  );
+}
+
 // ─── Last-seen helper ──────────────────────────────────────────────
 function lastSeen(person: Person): string {
   if (!person.lastEventAt) return "Not seen today";
@@ -360,7 +406,7 @@ function Avatar({ person, size }: { person: Person; size: "sm" | "lg" }) {
 }
 
 // ─── Vertical row ──────────────────────────────────────────────────
-function PersonRow({ person, isAdmin, setToast, now }: PersonProps) {
+const PersonRow = memo(function PersonRow({ person, isAdmin, setToast, now }: PersonProps) {
   const m = STATUS_META[person.status];
   const [open, setOpen] = useState(false);
   return (
@@ -405,10 +451,10 @@ function PersonRow({ person, isAdmin, setToast, now }: PersonProps) {
       {open && <AttendanceHistoryPanel personId={person._id} />}
     </div>
   );
-}
+});
 
 // ─── Horizontal card ───────────────────────────────────────────────
-function PersonCard({ person, isAdmin, setToast, now }: PersonProps) {
+const PersonCard = memo(function PersonCard({ person, isAdmin, setToast, now }: PersonProps) {
   const m = STATUS_META[person.status];
   const [open, setOpen] = useState(false);
   return (
@@ -440,9 +486,85 @@ function PersonCard({ person, isAdmin, setToast, now }: PersonProps) {
       {open && <AttendanceHistoryPanel personId={person._id} />}
     </div>
   );
-}
+});
 
 type PersonProps = { person: Person; isAdmin: boolean; setToast: (t: Toast) => void; now: Date };
+
+// ─── Compact "Faces" tile ──────────────────────────────────────────
+const CompactTile = memo(function CompactTile({
+  person, selected, onSelect,
+}: { person: Person; selected: boolean; onSelect: () => void }) {
+  const m = STATUS_META[person.status];
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      title={`${person.firstName} ${person.lastName} — ${m.label}`}
+      className={
+        "group flex flex-col items-center gap-1.5 rounded-xl border-2 p-2 transition hover:shadow-md " +
+        (selected ? `${m.card} ring-2 ${m.ring}` : `${m.card}`)
+      }
+    >
+      <div className={`relative rounded-full ring-2 ${m.ring} ring-offset-1`}>
+        {person.photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={person.photoUrl}
+            alt={`${person.firstName} ${person.lastName}`}
+            className="h-14 w-14 rounded-full object-cover"
+          />
+        ) : (
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+            {(person.firstName[0] ?? "") + (person.lastName[0] ?? "")}
+          </div>
+        )}
+        <span className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white ${m.dot}`} />
+      </div>
+      <span className="w-full truncate text-center text-[11px] font-semibold text-gray-800">
+        {person.firstName}
+      </span>
+    </button>
+  );
+});
+
+// ─── Compact view drill-down detail panel ──────────────────────────
+function CompactDetail({
+  person, isAdmin, setToast, now, onClose,
+}: PersonProps & { onClose: () => void }) {
+  const m = STATUS_META[person.status];
+  return (
+    <div className={`overflow-hidden rounded-xl border-2 shadow-sm ${m.card}`}>
+      <div className={`flex items-center justify-between px-3 py-1.5 ${m.band}`}>
+        <span className="text-xs font-bold uppercase tracking-wider text-white">
+          {m.bandLabel}{person.isOverridden ? " · Manual" : ""}
+        </span>
+        <button onClick={onClose} aria-label="Close" className="text-white/80 hover:text-white">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="flex flex-wrap items-center gap-3 p-3">
+        <Avatar person={person} size="lg" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-semibold text-gray-900">
+            {person.firstName} {person.lastName}
+          </p>
+          <p className="mt-0.5 truncate text-xs text-gray-600">{person.position}</p>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500">
+            <span className="inline-flex items-center gap-1">
+              <Building2 className="h-3 w-3" />{person.division}
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Clock className="h-3 w-3 text-gray-400" />{lastSeen(person)}
+              <span className="text-gray-400">· {relativeAgo(person.lastEventAt, now)}</span>
+            </span>
+          </div>
+        </div>
+        {isAdmin && <AdminControls person={person} setToast={setToast} />}
+      </div>
+      <AttendanceHistoryPanel personId={person._id} />
+    </div>
+  );
+}
 
 // ─── Attendance history follow-ups ─────────────────────────────────
 function HistoryToggle({ open, onToggle }: { open: boolean; onToggle: () => void }) {
